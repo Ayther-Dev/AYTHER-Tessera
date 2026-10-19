@@ -1,0 +1,149 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-dev",
+      "displayName": "Windows x64 development",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "BUILD_TESTING": "ON",
+        "TESSERA_ENABLE_DIAGNOSTICS": "OFF",
+        "TESSERA_ENGINE_INTEGRATION": "OFF",
+        "TESSERA_RUNTIME_INTEGRATION": "OFF",
+        "TESSERA_BUILD_BACKEND_PROBES": "OFF"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows x64 release",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-diagnostics",
+      "displayName": "Windows x64 AddressSanitizer diagnostics",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "TESSERA_ENABLE_DIAGNOSTICS": "ON"
+      }
+    },
+    {
+      "name": "windows-engine-integration",
+      "displayName": "Installed Engine SDK link check",
+      "inherits": "windows-release",
+      "cacheVariables": {
+        "TESSERA_ENGINE_INTEGRATION": "ON",
+        "TESSERA_ENGINE_PREFIX": "$penv{AYTHER_ENGINE_PREFIX}",
+        "TESSERA_ENGINE_DEPENDENCY_PREFIX": "$penv{AYTHER_ENGINE_DEPENDENCY_PREFIX}"
+      }
+    },
+    {
+      "name": "windows-runtime-integration",
+      "displayName": "Runtime native integration (unavailable)",
+      "inherits": "windows-release",
+      "cacheVariables": {
+        "TESSERA_RUNTIME_INTEGRATION": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-dev",
+      "configurePreset": "windows-dev",
+      "jobs": 2
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "jobs": 2
+    },
+    {
+      "name": "windows-diagnostics",
+      "configurePreset": "windows-diagnostics",
+      "jobs": 2
+    },
+    {
+      "name": "windows-engine-integration",
+      "configurePreset": "windows-engine-integration",
+      "jobs": 2
+    },
+    {
+      "name": "windows-runtime-integration",
+      "configurePreset": "windows-runtime-integration",
+      "jobs": 2
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-dev",
+      "configurePreset": "windows-dev",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-diagnostics",
+      "configurePreset": "windows-diagnostics",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-engine-integration",
+      "configurePreset": "windows-engine-integration",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-runtime-integration",
+      "configurePreset": "windows-runtime-integration",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    }
+  ]
+}

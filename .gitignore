@@ -1,0 +1,16 @@
+/build/
+/out/
+/install/
+/third_party/cache/
+/third_party/backends/
+CMakeUserPresets.json
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
