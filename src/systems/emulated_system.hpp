@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -31,8 +32,17 @@ public:
   [[nodiscard]] virtual const InputState &latched_inputs() const noexcept = 0;
   [[nodiscard]] virtual const Bytes &pixels() const noexcept = 0;
   [[nodiscard]] virtual const Bytes &pcm() const noexcept = 0;
+  [[nodiscard]] virtual bool original_available() const noexcept = 0;
+  [[nodiscard]] virtual std::uint32_t system() const noexcept = 0;
+  [[nodiscard]] virtual std::uint32_t frame_width() const noexcept = 0;
+  [[nodiscard]] virtual std::uint32_t frame_height() const noexcept = 0;
+  [[nodiscard]] virtual std::uint64_t frame_ticks() const noexcept = 0;
+  [[nodiscard]] virtual std::uint64_t tick_hz() const noexcept = 0;
   virtual void step(const InputState &inputs) = 0;
   [[nodiscard]] virtual Bytes machine_record() const = 0;
+  virtual void restore_record(std::span<const std::uint8_t> record,
+                              std::uint64_t frame,
+                              const InputState &inputs) = 0;
   [[nodiscard]] virtual std::vector<RegionData>
   regions(std::uint64_t mask) const = 0;
 };

@@ -13,6 +13,7 @@ Session::Session(std::string id, View rom, View cfg, View pm, View build_id)
   require(config == configuration(backend, build, memory),
           TESSERA_INVALID_ARGUMENT, TESSERA_PHASE_CREATE);
   reset_fault = SystemRegistry::initial_reset_fault(backend, content);
+  initial_sha = sha(state());
 }
 tessera_frame_id_v1 Session::identity() const {
   return {handle, epoch, machine->frame()};
@@ -22,11 +23,11 @@ tessera_session_info_v1 Session::info() const {
   v.frame_id = identity();
   v.generation = generation;
   v.logical_tick = machine->tick();
-  v.tick_hz_num = 60000;
+  v.tick_hz_num = machine->tick_hz();
   v.tick_hz_den = 1;
   v.capabilities = machine->capabilities();
   v.state = TESSERA_SESSION_PAUSED;
-  v.system = 0;
+  v.system = machine->system();
   std::copy(content_sha.begin(), content_sha.end(), v.content_sha256);
   std::copy(build.begin(), build.end(), v.backend_build_id);
   v.pending_transaction = pending ? pending->id : 0;
@@ -35,7 +36,7 @@ tessera_session_info_v1 Session::info() const {
 }
 Bytes Session::state() const {
   Bytes b = text("TSSTATE1");
-  field(b, 1, 6, text("tessera.synthetic"));
+  field(b, 1, 6, text(machine->system() ? "tessera.megadrive.clown" : "tessera.synthetic"));
   scalar(b, 2, 1, 1);
   scalar(b, 3, 1, 0);
   field(b, 4, 5, content_sha);

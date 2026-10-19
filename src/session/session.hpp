@@ -36,7 +36,8 @@ public:
   tessera_session handle{};
   std::uint64_t epoch{1}, generation{1};
   std::string backend;
-  Bytes content, config, memory, content_sha, config_sha, build;
+  Bytes content, config, memory, content_sha, config_sha, build, initial_sha,
+      replay_raw;
   std::unique_ptr<IEmulatedSystem> machine;
   std::optional<Pending> pending;
   std::optional<wire::Trace> replay;
@@ -60,6 +61,9 @@ public:
       validate_inputs(std::span<const tessera_input_assignment_v1>) const;
   void step(const InputState &, tessera_context_v1 &);
   void reset(tessera_context_v1 &);
+  [[nodiscard]] Bytes checkpoint() const;
+  void restore(wire::View checkpoint, wire::View trace,
+               tessera_context_v1 &context);
   void cancel(tessera_context_v1 &, std::uint32_t reason);
   void capture() noexcept;
   void emit(std::uint32_t code) noexcept;

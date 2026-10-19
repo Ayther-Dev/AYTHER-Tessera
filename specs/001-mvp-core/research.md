@@ -1,7 +1,7 @@
 # Investigación y decisiones técnicas del MVP
 
-**Fecha:** 2026-10-19. **Estado:** decisiones aprobadas; Gate 0 cerrado localmente con ClownMDEmu y fase 1 sintética/API/CLI validada. Integración Engine y Mega Drive de producto pendientes.
-Este registro explica decisiones, motivos, alternativas y evidencias; no acredita un backend integrado.
+**Fecha:** 2026-10-19. **Estado:** decisiones aprobadas; Gates 0–3 cerrados localmente con ClownMDEmu, Engine nativo y Mega Drive de producto. Presentación y Runtime pendientes.
+Este registro explica las decisiones iniciales; la evidencia de backend integrado está en [fase 3](../../docs/phase-3-results.md).
 Normas: [constitución](../../docs/constitution.md) y [especificación del MVP](spec.md).
 
 ## R-01 — Integración nativa con AYTHER Engine

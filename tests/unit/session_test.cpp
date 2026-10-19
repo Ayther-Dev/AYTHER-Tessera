@@ -187,7 +187,8 @@ TEST_CASE("Capabilities absent in minimal and expired handles fail without "
   CHECK(s.submit(2, control) == TESSERA_UNSUPPORTED_CAPABILITY);
   std::uint64_t n{};
   CHECK(tessera_checkpoint_export_v1(s.handle, {nullptr, 0}, &n, &s.context) ==
-        TESSERA_UNSUPPORTED_CAPABILITY);
+        TESSERA_BUFFER_TOO_SMALL);
+  CHECK(n > 64);
   CHECK(s.state() == before);
   const auto old = s.handle;
   fx01::expect(tessera_session_close_v1(s.handle, &s.context));
@@ -277,7 +278,7 @@ TEST_CASE("Whole canonical traces reject duplicate contradictory missing "
   }
 }
 
-TEST_CASE("Absent checkpoint operations preserve the accepted transaction and "
+TEST_CASE("Checkpoint export and invalid restore preserve the accepted transaction and "
           "borrowed original views") {
   fx01::Session session;
   fx01::expect(session.step(32));
@@ -289,12 +290,12 @@ TEST_CASE("Absent checkpoint operations preserve the accepted transaction and "
   std::uint64_t required = 123;
   CHECK(tessera_checkpoint_export_v1(session.handle, {nullptr, 0}, &required,
                                      &session.context) ==
-        TESSERA_UNSUPPORTED_CAPABILITY);
-  CHECK(required == 123);
+        TESSERA_BUFFER_TOO_SMALL);
+  CHECK(required > 64);
   CHECK(session.context.phase == TESSERA_PHASE_READ);
   CHECK(tessera_checkpoint_restore_v1(session.handle, {nullptr, 0},
                                       {nullptr, 0}, &session.context) ==
-        TESSERA_UNSUPPORTED_CAPABILITY);
+        TESSERA_CHECKPOINT_INVALID);
   CHECK(session.context.phase == TESSERA_PHASE_RESTORE);
   CHECK(session.state() == before);
   CHECK(session.info().pending_transaction == 91);

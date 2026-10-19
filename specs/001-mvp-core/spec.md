@@ -2,7 +2,7 @@
 
 **Identificador:** `001-mvp-core`  
 **Creada y aprobada:** 2026-10-19  
-**Estado:** aprobada para planificación; implementación y validación pendientes.  
+**Estado:** aprobada; fases 0–3 implementadas y validadas localmente. FX-03, Runtime y aceptación final pendientes.
 **Solicitud:** guardar el MVP aprobado, incorporando la demo de Engine/Lab y
 los fixtures pendientes; actualizarlo con integración nativa Engine→Tessera,
 detección y despacho por consola y mediciones de rendimiento.  

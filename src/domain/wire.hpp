@@ -54,16 +54,18 @@ struct Field {
   std::uint32_t tag, type;
   View data;
 };
-inline std::vector<Field> record(View b) {
+inline std::vector<Field> record(View b,
+                                 tessera_status invalid = TESSERA_INVALID_TRACE,
+                                 std::uint32_t phase = 0) {
   std::vector<Field> out;
   std::uint32_t previous{};
   while (!b.empty()) {
-    require(b.size() >= 16, TESSERA_INVALID_TRACE);
+    require(b.size() >= 16, invalid, phase);
     const auto tag = static_cast<std::uint32_t>(read(b, 0, 4));
     const auto type = static_cast<std::uint32_t>(read(b, 4, 4));
     const auto n = read(b, 8, 8);
     require(tag > previous && type >= 1 && type <= 11 && n <= b.size() - 16,
-            TESSERA_INVALID_TRACE);
+            invalid, phase);
     out.push_back({tag, type, b.subspan(16, static_cast<std::size_t>(n))});
     previous = tag;
     b = b.subspan(16 + static_cast<std::size_t>(n));
@@ -72,12 +74,14 @@ inline std::vector<Field> record(View b) {
 }
 inline View get(const std::vector<Field> &f, std::size_t index,
                 std::uint32_t tag, std::uint32_t type,
-                std::size_t bytes = std::numeric_limits<std::size_t>::max()) {
+                std::size_t bytes = std::numeric_limits<std::size_t>::max(),
+                tessera_status invalid = TESSERA_INVALID_TRACE,
+                std::uint32_t phase = 0) {
   require(index < f.size() && f[index].tag == tag && f[index].type == type,
-          TESSERA_INVALID_TRACE);
+          invalid, phase);
   require(bytes == std::numeric_limits<std::size_t>::max() ||
               f[index].data.size() == bytes,
-          TESSERA_INVALID_TRACE);
+          invalid, phase);
   return f[index].data;
 }
 inline std::vector<View> elements(View b, std::uint64_t maximum) {
@@ -109,10 +113,11 @@ inline Bytes inputs(const InputState &input) {
 }
 inline Bytes configuration(std::string_view id, View build, View memory) {
   Bytes b;
-  scalar(b, 1, 1, 0);
+  const bool megadrive = id == "clownmdemu";
+  scalar(b, 1, 1, megadrive ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE);
   field(b, 2, 6, text(id));
   field(b, 3, 5, build);
-  scalar(b, 4, 1, 0);
+  scalar(b, 4, 1, megadrive ? 1 : 0);
   scalar(b, 5, 1, 48000);
   std::vector<Bytes> map;
   for (std::uint32_t i = 0; i < 8; ++i) {
@@ -126,6 +131,14 @@ inline Bytes configuration(std::string_view id, View build, View memory) {
   }
   field(b, 6, 8, array(map));
   field(b, 7, 5, sha(memory));
+  if (megadrive) {
+    scalar(b, 8, 1, 895780);
+    scalar(b, 9, 1, 53693175);
+    scalar(b, 10, 1, 1);
+    scalar(b, 11, 2, 32768);
+    scalar(b, 12, 2, 4096);
+    field(b, 13, 6, text("integer-causal-ZOH-v1;CD-disabled-zero-required;zero-initialized-upstream-options"));
+  }
   return b;
 }
 struct Trace {

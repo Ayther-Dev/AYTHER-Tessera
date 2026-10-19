@@ -60,3 +60,59 @@ add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/package_consumer/verify_package.cmake")
 set_tests_properties(package.installed_consumer PROPERTIES
     LABELS "package;integration;phase2" TIMEOUT 180 RUN_SERIAL TRUE)
+
+add_executable(tessera_megadrive_session_test integration/megadrive_session_test.cpp)
+target_include_directories(tessera_megadrive_session_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_definitions(tessera_megadrive_session_test PRIVATE
+    TESSERA_ORIGINAL_ROM="${PROJECT_SOURCE_DIR}/tests/fixtures/ayther-engine-synthetic/ayther_synthetic.md")
+target_link_libraries(tessera_megadrive_session_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_megadrive_session_test)
+add_test(NAME integration.megadrive_session COMMAND tessera_megadrive_session_test)
+set_tests_properties(integration.megadrive_session PROPERTIES LABELS "integration;phase3;MegaDrive" TIMEOUT 45)
+
+add_executable(tessera_audio_fixture_generator backend_probe/main.cpp)
+target_link_libraries(tessera_audio_fixture_generator PRIVATE Tessera::build_options
+    nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_audio_fixture_generator)
+
+add_executable(tessera_state_format_test unit/state_format_test.cpp)
+target_include_directories(tessera_state_format_test PRIVATE "${PROJECT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_state_format_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_state_format_test)
+add_test(NAME unit.state_format COMMAND tessera_state_format_test)
+set_tests_properties(unit.state_format PROPERTIES LABELS "unit;phase3;checkpoint" TIMEOUT 45)
+
+add_executable(tessera_state_store_test integration/state_store_test.cpp)
+target_include_directories(tessera_state_store_test PRIVATE "${PROJECT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_state_store_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_state_store_test)
+add_test(NAME integration.state_store COMMAND tessera_state_store_test)
+set_tests_properties(integration.state_store PROPERTIES LABELS "integration;phase3;checkpoint" TIMEOUT 45)
+
+add_executable(tessera_checkpoint_test integration/checkpoint_test.cpp)
+target_include_directories(tessera_checkpoint_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_checkpoint_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_checkpoint_test)
+add_test(NAME integration.checkpoint COMMAND tessera_checkpoint_test)
+set_tests_properties(integration.checkpoint PROPERTIES
+    LABELS "integration;phase3;checkpoint;FX-01" TIMEOUT 45)
+
+add_executable(tessera_megadrive_replay_test integration/megadrive_replay_test.cpp)
+target_include_directories(tessera_megadrive_replay_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_definitions(tessera_megadrive_replay_test PRIVATE
+    TESSERA_ORIGINAL_ROM="${PROJECT_SOURCE_DIR}/tests/fixtures/ayther-engine-synthetic/ayther_synthetic.md"
+    TESSERA_FX02_MANIFEST="${PROJECT_SOURCE_DIR}/tests/fixtures/audio-active/manifest.json"
+    TESSERA_FX02_GENERATOR_SOURCE="${PROJECT_SOURCE_DIR}/tests/backend_probe/main.cpp")
+target_link_libraries(tessera_megadrive_replay_test PRIVATE Tessera::core Tessera::build_options
+    nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_megadrive_replay_test)
+add_test(NAME integration.megadrive_replay COMMAND tessera_megadrive_replay_test
+    "$<TARGET_FILE:tessera_audio_fixture_generator>" "${PROJECT_BINARY_DIR}/../evidence/phase3-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
+set_tests_properties(integration.megadrive_replay PROPERTIES
+    LABELS "integration;phase3;replay;FX-02;checkpoint" TIMEOUT 900 RUN_SERIAL TRUE)

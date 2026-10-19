@@ -205,9 +205,9 @@ TEST_CASE("synthetic profiles expose only implemented capabilities") {
   REQUIRE(complete);
   CHECK(minimal->backend_id() == minimal_id);
   CHECK(complete->backend_id() == complete_id);
-  CHECK(minimal->capabilities() == 0x100FULL);
-  CHECK(complete->capabilities() == 0x1DFFULL);
-  CHECK((complete->capabilities() & (1ULL << 9)) == 0);
+  CHECK(minimal->capabilities() == 0x120FULL);
+  CHECK(complete->capabilities() == 0x1FFFULL);
+  CHECK((complete->capabilities() & (1ULL << 9)) != 0);
   CHECK(minimal->frame() == 0);
   CHECK(minimal->tick() == 0);
   CHECK(minimal->latched_inputs() == InputState{});

@@ -1,12 +1,11 @@
 # Guía de validación del MVP
 
-**Estado:** fases 0–2 completadas localmente al 2026-10-19; Gate 0 seleccionó
-ClownMDEmu y Gate 2 acredita FX-01 desde Engine por integración nativa.
-El núcleo sintético, la CLI y el paquete instalado se validan por contratos,
-unidad, replay y consumo real de Engine. Consultar los resultados y límites de
-[fase 2](../../docs/phase-2-results.md), [fase 1](../../docs/phase-1-results.md) y
-[fase 0](../../docs/phase-0-results.md). La fase 3 está sin iniciar; Mega Drive
-de producto, FX-02, FX-03, checkpoints y Runtime permanecen pendientes.
+**Estado:** fases 0–3 completadas localmente al 2026-10-19; Gate 0 seleccionó
+ClownMDEmu, Gate 2 acredita FX-01 desde Engine y Gate 3 acredita Mega Drive,
+FX-02 y checkpoints entre procesos. Consultar los resultados y límites de
+[fase 3](../../docs/phase-3-results.md), [fase 2](../../docs/phase-2-results.md),
+[fase 1](../../docs/phase-1-results.md) y [fase 0](../../docs/phase-0-results.md).
+FX-03, presentación con `.ay` y Runtime permanecen pendientes.
 
 ## Comprobaciones disponibles hoy
 
@@ -56,7 +55,7 @@ El pack existente contiene texto de prueba, sin sustitución gráfica real.
 - Ejecutar desde la raíz con una compilación activa. Para candidatos usar
   `-Jobs 1`; los benchmarks posteriores deben quedar aislados de compilaciones.
 
-Núcleo sintético sin candidatos ni Engine/GPU:
+Núcleo nativo sin Engine/GPU, con ClownMDEmu fijado y tests sintéticos:
 
 ```powershell
 ./tools/bootstrap-dependencies.ps1 -Offline
@@ -72,8 +71,10 @@ solo pasa cuando AddressSanitizer detecta el fallo esperado. Sus anotaciones de
 contenedores STL están desactivadas; las comprobaciones de direcciones siguen activas.
 
 Las suites `contract.native_api`, `unit.synthetic_backend`, `unit.session`,
-`unit.system_detector`, `contract.snapshot`, `integration.cli` e
-`integration.replay` se ejecutan por CTest. Replay crea doce procesos nuevos de
+`unit.system_detector`, `contract.snapshot`, `integration.cli`,
+`integration.replay`, `integration.megadrive_session`, `unit.state_format`,
+`integration.state_store`, `integration.checkpoint` e
+`integration.megadrive_replay` se ejecutan por CTest. El replay FX-01 crea doce procesos nuevos de
 3.000 frames cada uno y contrasta los tres hashes con el modelo independiente.
 Los informes y `summary.json` quedan en `build/evidence/phase1-<config>-<ASAN>`;
 se regeneran con el build_id de cada configuración. No comparar estados de
@@ -191,7 +192,7 @@ la configuración porque la integración de producto aún no existe; no es un ch
    producen resultados definidos; reinicio y restauración invalidan épocas previas.
 7. **Engine → Tessera:** repetir los contratos por la integración nativa de Engine;
    verificar que esta ruta consume directamente la API de Tessera.
-8. **FX-02:** completar la semilla con oráculos independientes de estado observable,
+8. **FX-02:** ejecutar la variante completada con oráculos independientes de estado observable,
    vídeo y audio/entradas por API autónoma y Engine; verificar efecto conocido
    frente a control, ventanas de audio activo y transiciones. El silencio constante falla.
 9. **FX-03:** incorporar un paquete `.ay` con imágenes reales, regla sobre recurso
@@ -219,7 +220,7 @@ desactivada, activada y sustitución activa. Fijar presupuestos después de medi
 Conservar informes, hashes y trazabilidad a requisitos; ejecutar unidad,
 contratos, replay, regresiones y diagnósticos compatibles en CI. El cierre exige
 FX-01, FX-02 y FX-03 completos y distribución verificada en entorno limpio.
-Los resultados actuales de fase 0 no sustituyen ninguna de esas pruebas.
+Los resultados de fases 0–3 no sustituyen FX-03 ni las pruebas de Runtime.
 
 ## Paquete instalado e integración nativa de fase 2
 
@@ -255,3 +256,43 @@ Tessera aporta únicamente headers fijados para las pruebas y los fixtures de
 la CLI; el producto enlaza `Tessera::core` instalado. Engine documenta el uso
 público en `docs/TESSERA_NATIVE.md`. Los resultados definitivos de cada fase
 se registran antes de abrir la siguiente; esta receta no acredita su ejecución.
+
+## Repetir Gate 3 localmente
+
+Preparar solo la fuente fijada de ClownMDEmu, construir con un proceso activo y
+ejecutar primero las pruebas breves. El replay largo genera FX-02, valida sus
+hashes y publica una carpeta de evidencia nueva bajo `build/evidence`:
+
+```powershell
+./tools/bootstrap-backends.ps1 -SelectedOnly
+./tools/check.ps1 -Preset windows-dev -Stage Build -Jobs 1
+ctest --test-dir build/windows-dev -E '^integration.megadrive_replay$' --output-on-failure -j 1
+ctest --test-dir build/windows-dev -R '^integration.megadrive_replay$' --output-on-failure -j 1
+$evidence = Get-ChildItem build/evidence/phase3-RelWithDebInfo-OFF -Directory |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$summary = Get-Content (Join-Path $evidence.FullName 'summary.json') -Raw | ConvertFrom-Json
+if ($summary.divergences -ne 0 -or $summary.processes -ne 15) { throw 'Gate 3 autónomo falló.' }
+cmake --install build/windows-dev --prefix install/windows-dev
+```
+
+Desde la Developer Shell x64 de Engine, apuntar su build local sin ASan al
+paquete y a **esa misma** evidencia; los hashes de estado incluyen el build_id,
+por lo que no se mezclan perfiles dev/Release/ASan:
+
+```powershell
+cmake -S C:/ayther/AYTHER-Engine -B C:/ayther/AYTHER-Engine/build/windows-native `
+  -DAYTHER_ENABLE_TESSERA=ON `
+  -DTessera_DIR=C:/ayther/AYTHER-Tessera/install/windows-dev/lib/cmake/Tessera `
+  -DAYTHER_TESSERA_TEST_SOURCE_DIR=C:/ayther/AYTHER-Tessera `
+  -DAYTHER_TESSERA_PHASE3_EVIDENCE_DIR=$($evidence.FullName)
+cmake --build C:/ayther/AYTHER-Engine/build/windows-native `
+  --target ayther_tessera_checkpoint_test --parallel 1
+ctest --test-dir C:/ayther/AYTHER-Engine/build/windows-native `
+  -R '^ayther.integration.tessera_checkpoint$' --output-on-failure -j 1
+```
+
+La última prueba usa 12 procesos Engine y compara 13.500 frames con los hashes
+autónomos y los oráculos de FX-02. Los negativos de formato, guardado,
+interrupción y restauración están en `unit.state_format`,
+`integration.state_store`, `integration.checkpoint` e
+`integration.megadrive_session`.

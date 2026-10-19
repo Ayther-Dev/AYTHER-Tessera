@@ -79,9 +79,19 @@ foreach(negative IN ITEMS version runtime architecture toolset)
 endforeach()
 
 foreach(path IN ITEMS include/tessera/tessera.h lib/tessera_core.lib bin/tessera.exe
+        lib/tessera-backend/clownmdemu-core.lib
+        lib/tessera-backend/clown68000-interpreter.lib
+        lib/tessera-backend/clown68000-common.lib
+        lib/tessera-backend/clownz80-interpreter.lib
+        lib/tessera-backend/clownz80-common.lib
         share/tessera/package-metadata.json share/tessera/dependencies.lock.json
         share/tessera/licenses/LICENSE share/tessera/licenses/picosha2-1.0.1/LICENSE
-        share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT)
+        share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT
+        share/tessera/licenses/clownmdemu-core-88ef45a/LICENCE.txt
+        share/tessera/licenses/clown68000-bb19838/LICENCE.txt
+        share/tessera/licenses/clownz80-aa4cae3/LICENCE.txt
+        share/tessera/licenses/clowncommon-ecee31f/licence.txt
+        share/tessera/licenses/clowncommon-ddeff17/licence.txt)
     if(NOT EXISTS "${relocated}/${path}")
         message(FATAL_ERROR "PACKAGE_FILE_MISSING: ${path}")
     endif()

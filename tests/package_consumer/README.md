@@ -5,7 +5,9 @@ lo mueve y configura un proyecto C11/C++20 separado con `find_package(Tessera 0.
 CONFIG REQUIRED)` y `Tessera::core`. Compila con un solo job y comprueba consultas
 ABI públicas, ausencia de dependencias privadas/rutas del checkout, CLI,
 metadatos/licencias y rechazo de una versión incompatible y del runtime `/MT`.
-La prueba solo usa fuentes propias y no instala fixtures ni candidatos de backend.
+La prueba solo usa fuentes propias y no instala fixtures. El paquete incluye
+las bibliotecas fijadas de ClownMDEmu y sus avisos para el backend Mega Drive;
+su revisión de distribución sigue pendiente de T034.
 
 El consumidor debe configurar `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
 antes de crear sus targets y usar Windows x64 con ABI MSVC. El paquete publica

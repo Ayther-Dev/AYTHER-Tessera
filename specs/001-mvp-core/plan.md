@@ -3,7 +3,7 @@
 **Característica:** `001-mvp-core`  
 **Fecha y aprobación:** 2026-10-19  
 **Alineación aprobada:** diez correcciones de QA de la especificación y la constitución.  
-**Estado:** aprobado; fases 0 y 1 completadas localmente, con ClownMDEmu seleccionado en Gate 0 y núcleo sintético/API/CLI validados. Fase 2 sin iniciar; integración de producto y mediciones completas del MVP pendientes.  
+**Estado:** aprobado; fases 0–3 completadas localmente, con ClownMDEmu seleccionado, Engine nativo y replay/checkpoints Mega Drive validados. FX-03, Runtime y mediciones completas del MVP pendientes.
 **Especificación:** [spec.md](spec.md).  
 **Norma aplicable:** [docs/constitution.md](../../docs/constitution.md).
 
@@ -21,9 +21,9 @@ no representa otra consola. Otros sistemas, sustitución sonora, editor nuevo,
 red y multijugador siguen fuera del alcance. La infraestructura sonora existente
 de Engine conserva su propietario sin ampliar el MVP.
 
-Este plan no implementa el núcleo ni modifica Engine, Runtime o Lab. Sus cambios
-de integración se ejecutarán en las fases correspondientes. No hay todavía
-resultados de ejecución de Tessera.
+La implementación hasta Gate 3 y sus resultados locales constan en
+[fase 3](../../docs/phase-3-results.md). La integración de presentación y Runtime
+se ejecutará en las fases siguientes.
 
 ## Contexto técnico
 
@@ -236,9 +236,9 @@ suficiente o respaldo. No se integra un candidato que falle capacidades obligato
 
 | Fixture | Estado y trabajo obligatorio |
 | --- | --- |
-| Demo Engine/Lab copiada | Disponible como ROM de 32 KiB y fuentes con hashes. La imagen puede ser estable, no programa FM/PSG y no acredita ejecución en Tessera. |
-| FX-01 | Recorrido autónomo implementado y validado en T009–T014: perfiles mínimo/completo, entradas conocidas/control, trazas completas, reset y fallos inducidos. Engine T018 y continuidad/checkpoints T024 siguen pendientes. |
-| FX-02 | Pendiente: demo o variante sonora e interactiva con fuentes, procedencia, hashes, entrada conocida y control sin ella, estado observable, vídeo original y actividad/transiciones de audio esperados. Oráculos derivados de fuente/generador antes del contraste y verificados por API autónoma y Engine. Silencio constante falla; la ROM copiada se conserva intacta. |
+| Demo Engine/Lab copiada | ROM de 32 KiB y fuentes intactas con hashes; ejecución de 3.000 frames y continuaciones verificada por Tessera y Engine. No programa FM/PSG. |
+| FX-01 | Recorrido autónomo y Engine validado: perfiles mínimo/completo, entradas/control, trazas completas, reset y tres checkpoints K→K+1. |
+| FX-02 | Demo sonora separada, propia MIT, con fuentes/hashes, acción B y control, estado observable, vídeo y actividad/transiciones PCM. Oráculos independientes aprobados por API autónoma y Engine; silencio constante falla. |
 | FX-03 | Pendiente: `.ay` gráfico real para Engine–Tessera, imagen autorizada, identidad real de ROM y metadatos; coincidencias y recursos superpuestos con precedencia, ganador y píxeles esperados explícitos, repetibles entre procesos y validados también en Runtime. |
 
 El pack actual contiene texto y no satisface FX-03. Antes de publicar se

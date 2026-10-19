@@ -1,12 +1,13 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([switch]$Download)
+param([switch]$Download, [switch]$SelectedOnly)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $cacheRoot = Join-Path $repoRoot 'third_party/backends'
 $lock = Get-Content -LiteralPath (Join-Path $repoRoot 'cmake/dependencies.lock.json') -Raw | ConvertFrom-Json
 New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null
 foreach ($backend in $lock.backend_archives) {
+    if ($SelectedOnly -and $backend.name -like 'ares-*') { continue }
     $archive = Join-Path $repoRoot $backend.archive.path
     if (-not (Test-Path -LiteralPath $archive)) {
         if (-not $Download) { throw "BACKEND_ARCHIVE_MISSING: descarga explícitamente con -Download: $($backend.name)" }

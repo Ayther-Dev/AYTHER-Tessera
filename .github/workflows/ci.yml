@@ -33,7 +33,13 @@ jobs:
           key: ${{ runner.os }}-headers-${{ hashFiles('cmake/dependencies.lock.json') }}
       - name: Prepare and verify pinned headers
         run: ./tools/bootstrap-dependencies.ps1 -Download
-      - name: Configure, build and test available core suites
-        run: ./tools/check.ps1 -Preset windows-dev -Jobs 2
+      - name: Prepare the pinned Mega Drive backend
+        run: ./tools/bootstrap-backends.ps1 -Download -SelectedOnly
+      - name: Configure, build and test bounded core suites
+        run: |
+          ./tools/check.ps1 -Preset windows-dev -Stage Configure -Jobs 2
+          ./tools/check.ps1 -Preset windows-dev -Stage Build -Jobs 2
+          ctest --test-dir build/windows-dev -E '^integration.megadrive_replay$' --output-on-failure -j 2
       # Engine and Runtime acceptance run in their declared environments when implemented.
-      # Unit, C/C++ contracts, CLI, fresh-process replay and the installed package consumer share this CTest job.
+      # The long Mega Drive matrix runs locally for Gate 3; the FX-01 replay,
+      # contracts, CLI, and installed consumer remain in this bounded CI job.

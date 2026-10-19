@@ -12,7 +12,7 @@
 namespace {
 using namespace tessera;
 using namespace tessera::api;
-constexpr std::uint64_t complete_caps = 0x1DFF;
+constexpr std::uint64_t complete_caps = 0x1FFF;
 std::array<std::uint8_t, 32> build_identity() {
   const std::string_view text = TESSERA_CORE_BUILD_ID;
   std::array<std::uint8_t, 32> result{};
@@ -38,11 +38,11 @@ tessera_limits_v1 limits() {
   v.snapshot_bytes = 8 * 1024 * 1024;
   return v;
 }
-std::array<tessera_backend_info_v1, 2> backends() {
-  std::array<tessera_backend_info_v1, 2> values{};
+std::array<tessera_backend_info_v1, 3> backends() {
+  std::array<tessera_backend_info_v1, 3> values{};
   const auto registrations = SystemRegistry::registrations();
   const auto hash = build_identity();
-  for (std::size_t i = 0; i < 2; ++i) {
+  for (std::size_t i = 0; i < values.size(); ++i) {
     auto &v = values[i];
     v = initialized<tessera_backend_info_v1>();
     v.kind = registrations[i].kind;
@@ -155,25 +155,25 @@ tessera_status TESSERA_CALL tessera_backends_enumerate_v1(
     std::uint32_t *required, tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
     c.object(required);
-    std::array<tessera_backend_info_v1 *, 2> slots{};
+    std::array<tessera_backend_info_v1 *, 3> slots{};
     auto cursor = reinterpret_cast<std::uintptr_t>(out);
-    for (std::uint32_t i = 0; i < std::min(capacity, 2U); ++i) {
+    for (std::uint32_t i = 0; i < std::min(capacity, 3U); ++i) {
       auto *slot = reinterpret_cast<tessera_backend_info_v1 *>(cursor);
       c.object(slot);
       slots[i] = slot;
       cursor += slot->header.size;
     }
-    if (capacity < 2) {
+    if (capacity < 3) {
       c.start();
-      *required = 2;
+      *required = 3;
       return TESSERA_BUFFER_TOO_SMALL;
     }
     // Validate every prefix before publishing the first array element.
     c.start();
     const auto values = backends();
-    for (std::size_t i = 0; i < 2; ++i)
+    for (std::size_t i = 0; i < values.size(); ++i)
       publish(slots[i], values[i]);
-    *required = 2;
+    *required = 3;
     return TESSERA_OK;
   });
 }
@@ -310,7 +310,9 @@ tessera_status TESSERA_CALL tessera_session_bind_trace_v1(
                 candidate.config_sha == s->config_sha,
             TESSERA_INVALID_TRACE);
     require(s->machine->frame() == 0, TESSERA_WRONG_STATE);
+    Bytes raw(trace.data, trace.data + trace.bytes);
     s->replay = std::move(candidate);
+    s->replay_raw = std::move(raw);
     s->replay_next = 1;
     return TESSERA_OK;
   });
@@ -371,11 +373,12 @@ tessera_status TESSERA_CALL tessera_original_frame_query_v1(
     auto s = sessions.get(h);
     c.object(out);
     c.start();
-    require(s->machine->frame() > 0, TESSERA_WRONG_STATE);
+    require(s->machine->original_available(), TESSERA_WRONG_STATE);
     auto v = initialized<tessera_original_frame_v1>();
     v.frame_id = s->identity();
-    v.width = v.height = 16;
-    v.row_bytes = 64;
+    v.width = s->machine->frame_width();
+    v.height = s->machine->frame_height();
+    v.row_bytes = v.width * 4;
     v.video_format = 1;
     v.aspect_num = v.aspect_den = 1;
     const auto &pixels = s->machine->pixels();
@@ -384,8 +387,8 @@ tessera_status TESSERA_CALL tessera_original_frame_query_v1(
     v.pcm = {pcm.data(), pcm.size()};
     v.sample_rate = 48000;
     v.channels = 2;
-    v.pcm_frames = 800;
-    v.tick_begin = s->machine->tick() - 1000;
+    v.pcm_frames = pcm.size() / 4;
+    v.tick_begin = s->machine->tick() - s->machine->frame_ticks();
     v.tick_end = s->machine->tick();
     publish(out, v);
     return TESSERA_OK;
@@ -504,22 +507,28 @@ tessera_status TESSERA_CALL
 tessera_checkpoint_export_v1(tessera_session h, tessera_buffer_v1 out,
                              std::uint64_t *required, tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
-    (void)sessions.get(h);
+    auto s = sessions.get(h);
     c.output(out);
     c.object(required);
     c.start();
-    return TESSERA_UNSUPPORTED_CAPABILITY;
+    require(s->machine->capabilities() & TESSERA_CAP_CHECKPOINT,
+            TESSERA_UNSUPPORTED_CAPABILITY);
+    return copy_bytes(s->checkpoint(), out, required);
   });
 }
 tessera_status TESSERA_CALL
 tessera_checkpoint_restore_v1(tessera_session h, tessera_bytes_v1 checkpoint,
                               tessera_bytes_v1 trace, tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_RESTORE, [&](Call &c) {
-    (void)sessions.get(h);
+    auto s = sessions.get(h);
     c.input(checkpoint);
     c.input(trace);
     c.start();
-    return TESSERA_UNSUPPORTED_CAPABILITY;
+    require(s->machine->capabilities() & TESSERA_CAP_CHECKPOINT,
+            TESSERA_UNSUPPORTED_CAPABILITY);
+    s->restore({checkpoint.data, static_cast<std::size_t>(checkpoint.bytes)},
+               {trace.data, static_cast<std::size_t>(trace.bytes)}, c.context());
+    return TESSERA_OK;
   });
 }
 tessera_status TESSERA_CALL

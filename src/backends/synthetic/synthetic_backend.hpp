@@ -31,8 +31,18 @@ public:
   [[nodiscard]] const InputState &latched_inputs() const noexcept override;
   [[nodiscard]] const Bytes &pixels() const noexcept override;
   [[nodiscard]] const Bytes &pcm() const noexcept override;
+  [[nodiscard]] bool original_available() const noexcept override {
+    return !pixels_.empty();
+  }
+  [[nodiscard]] std::uint32_t system() const noexcept override { return 0; }
+  [[nodiscard]] std::uint32_t frame_width() const noexcept override { return 16; }
+  [[nodiscard]] std::uint32_t frame_height() const noexcept override { return 16; }
+  [[nodiscard]] std::uint64_t frame_ticks() const noexcept override { return 1000; }
+  [[nodiscard]] std::uint64_t tick_hz() const noexcept override { return 60000; }
   void step(const InputState &inputs) override;
   [[nodiscard]] Bytes machine_record() const override;
+  void restore_record(std::span<const std::uint8_t> record,
+                      std::uint64_t frame, const InputState &inputs) override;
   [[nodiscard]] std::vector<RegionData>
   regions(std::uint64_t mask) const override;
 

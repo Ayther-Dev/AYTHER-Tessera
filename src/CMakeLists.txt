@@ -1,15 +1,31 @@
 include(GNUInstallDirs)
 
+set(TESSERA_CLOWN_SOURCE "" CACHE PATH "Verified pinned ClownMDEmu source root")
+if(NOT TESSERA_CLOWN_SOURCE)
+    set(TESSERA_CLOWN_SOURCE "${PROJECT_SOURCE_DIR}/third_party/backends/clownmdemu-core-88ef45a6585556e2247dd26b6c937d6b9fb4a12d/clownmdemu-core-88ef45a6585556e2247dd26b6c937d6b9fb4a12d")
+endif()
+if(NOT EXISTS "${TESSERA_CLOWN_SOURCE}/source/clownmdemu.c")
+    message(FATAL_ERROR "CLOWN_SOURCE_REQUIRED: prepare the pinned source with tools/bootstrap-backends.ps1 before configuring.")
+endif()
+set(CC_USE_C99_INTEGERS ON CACHE BOOL "Use fixed C99 integers in ClownMDEmu" FORCE)
+add_subdirectory("${TESSERA_CLOWN_SOURCE}" "${PROJECT_BINARY_DIR}/clown-product" EXCLUDE_FROM_ALL)
+
 set(core_sources api/native_api.cpp backends/synthetic/synthetic_backend.cpp session/session.cpp
-    session/presentation_transaction.cpp observation/snapshot_store.cpp observation/event_stream.cpp
-    systems/system_detector.cpp systems/system_registry.cpp)
+    session/presentation_transaction.cpp session/session_restore.cpp
+    persistence/state_format.cpp persistence/state_store.cpp
+    observation/snapshot_store.cpp observation/event_stream.cpp
+    systems/system_detector.cpp systems/system_registry.cpp
+    backends/megadrive/megadrive_backend.cpp backends/megadrive/canonical_audio.cpp
+    backends/megadrive/clown_state_codec.cpp)
 add_library(tessera_core STATIC ${core_sources})
 add_library(Tessera::core ALIAS tessera_core)
 target_include_directories(tessera_core PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(tessera_core SYSTEM PRIVATE "${TESSERA_CLOWN_SOURCE}/source")
 target_link_libraries(tessera_core PRIVATE
-    "$<BUILD_INTERFACE:Tessera::build_options>" "$<BUILD_INTERFACE:PicoSHA2::PicoSHA2>")
+    "$<BUILD_INTERFACE:Tessera::build_options>" "$<BUILD_INTERFACE:PicoSHA2::PicoSHA2>"
+    "$<BUILD_INTERFACE:clownmdemu-core>")
 target_compile_options(tessera_core PRIVATE /utf-8)
 
 file(GLOB_RECURSE identity_sources CONFIGURE_DEPENDS

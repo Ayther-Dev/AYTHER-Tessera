@@ -137,9 +137,9 @@ TEST_CASE("CLI lists implemented test backends and detects bytes independently "
           "of filename") {
   const auto list = run({L"backend", L"list"});
   REQUIRE(list.exit_code == 0);
-  REQUIRE(list.report.at("backends").size() == 2);
+  REQUIRE(list.report.at("backends").size() == 3);
   CHECK(list.report.at("code") == 0);
-  CHECK(list.report.at("backends")[0].at("kind") == 2);
+  CHECK(list.report.at("backends")[0].at("kind") == 1);
   TemporaryDirectory directory;
   const auto fixture = directory.path / L"fixture with spaces";
   auto args = demo();

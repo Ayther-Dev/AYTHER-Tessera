@@ -1,6 +1,6 @@
 # Modelo de datos — MVP nativo de AYTHER Tessera
 
-**Estado:** diseño aprobado; alcance sintético/API/CLI de T007–T014 implementado y validado localmente. Integración Engine/Runtime, Mega Drive y persistencia de producto siguen en las fases posteriores.
+**Estado:** diseño aprobado; sintético/API/CLI, Engine nativo, Mega Drive y persistencia de T007–T024 validados localmente. Presentación HD y Runtime siguen pendientes.
 **Referencias:** [spec](spec.md), [constitución](../../docs/constitution.md) y [contrato nativo](contracts/native-api.md).
 Los campos siguientes son semánticos: no fijan layouts de ABI ni formatos binarios.
 
