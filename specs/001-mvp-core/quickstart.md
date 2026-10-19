@@ -220,3 +220,38 @@ Conservar informes, hashes y trazabilidad a requisitos; ejecutar unidad,
 contratos, replay, regresiones y diagnósticos compatibles en CI. El cierre exige
 FX-01, FX-02 y FX-03 completos y distribución verificada en entorno limpio.
 Los resultados actuales de fase 0 no sustituyen ninguna de esas pruebas.
+
+## Paquete instalado e integración nativa de fase 2
+
+Tessera se instala fuera del árbol de fuentes. La prueba `package.installed_consumer`
+instala en un prefijo temporal, lo reubica y compila un consumidor C11/C++20 sin
+incluir fuentes privadas; también rechaza versión 0.2, CRT `/MT`, destino ARM64
+y herramientas MSVC anteriores a 14.51. El paquete de diagnóstico conserva el
+compilador exacto y copia el runtime ASAN local para las pruebas.
+
+```powershell
+./tools/check.ps1 -Preset windows-release -Jobs 1
+cmake --install build/windows-release --prefix install/windows-release
+```
+
+El proveedor de Engine se habilita explícitamente; no cambia los consumidores
+legacy y no sustituye errores por otro backend. Desde una Developer Shell x64
+con el entorno de dependencias ya preparado de Engine:
+
+```powershell
+cmake -S C:/ayther/AYTHER-Engine -B C:/ayther/AYTHER-Engine/build/windows-release-engine-vpx `
+  -DAYTHER_ENABLE_TESSERA=ON `
+  -DTessera_DIR=C:/ayther/AYTHER-Tessera/install/windows-release/lib/cmake/Tessera `
+  -DAYTHER_TESSERA_TEST_SOURCE_DIR=C:/ayther/AYTHER-Tessera `
+  -DVCPKG_MANIFEST_INSTALL=OFF
+cmake --build C:/ayther/AYTHER-Engine/build/windows-release-engine-vpx --parallel 1
+ctest --test-dir C:/ayther/AYTHER-Engine/build/windows-release-engine-vpx `
+  -R tessera --parallel 1 --output-on-failure
+```
+
+`VCPKG_MANIFEST_INSTALL=OFF` presupone el caché auditado local: un entorno sin
+esas dependencias falla en lugar de descargarlas implícitamente. El checkout de
+Tessera aporta únicamente headers fijados para las pruebas y los fixtures de
+la CLI; el producto enlaza `Tessera::core` instalado. Engine documenta el uso
+público en `docs/TESSERA_NATIVE.md`. Los resultados definitivos de cada fase
+se registran antes de abrir la siguiente; esta receta no acredita su ejecución.

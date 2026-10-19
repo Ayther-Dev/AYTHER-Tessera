@@ -48,3 +48,15 @@ target_link_libraries(tessera_replay_test PRIVATE Tessera::core Tessera::build_o
 tessera_copy_diagnostic_runtime(tessera_replay_test)
 add_test(NAME integration.replay COMMAND tessera_replay_test "${PROJECT_BINARY_DIR}/src/tessera.exe" "${PROJECT_BINARY_DIR}/../evidence/phase1-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
 set_tests_properties(integration.replay PROPERTIES LABELS "integration;replay;phase1;FX-01" TIMEOUT 240 RUN_SERIAL TRUE)
+
+add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
+    "-DPRODUCER_BUILD=${PROJECT_BINARY_DIR}"
+    "-DPROJECT_SOURCE=${PROJECT_SOURCE_DIR}"
+    "-DCONSUMER_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/package_consumer"
+    "-DC_COMPILER=${CMAKE_C_COMPILER}"
+    "-DCXX_COMPILER=${CMAKE_CXX_COMPILER}"
+    "-DCTEST_COMMAND=${CMAKE_CTEST_COMMAND}"
+    "-DGENERATOR=${CMAKE_GENERATOR}" "-DCONFIG=$<CONFIG>"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/package_consumer/verify_package.cmake")
+set_tests_properties(package.installed_consumer PROPERTIES
+    LABELS "package;integration;phase2" TIMEOUT 180 RUN_SERIAL TRUE)

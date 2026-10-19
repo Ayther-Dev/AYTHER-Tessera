@@ -36,4 +36,4 @@ jobs:
       - name: Configure, build and test available core suites
         run: ./tools/check.ps1 -Preset windows-dev -Jobs 2
       # Engine and Runtime acceptance run in their declared environments when implemented.
-      # Phase 1 unit, C/C++ contracts, CLI and fresh-process replay share this CTest job.
+      # Unit, C/C++ contracts, CLI, fresh-process replay and the installed package consumer share this CTest job.
