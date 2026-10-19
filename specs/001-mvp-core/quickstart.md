@@ -1,12 +1,12 @@
 # Guía de validación del MVP
 
-**Estado:** fase 0 completada al 2026-10-19; Gate 0 cerrado localmente con
-ClownMDEmu seleccionado. Hay infraestructura, generador y qualifier privados
-comprobados. La fase 1 añade núcleo sintético, API C y CLI autónomos; el check
-local ejecuta sus contratos, unidad y replay. Consultar
-[resultados y límites de fase 1](../../docs/phase-1-results.md) y
-[fase 0](../../docs/phase-0-results.md). Engine/Runtime y Mega Drive de producto
-siguen pendientes de sus fases.
+**Estado:** fases 0–2 completadas localmente al 2026-10-19; Gate 0 seleccionó
+ClownMDEmu y Gate 2 acredita FX-01 desde Engine por integración nativa.
+El núcleo sintético, la CLI y el paquete instalado se validan por contratos,
+unidad, replay y consumo real de Engine. Consultar los resultados y límites de
+[fase 2](../../docs/phase-2-results.md), [fase 1](../../docs/phase-1-results.md) y
+[fase 0](../../docs/phase-0-results.md). La fase 3 está sin iniciar; Mega Drive
+de producto, FX-02, FX-03, checkpoints y Runtime permanecen pendientes.
 
 ## Comprobaciones disponibles hoy
 
