@@ -53,3 +53,11 @@ medios originales, cancelación al cerrar y rearme tras reinicio exitoso;
 un reinicio fallido conserva la pendiente. FX-03 confirma el rearme de la
 política y la conservación del paquete. La prueba visual de ese rearme y la
 coordinación tras restaurar pertenecen a T029.
+
+Como avance de T029, la API de sesión de Engine coordina la restauración:
+ante fallo conserva política y pendiente; ante éxito invalida la vista
+prestada, conserva paquete y controles ya efectivos y descarta únicamente
+la solicitud pendiente cancelada por Tessera. Los tests de controles y FX-03
+comprueban la nueva época, la causa de cancelación y la continuidad del
+paquete. Sigue faltando la prueba de composición y respaldo visual tras
+restaurar.
