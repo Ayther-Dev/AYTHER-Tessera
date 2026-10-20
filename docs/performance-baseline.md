@@ -539,3 +539,31 @@ tuvieron 287.128 muestras PCM activas cada una, cero solicitud adicional
 registrada, p99 de entrega 18,120–19,030 ms y máximos 18,540–31,680 ms.
 El máximo aislado de 31,680 ms sin solicitud adicional refuerza que un
 intervalo largo de entrega y el indicador SDL no son la misma medición.
+
+### Perfil físico de Runtime en CI privado, 2026-10-20
+
+El workflow de [Lab privado, run 39490219830](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+ejecutó en este PC los mismos tres recorridos de Runtime que la prevalidación
+local: FX-03 headless, FX-02 con audio activo y FX-03 con ventana Vulkan y
+audio. Fijó Runtime `7bccf5359b005b973b8664eb3a17252835e0f9d5`, ejecutable
+SHA-256 `808f6f2e6742260c6727e065900da50dc767db6ce563211d1b7d662e66bad895`
+y test compilado SHA-256
+`8bb939ce9fb403ceeb103d13f733f9d4999e24fdfc57df78a73fe3c2670b1ecb`.
+Los fixtures locales se verificaron por SHA-256 antes de ejecutar; ninguno
+salió como artifact. El runner efímero tuvo acceso solo al workflow de la rama
+privada de Lab y se retiró al terminar.
+
+| Perfil CI | Entrega p50 / p95 / p99 / máximo (ms) | Audio en el stream SDL | GPU |
+| --- | --- | --- | --- |
+| FX-03, 180 frames | 16,704 / 18,286 / 18,622 / 19,177 | 295 callbacks; silencio previsto; 0 episodios y 0 muestras adicionales demandadas | 180 timestamps; 0 errores Vulkan |
+| FX-02, 180 frames | 16,628 / 17,970 / 18,313 / 19,668 | 296 callbacks; 287.128 muestras PCM activas; 0 episodios y 0 muestras adicionales demandadas | 180 timestamps; 0 errores Vulkan |
+
+Los 179 intervalos por perfil se midieron con reloj monotónico entre entregas
+al presentador. Los contadores de audio corresponden al callback SDL en el
+límite Runtime→stream: `additional_amount` estima datos de entrada pedidos
+en ese instante y puede sobreestimar por buffering/resampling. Duración total
+y máxima informadas: 0,000 ms en ambos perfiles. No equivalen a observación
+acústica del dispositivo. La API de presentación efectiva no expuso timestamps;
+la serie se registra por separado como `unavailable`, sin inferir tiempos de
+pantalla a partir de la entrega. T032 conserva la investigación de los picos
+locales de regularidad y la consolidación de métricas.

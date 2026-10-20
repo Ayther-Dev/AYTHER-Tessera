@@ -6,8 +6,9 @@ base comparable de tres capas. La ampliación local añadió asignaciones,
 copias explícitas, eventos, respaldos, etapas CPU de presentación y una
 comparación progresiva FX-03 con hashes por frame. Los checks de código de
 las tres revisiones están verdes y los dos paquetes de software se publicaron
-y consumieron desde URL pública. El perfil físico GPU/audio en CI sigue
-pendiente. Un test omitido no cuenta como aprobado.
+y consumieron desde URL pública. El perfil físico GPU/audio pasó en
+[CI privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830).
+T032, T035 y T036 siguen abiertos; un test omitido no cuenta como aprobado.
 
 | ID | Evidencia ejecutada o pendiente | Estado |
 | --- | --- | --- |
@@ -15,31 +16,31 @@ pendiente. Un test omitido no cuenta como aprobado.
 | RF-02 | Fase 3/4: 15 procesos, 18.000 frames, 4.500 continuados y oráculos FX-02 | Local verificado; CI final pendiente |
 | RF-03 | `contract.native_api`, `integration.megadrive_session`, Engine backend/provider | Local verificado |
 | RF-04 | `contract.snapshot`, `integration.megadrive_observation` | Local verificado |
-| RF-05 | Engine `tessera_presentation_test` y Runtime `tessera_runtime_gpu_audio`; readback 1.224/0/0/1.224 píxeles magenta | Local verificado; CI GPU pendiente |
-| RF-06 | `contract.snapshot`, Engine controls/presentation, Runtime confirmación 1/2/3 | Local verificado; negativos Runtime adicionales pendientes |
+| RF-05 | Engine `tessera_presentation_test` y Runtime `tessera_runtime_gpu_audio`; readback 1.224/0/0/1.224 píxeles magenta | Local y CI GPU verificados |
+| RF-06 | `contract.snapshot`, Engine controls/presentation, Runtime confirmación 1/2/3 y rechazos de máscara, orden y pack sin avance | Local y perfil nativo CI verificados |
 | RF-07 | Engine controls/presentation y checkpoint; respaldo/rearme locales | Local verificado; CI final pendiente |
 | RF-08 | Engine pack/presentation: manifiesto, derechos, hashes, rutas y límites | Local verificado |
 | RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones; matriz T033 revalidada en `windows-dev` y ASan | Local verificado; CI final pendiente |
 | RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
-| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos | Local verificado; CI física pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, adquisición de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. Una de seis repeticiones tuvo 337 muestras de demanda adicional estimada por SDL y adquisición CPU elevada; la presentación efectiva física no expone timestamps. | Local parcial; incidente de regularidad y CI pendiente |
+| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos y perfil físico en CI privado | Local y CI física verificados |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, adquisición de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. El perfil físico en CI midió FX-03/FX-02; una de seis repeticiones locales tuvo 337 muestras de demanda adicional estimada por SDL y adquisición CPU elevada. La presentación efectiva física no expone timestamps. | CI física verificada; consolidación T032 pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
-| RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime | Pendiente del perfil físico CI |
+| RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime y [perfil físico CI](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Perfil físico verificado; aceptación final pendiente |
 | RC-04 | Código propio nuevo en inglés, mensajes/documentos en español; fuentes externas intactas con idioma, avisos y procedencia | Local verificado en T034 |
 | RC-05 | ZIP públicos Tessera/Engine, fuente y avisos, hashes/atestaciones, consumidor externo y Runtime desde prefijos públicos | Local verificado |
 | CA-01 | FX-01/02/03 presentes y con manifiestos, fuentes/generadores y hashes | Local verificado; entrega pendiente |
 | CA-02 | Replay completo de fases 1/3/4 y oráculos independientes, dos procesos | Local verificado; CI final pendiente |
 | CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3; consolidación T033 6/6 local y 4/4 ASan | Local verificado; CI pendiente |
 | CA-04 | Dos lectores, retención, observación activada/inactiva y misma salida | Local verificado |
-| CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local verificado; CI GPU pendiente |
+| CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local y CI GPU verificados |
 | CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Local verificado |
-| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime añadió entrada inválida, control fuera de orden y pack ausente sin avanzar frame. Matriz T033 cerrada localmente (6/6 y 4/4 ASan); falta CI | Pendiente |
-| CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código verdes y Runtime 233/233 local | Pendiente del perfil físico CI |
+| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime rechazó entrada inválida, control fuera de orden y pack ausente sin avanzar frame en el perfil CI físico. Matriz T033 cerrada localmente (6/6 y 4/4 ASan) | Revisión final T036 pendiente |
+| CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código previos verdes, Runtime 233/233 local y perfil físico CI privado | Coordinación final T035 pendiente |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
-| CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un callback pidió 337 muestras adicionales estimadas y el p99 de entrega llegó a 33,463 ms; la causa del pico y el perfil físico en CI siguen pendientes. | Pendiente |
+| CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo en [CI físico](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Local y CI física verificados; aceptación final pendiente |
+| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un callback pidió 337 muestras adicionales estimadas y el p99 de entrega llegó a 33,463 ms; el perfil físico en CI pasó, pero la causa del pico y la consolidación T032 siguen pendientes. | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
@@ -84,8 +85,8 @@ entradas completas y rechazos; transacción pendiente y cancelaciones; captura
 inmutable/retención; checkpoint y publicación atómica; detección por contenido;
 procedencia/precedencia gráfica y respaldo; fixture de audio independiente;
 métricas con punto/origen/cobertura y alcance de idioma externo. Los casos
-negativos se asignan a las suites citadas arriba y a T031 donde continúan
-abiertos.
+negativos se asignan a las suites citadas arriba; el perfil nativo de T031
+pasó en CI físico. La auditoría final de trazabilidad corresponde a T036.
 
 **Gate de cierre:** ejecutar T030–T035 sin omisiones, publicar la cadena de
 artefactos verificables Tessera→Engine→Runtime, actualizar el lock real y
@@ -228,3 +229,12 @@ PCM activo, cero solicitud SDL adicional y un máximo aislado de entrega de
 31,680 ms. La evidencia local está en
 `build/evidence/phase5-fx02-refill-semantics-exact/summary.json`; el máximo
 no se etiqueta como corte de audio.
+
+**Actualización del corte T031 (2026-10-20):** la decisión de mantener el perfil
+físico fuera de CI se revisó y el [run privado 39490219830](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+de Lab pasó sobre este PC con GPU NVIDIA y dispositivo SDL. El workflow fijó
+el commit de Runtime, el ejecutable y los fixtures locales por SHA-256; las
+tres pruebas nativas y dos perfiles de 180 frames completaron todas sus etapas.
+El runner efímero se retiró y no publicó ROM, pack ni trust. Esta evidencia
+cierra T031 y elimina las referencias anteriores a CI física pendiente como
+bloqueador actual; T032, T035 y T036 siguen abiertos por sus propios criterios.

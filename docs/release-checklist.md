@@ -11,8 +11,8 @@ El usuario autorizó el 2026-10-20 publicar únicamente los paquetes de software
 Tessera y Engine nativo tras cerrar la revisión de distribución y actualizar el
 lock de Runtime. La [revisión técnica local T034](distribution-review.md) quedó
 conforme; los ZIP públicos descargados coinciden con los locks, manifiestos y
-atestaciones. El gate GPU/audio físico en CI sigue pendiente por decisión del
-usuario.
+atestaciones. Tras revisar la vía física, el gate GPU/audio pasó en el
+[workflow privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830).
 
 El usuario confirmó que no hay permiso verificable para publicar la ROM/pack
 Engine/Lab ni la ROM FX-03 derivada. Se generan en `build/` con
@@ -37,8 +37,9 @@ El paquete Runtime publicado continúa fijado al Engine `v0.1.0-rc.19` para la
 CI del producto actual. Los locks nativos adicionales fijan Engine rc.22 y
 Tessera mvp.2; la ruta nativa de Runtime se activa explícitamente y pasó
 233/233 CTest locales con ambos paquetes públicos. Los checks protegidos de
-Runtime están verdes. El perfil GPU/audio físico en CI continúa pendiente;
-una ejecución local o un runner sin dispositivos no lo satisface.
+Runtime estaban verdes en el corte anterior. El perfil GPU/audio físico pasó
+en el run privado citado, sobre este PC con RTX 3060 y salida SDL; una prueba
+local aislada o un runner sin dispositivos no habría satisfecho el gate.
 
 La prevalidación local utiliza prefijos instalados y cachés verificadas, una
 compilación activa y benchmarks aislados. No se requieren PR adicionales,
@@ -52,9 +53,8 @@ timestamps efectivos del dispositivo. Una repetición FX-03 presentó demanda
 SDL adicional estimada de 337 muestras sobre silencio esperado y un p99 de
 entrega de 33,463 ms, por encima del aviso local; el contador no prueba pérdida
 de PCM ni corte audible. Se conserva el pico de regularidad para T032/CA-11.
-La prueba GPU/audio física en CI sigue
-pendiente por decisión del usuario. T031/T032/T035/T036 y CA-08/CA-11 no se
-declaran cerrados.
+El perfil físico de T031 ya pasó en CI; T032/T035/T036 y CA-11 continúan
+abiertos. CA-08 se reevalúa en el informe final de aceptación.
 
 La revisión Engine `3deb4c2` pasó el
 [CI completo 39440336838](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39440336838):
@@ -226,3 +226,20 @@ abiertos.
 produjeron 287.128 muestras activas por repetición y cero demanda faltante
 según SDL. La entrega tuvo p99 18,103–18,929 ms y máximo hasta 27,683 ms.
 Estos resultados locales no sustituyen el perfil GPU/audio físico de CI.
+
+**Actualización T031, 2026-10-20:** tras revisar la decisión anterior, se
+añadió un solo workflow a la rama `feat/mvp-physical-ci` del repositorio privado
+Lab (commit `2180d03`). El grupo `ayther-mvp-private-gpu` permitió únicamente
+ese repositorio y ese workflow; rechazó repositorios públicos y no efectuó
+checkout de código en el equipo. Se registró un runner efímero en la sesión
+física, se ejecutó el [run 39490219830](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+con las cuatro etapas en verde y el runner se retiró automáticamente. FX-03
+validó hashes originales/PCM/presentación y 1.224/0/0/1.224 píxeles magenta;
+FX-02 produjo 287.128 muestras activas. Ambas series de 180 frames tuvieron
+179 intervalos de entrega, 180 timestamps de comandos GPU, cero errores de
+validación y cero demanda adicional de audio estimada por el callback SDL.
+Los percentiles y la cobertura exacta están en la
+[línea base](performance-baseline.md). ROM, pack y trust quedaron locales; no
+se abrió PR de Lab ni se cargaron artifacts de fixture. T031 queda completada
+y desbloquea la coordinación de T035. La aceptación final y T032 siguen
+abiertas por sus criterios propios.

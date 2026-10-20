@@ -1,12 +1,18 @@
 # Fase 5 — progreso local
 
-Fecha: 2026-10-20. Estado: **en curso**; T033 cerrada y T030–T032 y T034–T036
-abiertas hasta acreditar todos sus criterios. PR borradores
+Fecha: 2026-10-20. Estado: **en curso**; T030, T031, T033 y T034 cerradas;
+T032, T035 y T036 abiertas hasta acreditar sus criterios. PR borradores
 [Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
 [Engine #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48) y
 [Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55); el lock
 publicado de Runtime no cambió. La matriz detallada está en
 [`acceptance-report.md`](../specs/001-mvp-core/acceptance-report.md).
+
+T031 pasó el [perfil GPU/audio en CI físico privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+con Runtime `7bccf53`; el runner efímero se retiró al terminar. El workflow
+corrió sin subir ROM, pack ni trust y no requirió un cuarto PR. Las métricas
+exactas y sus límites de interpretación constan en la
+[línea base](performance-baseline.md).
 
 ## Runtime: GPU, dispositivo de audio y proveedor nativo
 
