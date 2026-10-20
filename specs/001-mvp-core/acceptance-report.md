@@ -102,7 +102,7 @@ locales tras recompilar con el commit `a1fc482`. Los checks de Runtime
 y Engine `3deb4c2` pasaron, incluido el [Required CI gate](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39440336838).
 La cobertura C++ remota dio 82,39 % total y 79,42 % en líneas cambiadas,
 sin reducir umbrales. Falta paquete Engine publicado con su lock Runtime
-actualizado, runner GPU/audio físico y la revisión final de T034. Ninguno de estos avances
+actualizado, runner GPU/audio físico y la verificación del asset final en T035. Ninguno de estos avances
 equivale a aceptación CA-08 o CA-11.
 
 La [comparación progresiva](../../docs/performance-baseline.md) usó FX-03 en
@@ -129,7 +129,7 @@ Los hashes SHA-256 de los ZIP, el origen de las series y sus límites están en
 El test de dispositivo valida readback y callbacks locales; no aporta
 timestamps efectivos de presentación ni observación acústica física. Faltan
 revisión de distribución, paquetes publicados, lock Runtime nativo y CI del
-candidato; CA-08/CA-11 y T034–T036 siguen abiertos.
+candidato; CA-08/CA-11 y T035–T036 siguen abiertos.
 
 La [serie progresiva del candidato](../../docs/performance-baseline.md) repitió
 FX-03 con el paquete Release actual en 3×180 frames y hashes comparables
@@ -153,3 +153,9 @@ La línea base ya incluye presupuestos de aviso locales para la siguiente
 validación, calculados con el máximo de las tres repeticiones y 25 % de margen
 redondeado. Se limitan al hardware y perfil medidos; no sustituyen el perfil
 de dispositivo en CI que quedó pendiente por decisión del usuario.
+
+La revisión técnica de distribución T034 pasó localmente con Tessera `de825e5`
+y Engine `fb3d9a8`: metadato de fuente limpia, paquete reproducible,
+consumidor instalado y consumidor externo de los ZIP extraídos. Runtime pasó
+3/3 pruebas nativas con este par exacto. La publicación, procedencia remota,
+lock y aceptación T035–T036 continúan pendientes.

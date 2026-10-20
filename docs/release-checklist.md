@@ -8,7 +8,7 @@ No se crearon tags ni releases por tarea.
 
 El usuario autorizó el 2026-10-20 publicar únicamente los paquetes de software
 Tessera y Engine nativo tras cerrar la revisión de distribución y actualizar el
-lock de Runtime. La [revisión técnica](distribution-review.md) sigue abierta:
+lock de Runtime. La [revisión técnica local T034](distribution-review.md) quedó conforme:
 los ZIP identificados aquí son candidatos locales y no se han subido.
 
 El usuario confirmó que no hay permiso verificable para publicar la ROM/pack
@@ -50,11 +50,11 @@ hashes de binarios/fixtures y el resultado de `acceptance-report.md`.
 **Bloqueadores actuales:** el perfil local ya separa asignaciones C++, copias
 explícitas, eventos/pérdidas, respaldos, espera de imagen y trabajo GPU, pero
 no mide cortes acústicos físicos ni presentación efectiva del dispositivo.
-Restan los presupuestos sustentados por las series, el paquete Engine publicado
+Resta validar los presupuestos locales derivados con el paquete Engine publicado
 con la ruta nativa, el lock Runtime actualizado, su validación con los paquetes
 publicados y la prueba GPU/audio en un runner físico. El inventario y los avisos de ClownMDEmu
-ya reflejan la integración nativa; T034 aún exige verificar la clausura real
-de la distribución combinada y sus avisos. T034–T036 y
+ya reflejan la integración nativa; T035 aún exige verificar la entrega real
+de la distribución combinada y sus avisos. T035–T036 y
 CA-08/CA-11 permanecen abiertos.
 
 La revisión Engine `3deb4c2` pasó el
@@ -127,8 +127,8 @@ en una pasada posterior a alinear CLI y biblioteca Tessera. En la primera, el
 La validación de dispositivo local de FX-02 entregó 287.128 muestras
 activas y cero faltantes SDL; FX-03 presentó 180 frames sin errores Vulkan.
 Timestamps efectivos de presentación y cortes acústicos físicos siguen sin
-observación. Son candidatos locales, no assets publicados: faltan revisión de
-distribución, publicación autorizada de paquetes, lock real y CI sobre ese lock.
+observación. Son candidatos locales, no assets publicados: faltan publicación
+autorizada de paquetes, lock real y CI sobre ese lock.
 
 **Corte local posterior (2026-10-20):** el candidato limpio de Tessera en
 `9e4f4c9` produjo dos ZIP reproducibles con SHA-256
@@ -141,7 +141,7 @@ tipos de binarios no autorizados. Engine Release cubrió 223/223 casos entre la
 pasada inicial y la repetición del checkpoint con corpus compatible; Runtime
 pasó 3/3 pruebas de ruta nativa con GPU y audio físicos locales. El PR de Engine
 y el de Runtime están en verde; el check de Tessera para `9e4f4c9` también
-terminó en verde. Siguen pendientes la revisión final de distribución, los assets
+terminó en verde. Siguen pendientes la verificación final de los assets
 publicados, el lock nativo y el perfil de dispositivo en CI.
 
 Para intentar el perfil físico en CI se registró temporalmente el runner de
@@ -151,3 +151,14 @@ propuesto. El runner se detuvo y se eliminó del registro de la organización si
 ejecutar jobs. Las pruebas locales conservan su evidencia, pero no sustituyen
 el gate de CI aprobado. El usuario decidió mantener la validación GPU/audio
 en los dispositivos locales y dejar ese gate de CI pendiente.
+
+**Revisión técnica local T034 completada:** el commit `de825e5` instaló el
+metadato `T034-local-verified` desde árbol limpio. El consumidor instalado
+C11/C++20 pasó 1/1; dos ZIP idénticos de Tessera tienen SHA-256
+`b20d79bed826ae3c766a45e262492acf4f345d9118a10297da2068c2b27c5215`.
+El consumidor externo compiló y ejecutó con ese ZIP y el ZIP Engine
+`9ae983e6…` extraídos. Runtime se reconfiguró contra ese par exacto y pasó
+3/3 pruebas nativas, incluida GPU/audio físico. Los ZIP siguen siendo
+candidatos locales: faltan tags, assets, atestaciones, lock nativo y consumo
+de la entrega publicada. La decisión de dejar CI de dispositivo pendiente se
+mantiene.
