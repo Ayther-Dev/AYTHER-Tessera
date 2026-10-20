@@ -126,7 +126,7 @@ file(CONFIGURE OUTPUT "${tessera_package_directory}/package-metadata.json" CONTE
   "build": {"id": "@build_id@", "configuration": "@CMAKE_BUILD_TYPE@", "compiler_id": "@CMAKE_CXX_COMPILER_ID@", "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@", "diagnostics": @tessera_diagnostics_json@},
   "source": {"repository": "https://github.com/Ayther-Dev/AYTHER-Tessera", "revision": "@tessera_source_revision@", "clean_at_configure": @tessera_source_clean_json@},
   "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": ["PicoSHA2 1.0.1", "ClownMDEmu 88ef45a", "clown68000 bb19838", "clownz80 aa4cae3", "clowncommon ecee31f/ddeff17"], "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
-  "scope": {"core": "synthetic-and-megadrive", "candidate_backends_included": true, "fixtures_included": false, "distribution_review": "T034-pending"},
+  "scope": {"core": "synthetic-and-megadrive", "candidate_backends_included": true, "fixtures_included": false, "distribution_review": "T034-local-verified"},
   "asan_runtime": {"included": @tessera_diagnostics_json@, "file": "@tessera_asan_dll_name@", "sha256": "@tessera_asan_sha256@", "origin": "local-compiler-toolchain", "scope": "local-development-distribution-review-T034"}
 }
 ]=] @ONLY)
