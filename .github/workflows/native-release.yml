@@ -39,10 +39,12 @@ jobs:
           if ('${{ github.run_attempt }}' -ne '1') {
             throw 'Use a new tag for a corrected candidate.'
           }
-          gh release view '${{ github.ref_name }}' --repo '${{ github.repository }}' *> $null
-          if ($LASTEXITCODE -eq 0) {
-            throw 'A release already exists for this immutable tag.'
-          }
+          $response = Invoke-WebRequest `
+            -Uri 'https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}' `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' } `
+            -SkipHttpErrorCheck
+          if ($response.StatusCode -eq 200) { throw 'A release already exists for this immutable tag.' }
+          if ($response.StatusCode -ne 404) { throw "Release lookup failed: HTTP $($response.StatusCode)." }
 
       - name: Prepare exact pinned source inputs
         run: |
