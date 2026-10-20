@@ -63,6 +63,9 @@ install(FILES "${tessera_package_directory}/TesseraConfig.cmake"
 
 # Only the core and CLI closure is installed; probes and fixtures stay private.
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION "${TESSERA_INSTALL_DATADIR}/licenses")
+install(FILES "${PROJECT_SOURCE_DIR}/legal/THIRD_PARTY_NOTICES.md"
+    "${PROJECT_SOURCE_DIR}/legal/DEPENDENCIES.csv"
+    DESTINATION "${TESSERA_INSTALL_DATADIR}")
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/third_party/licenses/picosha2-1.0.1"
     "${PROJECT_SOURCE_DIR}/third_party/licenses/nlohmann-json-3.12.0"
     "${PROJECT_SOURCE_DIR}/third_party/licenses/clownmdemu-core-88ef45a"

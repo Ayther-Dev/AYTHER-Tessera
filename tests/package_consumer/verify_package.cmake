@@ -85,6 +85,7 @@ foreach(path IN ITEMS include/tessera/tessera.h lib/tessera_core.lib bin/tessera
         lib/tessera-backend/clownz80-interpreter.lib
         lib/tessera-backend/clownz80-common.lib
         share/tessera/package-metadata.json share/tessera/dependencies.lock.json
+        share/tessera/THIRD_PARTY_NOTICES.md share/tessera/DEPENDENCIES.csv
         share/tessera/licenses/LICENSE share/tessera/licenses/picosha2-1.0.1/LICENSE
         share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT
         share/tessera/licenses/clownmdemu-core-88ef45a/LICENCE.txt
