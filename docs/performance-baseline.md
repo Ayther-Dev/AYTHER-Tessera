@@ -200,12 +200,42 @@ Runtime `2e57617096c90356596fd0218b58e18a461119150b382c27ee2b03863ee18001`.
 
 | Etapa | `step` p50, µs (tres series) | `engine_frame` p50, µs | Hash p50, µs |
 | --- | ---: | ---: | ---: |
-| Tessera sin observación | 1698,8 / 1613,6 / 1730,2 | — | 26785 / 25443 / 27344 |
-| Tessera con snapshot/eventos | 3159,7 / 3076,3 / 3184,5 | — | 27224 / 24598 / 27385 |
+| Tessera sin observación | 1750,3 / 1712,9 / 1769,5 | — | 26964 / 26638 / 27511 |
+| Tessera con snapshot/eventos | 3141,1 / 3198,2 / 3086,4 | — | 25892 / 26192 / 26158 |
 | Engine, máscara de observación 0 tras frame 1 | 1474,5 / 1482,8 / 1501,3 | 0,7 / 0,7 / 0,7 | 584 / 587 / 585 |
 | Engine, máscara 31 | 3011,4 / 3106,8 / 2962,5 | 1,4 / 1,4 / 1,5 | 622 / 632 / 629 |
 | Engine, máscara 31 y pack | 2973,5 / 3035,3 / 2927,0 | 85,2 / 89,7 / 84,4 | 637 / 632 / 632 |
 | Runtime, pack y dispositivos | 3131,2 / 3196,5 / 3231,2 | 132,9 / 130,8 / 126,5 | 609 / 612 / 614 |
+
+Los p95/p99 de `step` o `engine_step` (µs), por repetición, se conservaron
+en el mismo `summary.json`:
+
+| Modo | p95, repeticiones 1/2/3 | p99, repeticiones 1/2/3 |
+| --- | ---: | ---: |
+| Tessera sin observación | 2409,3 / 2148,5 / 2566,7 | 3170,9 / 2828,0 / 3707,8 |
+| Tessera con snapshot/eventos | 3963,4 / 5577,6 / 3646,2 | 8424,0 / 8231,7 / 7639,6 |
+| Engine, máscara 0 | 1778,9 / 1829,5 / 1808,3 | 2166,3 / 2310,9 / 1982,1 |
+| Engine, máscara 31 | 3464,8 / 3579,5 / 3742,5 | 3693,2 / 3752,6 / 4317,8 |
+| Engine, máscara 31 y pack | 3404,1 / 3357,2 / 3308,4 | 3521,2 / 3664,1 / 3453,4 |
+| Runtime, pack y dispositivos | 3539,4 / 3597,5 / 3623,4 | 4008,6 / 3788,7 / 3780,2 |
+
+Para la composición `engine_frame`, p95/p99 fueron
+141,7/202,6; 151,9/184,2; 156,0/277,0 µs. Con dispositivos,
+`engine_frame` dio 176,8/237,8; 175,5/253,9; 160,4/183,8 µs, y
+`runtime_device` 431,8/800,4; 345,2/660,9; 384,4/569,1 µs.
+La dispersión de p99, especialmente en Tessera autónoma con observación,
+desaconseja presentar un presupuesto estricto a partir de solo tres series.
+Los demás tramos instrumentados conservan en el JSON las tres series completas.
+Como envolvente entre repeticiones, `canonical_hashes` p95/p99 fue
+35.446–37.357/41.131–46.042 µs sin observación y
+33.222–35.600/37.321–40.107 µs con ella; `observation` p95/p99 con
+capturas fue 572–767/627–1.490 µs. `runtime_hash` p95/p99 quedó en
+717–733/783–938 µs con Engine mínimo, 728–815/876–999 µs con
+observación, 710–732/803–985 µs con composición y 716–730/801–909 µs
+con Runtime. `gpu_execute` p95/p99 dio 307–310/311–454 µs;
+`gpu_image_wait` 0,2/0,2–8,4 µs. Los rangos son mínimos y máximos de
+percentiles de cada repetición, no percentiles calculados sobre muestras
+agregadas; no se suman tramos solapados.
 
 `step` termina antes de `native_frame()`. Los 85–90 µs de composición p50
 aparecen en `engine_frame`, no en `engine_step`; la entrega Vulkan/SDL añade

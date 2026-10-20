@@ -73,6 +73,11 @@ con 36.000 frames sin divergencias. Dos ZIP Engine idénticos SHA-256
 `5bd460bfe713ac5b3b86b9ebf3caef564ee5f9930dd8d33c69d47f2880808c3e`
 (122 entradas) se extrajeron junto con Tessera; un consumidor externo compiló
 y ejecutó. Ninguno de los ZIP lleva ROM, pack, trust ni generador compilado.
+Los hashes del aviso, inventario, lock y licencia principal del ZIP de Tessera
+coinciden con las fuentes (4/4); las 10 licencias externas instaladas también
+son idénticas byte por byte a las fuentes. El metadato del paquete conserva
+`distribution_review: T034-pending` hasta cerrar la revisión conjunta de
+distribución, sin inferir derechos sobre los fixtures generados.
 Runtime `a1fc482` configuró y enlazó con los dos paquetes extraídos y pasó
 230/230 CTest, incluidos los tres perfiles Tessera. Engine pasó 247/247 CTest
 en una pasada posterior a alinear CLI y biblioteca Tessera. En la primera, el
