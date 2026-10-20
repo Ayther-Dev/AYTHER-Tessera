@@ -64,11 +64,12 @@ consolidación final.
 
 ## Entrega y aceptación
 
-El workflow Engine fija Tessera `2549a0b`; Runtime aún bloquea Engine
+El workflow Engine fija Tessera `5704605`; Runtime aún bloquea Engine
 `v0.1.0-rc.19`. Se verificaron los ocho contextos protegidos de Runtime en
 GitHub; los tres PR borradores tienen sus checks actuales aprobados:
-Tessera `2549a0b`, Engine `3deb4c2` (incluido su gate C++ combinado) y
-Runtime `a1fc482`. T035 exige
+Tessera `5704605`, Engine `3deb4c2` (incluido su gate C++ combinado) y
+Runtime `a1fc482`; la revisión actual de Engine `6bbe484` se está
+revalidando en CI. T035 exige
 publicar la cadena real de paquetes con hashes/procedencia y repetir los
 checks sin omisiones, incluido un entorno GPU/audio declarado. T036 y la
 aceptación final permanecen pendientes.

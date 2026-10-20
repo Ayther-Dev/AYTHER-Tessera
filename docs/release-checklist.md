@@ -14,7 +14,7 @@ compilado. Ningún binario generado se sube como artifact de Actions.
 
 | Repositorio | Validación local de este corte | CI remota exigida antes de T036 |
 | --- | --- | --- |
-| Tessera | 16/16 CTest breves con ROM generada, consumidor instalado, replay largo y comparación progresiva FX-03/FX-02 | `Core checks` aprobado en [run 39434356326](https://github.com/Ayther-Dev/AYTHER-Tessera/actions/runs/39434356326), commit `2549a0b` |
+| Tessera | 16/16 CTest breves con ROM generada, consumidor instalado, replay largo y comparación progresiva FX-03/FX-02 | `Core checks` aprobado en [run 39451047154](https://github.com/Ayther-Dev/AYTHER-Tessera/actions/runs/39451047154), commit `5704605` |
 | Engine | Build/instalación y pruebas nativas locales; replay Release de 18.000 frames y 4.500 continuaciones sin divergencias | Todos los checks del [PR #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48) aprobados; 225/225 CTest Windows y 4/4 perfiles nativos; pin Tessera `2549a0b` |
 | Runtime | Build MSVC y 230/230 CTest locales; FX-03 progresivo 180/180 frames por repetición y etapa `engine_frame` aislada | Todos los checks del [PR #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55) aprobados; lock rc.19 todavía sin ruta nativa |
 
@@ -26,8 +26,8 @@ Las ramas `main` de Tessera y Engine no devuelven protección de rama en la API;
 sus workflows declarados siguen siendo parte del gate del MVP.
 
 El paquete Runtime publicado continúa fijado al Engine `v0.1.0-rc.19`, que no
-exporta esta ruta nativa. El workflow de Engine instala Tessera desde el commit
-verificado `2549a0b`. No cambiar locks
+exporta esta ruta nativa. El workflow de Engine ahora fija Tessera `5704605`
+en el PR #48; sus nuevos checks están en curso. No cambiar locks
 por un artefacto inexistente. Para cerrar T035 hay que: consolidar y publicar
 la revisión de Tessera con SHA de fuentes y paquete; validar y publicar Engine
 contra ese SHA; actualizar el lock Runtime con versión, URL, checksum y
@@ -62,7 +62,7 @@ Linux CPU/GPU y Windows Engine→Tessera: 53.886/65.403 (82,39 %) total y
 El workflow de release existente todavía construye Engine sin Tessera; T035
 requiere un candidato nativo verificable y su lock real antes de declarar
 entrega completa. Runtime no tiene runner autohospedado registrado (consulta
-GitHub de 2026-10-20), por lo que GPU/audio físico siguen pendientes.
+GitHub de 2026-10-20), por lo que el perfil GPU/audio físico en CI sigue pendiente.
 
 **Candidato local extraído (2026-10-20):** Tessera `d074cb4` instaló C11/C++20,
 CLI, licencias, inventario y avisos; dos ZIP idénticos SHA-256
@@ -74,10 +74,10 @@ con 36.000 frames sin divergencias. Dos ZIP Engine idénticos SHA-256
 (122 entradas) se extrajeron junto con Tessera; un consumidor externo compiló
 y ejecutó. Ninguno de los ZIP lleva ROM, pack, trust ni generador compilado.
 Runtime `a1fc482` configuró y enlazó con los dos paquetes extraídos y pasó
-230/230 CTest, incluidos los tres perfiles Tessera. Una primera pasada Engine
-tuvo 246/247 resultados correctos porque `AYTHER_TESSERA_CLI` seguía apuntando
-a una revisión vieja; corregida la ruta al CLI del paquete, el replay faltante
-pasó 1/1. La validación de dispositivo local de FX-02 entregó 287.128 muestras
+230/230 CTest, incluidos los tres perfiles Tessera. Engine pasó 247/247 CTest
+en una pasada posterior a alinear CLI y biblioteca Tessera. En la primera, el
+único fallo se debió a `AYTHER_TESSERA_CLI` cacheado desde una revisión vieja.
+La validación de dispositivo local de FX-02 entregó 287.128 muestras
 activas y cero faltantes SDL; FX-03 presentó 180 frames sin errores Vulkan.
 Timestamps efectivos de presentación y cortes acústicos físicos siguen sin
 observación. Son candidatos locales, no assets publicados: faltan revisión de
