@@ -49,6 +49,7 @@ private:
   std::array<std::uint16_t, 256> palette_{};
   Bytes pixels_buffer_ = Bytes(1024 * 1024 * 4);
   Bytes temporal_indices_;
+  Bytes temporal_coverage_;
   std::vector<std::array<std::uint16_t, 256>> temporal_palettes_;
   std::array<bool, 1024> temporal_lines_{};
   bool temporal_requested_{};

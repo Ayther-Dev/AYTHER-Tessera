@@ -1,0 +1,29 @@
+# FX-03 — paquete gráfico sintético
+
+El paquete `fx03.ay` y `trust.toml` se generan localmente con
+`python tests/fixtures/graphics-replacement/generate.py`, después de compilar
+`make_test_pack` en Engine. No requieren red ni GitHub Actions. El generador
+deriva una variante propia `fx03_rom.md` del generador sintético de Engine y
+fija el `game_id` con su CRC32. `manifest.json` registra SHA-256 de ROM, pack,
+registro y assets.
+
+Las dos imágenes de 8×8 píxeles son patrones propios creados para este test,
+con licencia CC0-1.0 y autor AYTHER Tessera. La regla apunta al hash medido
+del tile rojo visible de la demo, en `(32,32)` a `(39,39)` y de la celda del
+plano A en `(96,64)` a `(103,71)`. Hay dos `[[sub]]`
+iguales: el catálogo debe elegir `first.png` (magenta); un override de
+ejecución sobre el mismo hash debe elegir `second.png` (cian). La máscara
+candidata de cambio son únicamente esas dos celdas, y el frame original de
+Tessera sigue siendo rojo. La segunda celda tiene prioridad sobre un sprite
+verde de SAT slot 0. Otro sprite azul de slot 1 empieza en x=104: slot 0 gana
+en x=105 pese a la prioridad gráfica de slot 1, y slot 1 queda visible en
+x=109. `manifest.json` fija esos cuatro píxeles originales y los esperados
+para la presentación con catálogo y override: magenta o cian en ambas celdas,
+verde en x=105 y azul en x=109; fuera de las dos máscaras, bytes idénticos al
+original. Engine prueba que el hash del catálogo coincide
+con el tile observado, que el paquete firmado carga con la ROM real y que la
+primera regla gana.
+
+**Estado:** la ROM superpuesta, el pack y los oráculos son reproducibles. La
+composición HD en Engine y la validación en Runtime siguen pendientes. El
+fixture por sí solo no declara cumplido Gate 4.

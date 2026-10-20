@@ -1,0 +1,10 @@
+version = 1
+
+[[keys]]
+id = "ayther-rc-consumer"
+algorithm = "ed25519"
+public_key = "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+not_before_unix = 0
+not_after_unix = 4102444800
+revoked = false
+games = ["crc32:2af4a80d"]

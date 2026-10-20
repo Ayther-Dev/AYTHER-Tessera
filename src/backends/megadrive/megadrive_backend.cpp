@@ -55,10 +55,12 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
     backend.palette_[index] = static_cast<std::uint16_t>(colour);
   };
   callbacks_.scanline_rendered = [](void *data, cc_u16f line,
-                                    const cc_u8l *row, cc_u16f, cc_u16f,
+                                    const cc_u8l *row, cc_u16f left,
+                                    cc_u16f right,
                                     cc_u16f width, cc_u16f height) {
     auto &backend = self(data);
-    require(width <= 1024 && height <= 1024 && line < height,
+    require(width <= 1024 && height <= 1024 && line < height &&
+                left <= right && right <= width,
             TESSERA_BACKEND_FAILURE, TESSERA_PHASE_STEP);
     if (backend.scanlines_ != 0 &&
         (backend.width_ != width || backend.height_ != height))
@@ -67,16 +69,17 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
     backend.height_ = height;
     ++backend.scanlines_;
     if (backend.temporal_requested_) {
-      if (backend.scanlines_ == 1)
-        backend.temporal_complete_ = true;
-      if (backend.temporal_lines_[line])
-        backend.temporal_complete_ = false;
       backend.temporal_lines_[line] = true;
-      std::copy_n(row, width,
-                  backend.temporal_indices_.data() + std::size_t(line) * 1024);
+      std::copy(row + left, row + right,
+                backend.temporal_indices_.data() +
+                    std::size_t(line) * 1024 + left);
+      std::fill(backend.temporal_coverage_.begin() +
+                    std::size_t(line) * 1024 + left,
+                backend.temporal_coverage_.begin() +
+                    std::size_t(line) * 1024 + right, 1);
       backend.temporal_palettes_[line] = backend.palette_;
     }
-    for (std::size_t x = 0; x < width; ++x) {
+    for (std::size_t x = left; x < right; ++x) {
       const auto colour = backend.palette_[row[x]];
       const auto offset = (std::size_t(line) * width + x) * 4;
       backend.pixels_buffer_[offset] = static_cast<std::uint8_t>((colour & 15) * 17);
@@ -174,6 +177,7 @@ void MegaDriveBackend::prepare_observation(std::uint64_t mask) {
   temporal_requested_ = (mask & TESSERA_REGION_TEMPORAL) != 0;
   if (temporal_requested_) {
     temporal_indices_.resize(1024 * 1024);
+    temporal_coverage_.resize(1024 * 1024);
     temporal_palettes_.resize(1024);
   }
 }
@@ -186,7 +190,9 @@ void MegaDriveBackend::step(const InputState &inputs) {
   input_ = inputs;
   scanlines_ = 0;
   temporal_lines_.fill(false);
-  temporal_complete_ = false;
+  temporal_complete_ = temporal_requested_;
+  if (temporal_requested_)
+    std::fill(temporal_coverage_.begin(), temporal_coverage_.end(), 0);
   pixels_buffer_.resize(1024 * 1024 * 4);
   ClownMDEmu_Iterate(machine_.get());
   auto next_pcm = audio_.finish_frame();
@@ -194,10 +200,15 @@ void MegaDriveBackend::step(const InputState &inputs) {
               next_pcm.size() <= 16384 * 4,
           TESSERA_BACKEND_FAILURE, TESSERA_PHASE_STEP);
   pixels_buffer_.resize(std::size_t(width_) * height_ * 4);
-  temporal_complete_ = temporal_requested_ && temporal_complete_ &&
-      scanlines_ == height_ &&
-      std::all_of(temporal_lines_.begin(), temporal_lines_.begin() + height_,
-                  [](bool captured) { return captured; });
+  if (temporal_complete_)
+    for (std::size_t line = 0; line < height_; ++line)
+      if (!temporal_lines_[line] ||
+          !std::all_of(temporal_coverage_.begin() + line * 1024,
+                       temporal_coverage_.begin() + line * 1024 + width_,
+                       [](std::uint8_t covered) { return covered != 0; })) {
+        temporal_complete_ = false;
+        break;
+      }
   pcm_.swap(next_pcm);
   ++frame_;
 }
