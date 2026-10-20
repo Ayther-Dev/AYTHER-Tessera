@@ -209,3 +209,17 @@ CTest secuenciales, incluidos FX-03, GPU y audio locales. Se conservaron
 fuera de publicación ROM, pack, trust y generador compilado. T031/T036 y el
 gate físico GPU/audio de CI siguen pendientes por la decisión del usuario;
 T032 conserva el incidente de regularidad/audio descrito en la línea base.
+
+**Rendimiento del par público:** el runner enlazado al core instalado ejecutó
+dos series de 3×180 frames con 30 de calentamiento. Los hashes por modo
+permanecieron estables, los 361 eventos no tuvieron pérdidas y las seis
+repeticiones dieron cero demanda adicional de audio no disponible. La entrega
+al presentador tuvo p99 18,261–19,141 ms y máximo hasta 24,681 ms; una
+repetición tuvo `runtime_device` p99 de 2,506 ms. La
+[línea base](performance-baseline.md) conserva tanto esa variación como el
+episodio anterior de 337 muestras; T032 y CA-11 siguen abiertos.
+
+**Audio activo FX-02:** dos series adicionales de 3×180 frames con B mantenido
+produjeron 287.128 muestras activas por repetición y cero demanda faltante
+según SDL. La entrega tuvo p99 18,103–18,929 ms y máximo hasta 27,683 ms.
+Estos resultados locales no sustituyen el perfil GPU/audio físico de CI.

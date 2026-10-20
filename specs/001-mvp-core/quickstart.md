@@ -350,6 +350,12 @@ build/windows-dev/tests/tessera_performance_benchmark.exe `
 El runner exige composición real y compara hashes originales por frame entre
 las etapas de Engine y Runtime; `docs/performance-baseline.md` documenta el
 alcance y los límites de las mediciones. ROM y pack permanecen solo en local.
+Para FX-02 con audio activo, repetir el primer comando del benchmark añadiendo
+`--press-b`: mantiene B pulsado durante la traza y registra
+`input_profile=b-held` en el informe. Sin esa opción, la traza es neutral y
+no demuestra generación de audio activo. Si se mide un paquete Tessera
+instalado, compilar el runner contra su `Tessera::core` para que coincida el
+identificador de backend con el CLI y Runtime empleados.
 
 El último comando se ejecuta desde `C:/ayther/AYTHER-Tessera`, sin otras
 compilaciones o pruebas paralelas. Genera una traza y configuración compartidas,

@@ -284,13 +284,14 @@ Json direct_report(const fs::path &path) {
 
 int main(int argc, char **argv) {
   if (argc < 5) {
-    std::cerr << "Usage: benchmark TESSERA_CLI RUNTIME ROM OUTPUT_DIR [--devices] [--pack PACK TRUST]\n";
+    std::cerr << "Usage: benchmark TESSERA_CLI RUNTIME ROM OUTPUT_DIR [--devices] [--pack PACK TRUST] [--press-b]\n";
     return 2;
   }
   try {
     const fs::path cli = fs::absolute(argv[1]), runtime = fs::absolute(argv[2]);
     const fs::path rom_path = fs::absolute(argv[3]), output = fs::absolute(argv[4]);
     bool devices = false;
+    bool press_b = false;
     fs::path pack, trust;
     for (int index = 5; index < argc; ++index) {
       if (std::string_view(argv[index]) == "--devices") {
@@ -300,6 +301,9 @@ int main(int argc, char **argv) {
         require(pack.empty() && index + 2 < argc, "--pack requires PACK and TRUST");
         pack = fs::absolute(argv[++index]);
         trust = fs::absolute(argv[++index]);
+      } else if (std::string_view(argv[index]) == "--press-b") {
+        require(!press_b, "Duplicate --press-b");
+        press_b = true;
       } else {
         throw std::runtime_error("Unsupported benchmark option");
       }
@@ -328,11 +332,13 @@ int main(int argc, char **argv) {
                          tessera::wire::sha(config));
     tessera::wire::scalar(trace, 3, TESSERA_ENCODING_U64, 180);
     std::vector<Bytes> frames;
+    tessera::InputState input{};
+    if (press_b) input[5] = 1;
     for (std::uint64_t frame = 1; frame <= 180; ++frame) {
       Bytes item;
       tessera::wire::scalar(item, 1, TESSERA_ENCODING_U64, frame);
       tessera::wire::field(item, 2, TESSERA_ENCODING_ARRAY,
-                           tessera::wire::inputs(tessera::InputState{}));
+                           tessera::wire::inputs(input));
       frames.push_back(std::move(item));
     }
     tessera::wire::field(trace, 4, TESSERA_ENCODING_ARRAY,
@@ -342,6 +348,7 @@ int main(int argc, char **argv) {
     write(output / "trace.bin", trace);
 
     Json result = {{"schema", 2}, {"frames", 180}, {"warmup", 30},
+                   {"input_profile", press_b ? "b-held" : "neutral"},
                    {"repetitions", 3}, {"direct_off", Json::array()},
                    {"direct_full", Json::array()},
                    {"engine_minimal", Json::array()},

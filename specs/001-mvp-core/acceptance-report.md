@@ -194,3 +194,20 @@ local. Los checks de código de Engine y Runtime quedaron verdes; falta
 revalidar el commit documental final de Tessera. La matriz física de CI
 continúa pendiente, por lo que CA-08 y el cierre del MVP no se declaran
 aprobados.
+
+La comparación progresiva se repitió con los **paquetes públicos exactos**:
+dos series de 3×180 frames, 30 de calentamiento, mismo contenido/configuración/
+traza y hashes estables dentro de cada modo. En las seis repeticiones hubo
+180 composiciones, 361 eventos sin pérdidas y cero demanda adicional de audio
+no disponible. La entrega tuvo p99 18,261–19,141 ms y máximo hasta 24,681 ms;
+`runtime_device` p99 llegó a 2,506 ms en una repetición. La línea base ahora
+separa esos resultados de los límites del binario anterior. El episodio previo
+de 337 muestras y la falta de CI física siguen sin resolver, por lo que
+T032/CA-11 permanecen abiertos.
+
+La prueba FX-02 con audio activo, sobre los mismos paquetes públicos, añadió
+dos series de 3×180 frames con B mantenido: 287.128 muestras activas por
+repetición, hashes estables, cero pérdidas de eventos y cero demanda faltante
+en el stream SDL. La entrega dio p99 18,103–18,929 ms y máximo hasta
+27,683 ms. Este indicador del callback no mide cortes audibles del dispositivo;
+el perfil físico en CI sigue pendiente por decisión del usuario.

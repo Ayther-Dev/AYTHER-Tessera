@@ -427,3 +427,89 @@ y `AYTHER_NATIVE_DONE frames=180`. Con pack activo, un control de desactivación
 solicitado para el frame 181 no produjo frame ni respaldo adicional
 (`composed_frames=180`, `fallback_frames=0`). Ninguna traza o fixture generado
 se publica en Git ni en artifacts de CI.
+
+### Comparación con los paquetes públicos exactos
+
+Se repitió la comparación FX-03 en dos series de 3×180 frames, con 30 frames
+de calentamiento por repetición. Evidencia local ignorada por Git:
+`build/evidence/phase5-progressive-public-pair-linked/summary.json` y
+`build/evidence/phase5-progressive-public-pair-repeat/summary.json`. El primer
+intento con un runner enlazado al core de desarrollo fue rechazado por identidad
+de backend incompatible. El runner usado en ambas series se enlazó con el
+**mismo paquete público Tessera** que consumen el CLI y Engine; no se mezclaron
+IDs de builds diferentes. Paquetes ZIP: Tessera `v0.1.0-mvp.2`
+SHA-256 `40ae6447b3a5dd7ca4bd4aaed2fccc436118fd53bec6c97deeb6c2593bed5a8f`
+y Engine `native-v0.1.0-rc.22`
+SHA-256 `4f17c34cde082b39a21c4a5216d77bc53e161df896487f1f9e50ab8a3fc1bdf2`.
+Binarios: CLI `6f7609c22390bab4b844d276de4e95c0650ea7b7c79110b80685506c60ac9bf8`,
+Runtime `808f6f2e6742260c6727e065900da50dc767db6ce563211d1b7d662e66bad895`,
+runner `39f17bf45bc42a5cd3842ef228e439c4b666fcf769d8b9e468d77f5ddffcd677`.
+ROM `92478b869fc61dcd7a8d457b52ac6e08661c27956c774babf4768f32497d1077`,
+pack `669550f27ed28b2897265a15828987a968335dc6e2d69e4a83f3252928199abf`,
+configuración `349cf804ed83fad41e838ce385b919b097065deaa91a8af6c152240f60de5e61`
+y traza `844147cc2e378444b6a75e683670b549fa97f2e132f627730f0f337d58b7c276`
+fueron idénticos entre las dos series. El host Windows usó MSVC 19.51.36256
+para Runtime/runner, core Tessera Clang 20.1.8, NVIDIA GeForce RTX 3060
+Laptop GPU con controlador 32.0.16.1656 y dispositivo de salida SDL local.
+
+| Etapa, unidad ms por frame estable | p50 entre seis repeticiones | p95 | p99 |
+| --- | ---: | ---: | ---: |
+| Tessera sin observación, avance | 1,002–1,052 | 1,271–1,637 | 2,519–5,133 |
+| Tessera con observación, avance | 2,326–2,444 | 2,988–4,234 | 3,403–7,037 |
+| Engine mínimo, avance | 0,783–0,952 | 0,968–1,124 | 1,068–1,710 |
+| Engine observado, avance | 2,160–2,444 | 2,560–2,883 | 2,701–3,346 |
+| Engine con pack, composición | 0,065–0,074 | 0,105–0,140 | 0,124–0,277 |
+| Runtime, avance | 1,764–2,230 | 2,247–2,664 | 2,540–2,978 |
+| Runtime, entrega CPU a dispositivo | 0,247–0,273 | 0,323–1,376 | 0,345–2,506 |
+| GPU, ejecución por timestamps | 0,086–0,127 | 0,339–0,958 | 0,636–0,961 |
+| CPU, adquisición de imagen | 0,022–0,029 | 0,035–1,172 | 0,044–2,242 |
+
+La entrega monotónica al presentador dio p50 16,602–16,743 ms, p95
+17,797–18,545 ms, p99 18,261–19,141 ms y máximo 18,363–24,681 ms;
+dos máximos superaron 24 ms, sin elevar el p99 por encima de 20 ms. Runtime
+usó 248,3–248,8 MiB de memoria máxima por proceso. Cada repetición completó
+180 composiciones y 361 eventos sin pérdidas, con hashes originales y
+presentados estables dentro de cada modo; observación directa no cambió sus
+hashes y la presentación Runtime coincidió con la composición Engine. SDL
+reportó 0 episodios y 0 muestras adicionales demandadas sin disponibilidad
+en las seis repeticiones. El silencio de FX-03 es el contenido esperado; FX-02
+cubre audio activo por separado. La serie de presentación efectiva sigue
+`unavailable`; el callback SDL mide una aproximación de falta de datos del
+stream, no cortes audibles del hardware.
+
+Los límites de aviso de `d074cb4` anteriores pertenecen a ese binario y
+perfil. En la pareja pública, los p99 de observación directa, entrega CPU y
+dos máximos de intervalo mostraron colas distintas; no se interpretan como
+regresión causal frente a `d074cb4` ni se oculta el episodio previo de 337
+muestras faltantes. Para una siguiente validación del **mismo par público**,
+un margen provisional de aproximadamente 25 % sobre los mayores valores
+medidos da avisos de 8,8 ms para p99 de Tessera observada, 4,2 ms para Engine
+observado, 3,2 ms para `runtime_device`, 24,0 ms para p99 de entrega y 30,9 ms
+para el intervalo máximo. Cualquier muestra adicional demandada por SDL se
+investiga por tener base cero. Son avisos locales, no garantías estadísticas
+ni sustitutos del perfil físico en CI.
+
+### FX-02 con audio activo en los mismos paquetes públicos
+
+El runner `tests/performance/benchmark.cpp` admite `--press-b` para generar
+una traza completa de 180 frames con el control B mantenido. Su valor por
+defecto sigue siendo una entrada neutral. Se ejecutaron dos series adicionales
+de 3×180 frames con `--devices --press-b` y sin pack, excluyendo los primeros
+30 frames de cada repetición. Evidencia local:
+`build/evidence/phase5-progressive-fx02-public-active/summary.json` y
+`build/evidence/phase5-progressive-fx02-public-active-repeat/summary.json`.
+ROM FX-02 SHA-256 `5296c4fa331fd8cb47663fc7ce3b0abef03364221b309a65f2966c6a8642225c`,
+configuración `349cf804ed83fad41e838ce385b919b097065deaa91a8af6c152240f60de5e61`,
+traza `fb97aa4998c424297405e8903cd2e1e00e73384239ee219fa4bbcf477925113c`
+y runner recompilado `c1328a35080ebd69c37aad16074b31d97723ed9d3bd6afffb373d7230d70649b`.
+Los ZIP, Runtime, GPU y toolchain son los identificados en la sección anterior.
+
+Las seis repeticiones produjeron `source_peak=1022` y 287.128 muestras
+activas cada una, con hashes estables por modo, cero pérdidas de eventos y
+**cero episodios/muestras adicionales demandadas sin disponibilidad** en el
+stream SDL. La entrega dio p99 18,103–18,929 ms y máximo 18,511–27,683 ms;
+dos máximos superaron 25 ms sin producir demanda faltante según el callback.
+`runtime_device` p99 fue 0,656–1,426 ms y `gpu_execute` p99
+0,324–0,489 ms. Se conserva el máximo de 27,683 ms como variación real de
+entrega, sin equipararlo a una interrupción acústica. Este perfil tampoco
+mide el reloj de salida ni sustituye la validación física en CI.
