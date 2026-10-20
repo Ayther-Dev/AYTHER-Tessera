@@ -3,7 +3,8 @@
 **Corte local:** 2026-10-20. **Resultado:** aceptación final **pendiente**.
 La fase 5 añadió presentación Vulkan, salida SDL al dispositivo y una línea
 base comparable de tres capas. La ampliación local añadió asignaciones,
-copias explícitas, eventos, respaldos y etapas CPU de presentación. Los checks
+copias explícitas, eventos, respaldos, etapas CPU de presentación y una
+comparación progresiva FX-03 con hashes por frame. Los checks
 remotos de las revisiones finales y la distribución coordinada siguen
 pendientes. Un test omitido no cuenta como aprobado.
 
@@ -17,11 +18,11 @@ pendientes. Un test omitido no cuenta como aprobado.
 | RF-06 | `contract.snapshot`, Engine controls/presentation, Runtime confirmación 1/2/3 | Local verificado; negativos Runtime adicionales pendientes |
 | RF-07 | Engine controls/presentation y checkpoint; respaldo/rearme locales | Local verificado; CI final pendiente |
 | RF-08 | Engine pack/presentation: manifiesto, derechos, hashes, rutas y límites | Local verificado |
-| RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones | Local verificado; revisión final T033 pendiente |
+| RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones; matriz T033 revalidada en `windows-dev` y ASan | Local verificado; CI final pendiente |
 | RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
 | RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; CTest Runtime 4/4 | Local verificado; CI encadenada pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU y 180 timestamps GPU por serie; 295–298 callbacks SDL sin demanda descubierta. La serie GPU puede incluir espera de semáforo; el dispositivo no expone cortes acústicos físicos. | Local parcial; CI pendiente |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, espera de imagen y trabajo GPU separados; comparación progresiva FX-03 con 180 hashes originales por etapa y composición 180/180. SDL no detectó demanda descubierta; el dispositivo no expone cortes acústicos físicos. | Local parcial; CI pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
 | RC-03 | Contratos, unidad, replay, robustez y GPU/audio locales; Actions de estas revisiones no ejecutado | Pendiente |
@@ -29,7 +30,7 @@ pendientes. Un test omitido no cuenta como aprobado.
 | RC-05 | `package.installed_consumer` pasó; paquetes Engine/Runtime y avisos de todas las copias pendientes | Pendiente |
 | CA-01 | FX-01/02/03 presentes y con manifiestos, fuentes/generadores y hashes | Local verificado; entrega pendiente |
 | CA-02 | Replay completo de fases 1/3/4 y oráculos independientes, dos procesos | Local verificado; CI final pendiente |
-| CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3 | Local verificado; consolidación T033 pendiente |
+| CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3; consolidación T033 6/6 local y 4/4 ASan | Local verificado; CI pendiente |
 | CA-04 | Dos lectores, retención, observación activada/inactiva y misma salida | Local verificado |
 | CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local verificado; CI GPU pendiente |
 | CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Local verificado |
@@ -37,7 +38,7 @@ pendientes. Un test omitido no cuenta como aprobado.
 | CA-08 | Consumidor Tessera limpio pasó; CI y cadena de paquetes Engine→Runtime sin publicar | Pendiente |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Tres repeticiones con 150 muestras estables cada una y 180 timestamps GPU por serie; límites y variación declarados en la línea base. Falta completar comparación progresiva de T032 y validar CI. | Pendiente |
+| CA-11 | Tres repeticiones con 150 muestras estables cada una y 180 timestamps GPU por serie; comparación progresiva FX-03 ejecutada con hashes originales conservados, composición real y límites declarados en la línea base. Faltan CI y presupuestos respaldados por la base medida. | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
@@ -63,8 +64,19 @@ contadores SDL de demanda no prueban por sí solos ausencia de cortes audibles.
 (5/5); `ctest --test-dir C:/ayther/AYTHER-Runtime/out/build/tessera-local
 -C RelWithDebInfo -R '^(runtime_options|tessera_runtime_.*)$'`
 (4/4); `tessera_performance_benchmark.exe` con `--devices` (3 repeticiones,
-`summary.json` local). Revisión de código de la medida en
+`summary.json` local); benchmark progresivo FX-03 en
+`build/evidence/phase5-progressive-fx03/summary.json` (3×180 frames, 30 de
+calentamiento, 180 composiciones por serie, hashes por frame conservados) y
+FX-02 sin pack en `build/evidence/phase5-progressive-fx02/summary.json`.
+La regresión `ayther.integration.tessera_session_test` confirmó la política
+durante replay por traza (1/1); Engine controls/presentation (2/2) y Runtime
+options/headless/audio/GPU (4/4) pasaron tras la corrección. Revisión de código de la medida en
 `tests/performance/benchmark.cpp`; binarios y revisiones en la línea base.
+La consolidación T033 pasó 6/6 en `build/windows-dev`, 4/4 con AddressSanitizer
+en `build/windows-diagnostics` y el caso de paquetes mutados de Engine (1/1).
+`ctest --test-dir build/windows-dev --output-on-failure -R
+'^package\.installed_consumer$'` pasó 1/1: instaló en prefijo aislado,
+reubicó el paquete y compiló consumidores C11/C++20 fuera del árbol.
 
 **Diez grupos de QA preservados:** reinicio y estado inicial; frames/traza/EOF;
 entradas completas y rechazos; transacción pendiente y cancelaciones; captura

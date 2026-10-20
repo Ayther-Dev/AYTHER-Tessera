@@ -32,7 +32,8 @@ Tessera mide `replay_next`, exportación/hash canónicos y lectura de
 observación con `steady_clock` en microsegundos; el informe JSON conserva las
 150 muestras posteriores al calentamiento por repetición. El modo observado
 realizó 180 lecturas de snapshot y 180 lotes de eventos por repetición. En
-Runtime, `engine_step` rodea avance/replay y entrega de frame de Engine;
+Runtime, `engine_step` rodea solo avance/replay de Engine; `engine_frame`
+rodea la adquisición del frame y la composición de Engine;
 `runtime_hash` rodea hashes de vídeo original/presentado y PCM;
 `runtime_device` rodea encolado SDL, render Vulkan y espera de `end_frame`.
 Estas etapas no se suman con la serie de presentación: esta última mide
@@ -180,3 +181,67 @@ La ROM FX-02 está en `build/windows-dev/native-fixtures/fx02/program.md`;
 ninguna ROM o pack generados se incluyen en Git o artifacts de CI.
 Requiere los paquetes locales de Engine y Tessera instalados antes de
 configurar Runtime.
+
+### Comparación progresiva FX-03, 2026-10-20
+
+Evidencia local: `build/evidence/phase5-progressive-fx03/summary.json` (ignorada
+por Git). Una ROM FX-03, configuración y traza neutral de 180 frames se usaron
+en todos los modos, con tres repeticiones secuenciales y 30 frames de
+calentamiento excluidos. SHA-256: ROM
+`92478b869fc61dcd7a8d457b52ac6e08661c27956c774babf4768f32497d1077`,
+configuración `077fe4f966c6eaa21d41de33cec512c4ddeb3a68ab274ff3cf3d9a2a9e4d3a14`,
+traza `fdbab19a72919f981e0a36013e1761d7e3b55fb5bf5c454932ca8b0696ed6301`,
+pack `669550f27ed28b2897265a15828987a968335dc6e2d69e4a83f3252928199abf`.
+Mismo equipo y toolchain indicados arriba. Binarios SHA-256: CLI
+`e1655b39fa5984364991d1b87c32cebda2464b1a5b0d2c269a77dc3ac338e450`,
+Engine instalado
+`eca7603dd309e196b72e24002dd83de1f9fef3cd7d5f3e016f38d75cd36a0258`,
+Runtime `2e57617096c90356596fd0218b58e18a461119150b382c27ee2b03863ee18001`.
+
+| Etapa | `step` p50, µs (tres series) | `engine_frame` p50, µs | Hash p50, µs |
+| --- | ---: | ---: | ---: |
+| Tessera sin observación | 1698,8 / 1613,6 / 1730,2 | — | 26785 / 25443 / 27344 |
+| Tessera con snapshot/eventos | 3159,7 / 3076,3 / 3184,5 | — | 27224 / 24598 / 27385 |
+| Engine, máscara de observación 0 tras frame 1 | 1474,5 / 1482,8 / 1501,3 | 0,7 / 0,7 / 0,7 | 584 / 587 / 585 |
+| Engine, máscara 31 | 3011,4 / 3106,8 / 2962,5 | 1,4 / 1,4 / 1,5 | 622 / 632 / 629 |
+| Engine, máscara 31 y pack | 2973,5 / 3035,3 / 2927,0 | 85,2 / 89,7 / 84,4 | 637 / 632 / 632 |
+| Runtime, pack y dispositivos | 3131,2 / 3196,5 / 3231,2 | 132,9 / 130,8 / 126,5 | 609 / 612 / 614 |
+
+`step` termina antes de `native_frame()`. Los 85–90 µs de composición p50
+aparecen en `engine_frame`, no en `engine_step`; la entrega Vulkan/SDL añade
+`runtime_device` p50 de 288/282/272 µs. El hash de Tessera exporta y digiere
+estado, vídeo y audio canónicos; el de Runtime digiere vídeo original,
+presentado y PCM mediante FNV. Por esa diferencia de trabajo y algoritmo,
+sus tiempos de hash no son comparables entre sí. Runtime mantuvo el hash activo
+en todas las etapas y lo midió aparte: la serie mínima aísla el costo de
+avance con observación desactivada, pero no es una ejecución completa sin
+hash. El control inicial se confirmó en el frame 1 y se desactivó en el 2,
+dentro del calentamiento. Carga de ROM/pack, apertura de dispositivos, guardado
+y pacing quedan fuera de los tramos CPU estables.
+
+La comparación valida los 180 hashes canónicos de Tessera entre observación
+apagada/encendida y los 180 hashes originales de vídeo/PCM de Engine entre
+máscara 0, máscara 31 y composición; los 180 hashes original/presentado/PCM
+de Runtime con dispositivos coinciden con Engine con pack. La configuración
+coincide en todas las rutas. Los formatos SHA-256 canónico y FNV sobre bytes
+originales son distintos; la comprobación cruzada directa de un digest único
+entre CLI y Runtime queda fuera de esta serie. La composición se produjo en
+180/180 frames por repetición, con 51.609.600 bytes de copia base; sin pack
+hubo 180 respaldos. Observación completa: 180 snapshots, 361 eventos y cero
+pérdidas por repetición; Engine retuvo los mismos 361 eventos. En Runtime se
+transfirieron 51.609.600 bytes al staging GPU y 576.572 bytes PCM al stream.
+Los contadores `new` fueron 2/frame en Engine mínimo, ~196/frame con capturas,
+~205/frame con composición y ~210/frame con dispositivos; son asignaciones
+solicitadas, no memoria viva. El pico de proceso pasó de ~22,1 MiB en Engine
+mínimo a ~24,4 MiB con pack y ~244–283 MiB con dispositivos.
+
+La GPU informó trabajo p50 86,112/85,888/86,272 µs, espera de imagen p50
+0,128 µs y entrega p95 17,969/17,883/18,036 ms; hubo cero errores de
+validación. Audio SDL informó cero episodios y cero muestras demandadas sin
+disponibilidad. Estas series de GPU, espera, entrega y audio conservan los
+límites de interpretación descritos arriba; no se suman percentiles ni se
+deriva todavía un presupuesto contractual. Durante el primer ensayo, replay
+por traza evitaba confirmar la política de Engine y produjo 180 respaldos
+`policy_unconfirmed`; se corrigió mediante `AytherSession::native_replay_next`
+y la serie publicada arriba es la repetición completa posterior a la
+corrección. La comparación no acredita aún CI ni aceptación final.

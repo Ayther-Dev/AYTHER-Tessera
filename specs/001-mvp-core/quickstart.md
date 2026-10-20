@@ -331,6 +331,23 @@ build/windows-dev/tests/tessera_performance_benchmark.exe `
   build/phase5-fx02/program.md build/evidence/phase5-benchmark --devices
 ```
 
+Para la comparación progresiva local de FX-03, con las mismas opciones de
+build y paquetes instalados, ejecutar:
+
+```powershell
+build/windows-dev/tests/tessera_performance_benchmark.exe `
+  build/windows-dev/src/tessera.exe `
+  C:/ayther/AYTHER-Runtime/out/build/tessera-local/bin/RelWithDebInfo/ayther_runtime.exe `
+  build/windows-dev/native-fixtures/fx03/fx03_rom.md `
+  build/evidence/phase5-progressive-fx03 --devices `
+  --pack build/windows-dev/native-fixtures/fx03/fx03.ay `
+  build/windows-dev/native-fixtures/fx03/trust.toml
+```
+
+El runner exige composición real y compara hashes originales por frame entre
+las etapas de Engine y Runtime; `docs/performance-baseline.md` documenta el
+alcance y los límites de las mediciones. ROM y pack permanecen solo en local.
+
 El último comando se ejecuta desde `C:/ayther/AYTHER-Tessera`, sin otras
 compilaciones o pruebas paralelas. Genera una traza y configuración compartidas,
 tres repeticiones de 180 frames por modo y 30 frames de calentamiento; el

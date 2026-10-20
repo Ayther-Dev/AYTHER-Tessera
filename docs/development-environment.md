@@ -42,6 +42,24 @@ cerrar la sesión. Los fallos controlados de E/S siguen cubiertos por
 `integration.state_store`. UBSan no está configurado en Windows y no se le
 atribuye cobertura.
 
+Revalidación local del 2026-10-20: `ctest --test-dir build/windows-diagnostics
+--output-on-failure -R '^(integration\.robustness|integration\.state_store|
+integration\.checkpoint|unit\.state_format)$'` pasó 4/4 con AddressSanitizer;
+el perfil `build/windows-dev` pasó 6/6 incluyendo `unit.session` y
+`contract.snapshot`. Cobertura de T033: estados truncados/mutados e
+incompatibles (`unit.state_format`), primer guardado y reemplazo interrumpidos,
+errores de lectura/espacio/permisos/publicación y preservación de destino
+(`integration.state_store`), restore inválido sin consumir pendiente y
+cancelación fuera de la cola saturada (`integration.checkpoint`), entradas
+incompletas/duplicadas/fuera de orden y EOF estable (`unit.session`,
+`integration.robustness`), lectores lentos y presupuesto de snapshots
+(`contract.snapshot`), y captura retenida tras cierre
+(`integration.robustness`). Los paquetes firmados con metadatos, rutas, imagen
+y reglas mutadas se prueban en Engine `ayther.integration.tessera_pack_test`;
+la suite ASan de Tessera no acredita esa ruta externa. El diagnóstico cubre
+asignaciones administradas por el proceso instrumentado, no sustituye una
+medición de recursos Vulkan/SDL ni UBSan en Linux.
+
 ## Consumo local de Engine y Runtime
 
 - Paquete Engine comprobado mediante enlace: `C:/ayther/AYTHER-Engine/install/windows-release-engine-vpx`,
