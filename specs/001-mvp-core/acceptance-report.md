@@ -4,9 +4,10 @@
 La fase 5 añadió presentación Vulkan, salida SDL al dispositivo y una línea
 base comparable de tres capas. La ampliación local añadió asignaciones,
 copias explícitas, eventos, respaldos, etapas CPU de presentación y una
-comparación progresiva FX-03 con hashes por frame. Los checks
-remotos de las revisiones finales y la distribución coordinada siguen
-pendientes. Un test omitido no cuenta como aprobado.
+comparación progresiva FX-03 con hashes por frame. Los checks de código de
+las tres revisiones están verdes y los dos paquetes de software se publicaron
+y consumieron desde URL pública. El perfil físico GPU/audio en CI sigue
+pendiente. Un test omitido no cuenta como aprobado.
 
 | ID | Evidencia ejecutada o pendiente | Estado |
 | --- | --- | --- |
@@ -21,13 +22,13 @@ pendientes. Un test omitido no cuenta como aprobado.
 | RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones; matriz T033 revalidada en `windows-dev` y ASan | Local verificado; CI final pendiente |
 | RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
-| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; CTest Runtime 4/4 | Local verificado; CI encadenada pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, espera de imagen y trabajo GPU separados; comparación progresiva FX-03 con 180 hashes originales por etapa y composición 180/180. SDL no detectó demanda descubierta; el dispositivo no expone cortes acústicos físicos. | Local parcial; CI pendiente |
+| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos | Local verificado; CI física pendiente |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, espera de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. Una de seis repeticiones tuvo 337 muestras faltantes y espera GPU elevada; la presentación efectiva física no expone timestamps. | Local parcial; incidente y CI pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
-| RC-03 | Contratos, unidad, replay, robustez y GPU/audio locales; Actions de estas revisiones no ejecutado | Pendiente |
-| RC-04 | Código nuevo en inglés, mensajes/documentos en español; copia externa conservada; revisión de idioma final pendiente | Pendiente |
-| RC-05 | `package.installed_consumer` pasó; paquetes Engine/Runtime y avisos de todas las copias pendientes | Pendiente |
+| RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime | Pendiente del perfil físico CI |
+| RC-04 | Código propio nuevo en inglés, mensajes/documentos en español; fuentes externas intactas con idioma, avisos y procedencia | Local verificado en T034 |
+| RC-05 | ZIP públicos Tessera/Engine, fuente y avisos, hashes/atestaciones, consumidor externo y Runtime desde prefijos públicos | Local verificado |
 | CA-01 | FX-01/02/03 presentes y con manifiestos, fuentes/generadores y hashes | Local verificado; entrega pendiente |
 | CA-02 | Replay completo de fases 1/3/4 y oráculos independientes, dos procesos | Local verificado; CI final pendiente |
 | CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3; consolidación T033 6/6 local y 4/4 ASan | Local verificado; CI pendiente |
@@ -35,10 +36,10 @@ pendientes. Un test omitido no cuenta como aprobado.
 | CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local verificado; CI GPU pendiente |
 | CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Local verificado |
 | CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime añadió entrada inválida, control fuera de orden y pack ausente sin avanzar frame. Matriz T033 cerrada localmente (6/6 y 4/4 ASan); falta CI | Pendiente |
-| CA-08 | Consumidor Tessera limpio pasó; CI y cadena de paquetes Engine→Runtime sin publicar | Pendiente |
+| CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código verdes y Runtime 233/233 local | Pendiente del perfil físico CI |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Tres repeticiones con 150 muestras estables cada una y 180 timestamps GPU por serie; comparación progresiva FX-03 ejecutada con hashes originales conservados, composición real y límites declarados en la línea base. Faltan CI y presupuestos respaldados por la base medida. | Pendiente |
+| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un episodio de 337 muestras faltantes y p99 de entrega 33,463 ms activó avisos; la causa y el perfil físico en CI siguen pendientes. | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
@@ -166,3 +167,30 @@ En una repetición apareció un episodio SDL de 337 muestras faltantes durante
 adquirir imagen de 36,267 ms; las otras cinco repeticiones no lo reprodujeron.
 Se conservan ambas series en la línea base. Los presupuestos locales de aviso
 detectaron el caso y CA-11 no se declara cerrado.
+
+El borrador de Tessera `v0.1.0-mvp.2` pasó su workflow Release y ofrece un ZIP
+SHA-256 `40ae6447b3a5dd7ca4bd4aaed2fccc436118fd53bec6c97deeb6c2593bed5a8f`
+con checksum y atestación verificados, fuente limpia y sin fixtures excluidos.
+Su consumidor externo pasó con Engine local. En ese punto todavía faltaban el
+asset Engine final, los locks nativos y la aceptación de toda la cadena.
+
+El borrador Engine `native-v0.1.0-rc.22` también pasó su workflow completo;
+el ZIP SHA-256 `4f17c34cde082b39a21c4a5216d77bc53e161df896487f1f9e50ab8a3fc1bdf2`
+y su checksum fueron descargados y atestados. Ambos ZIP borrador juntos
+pasaron el consumidor externo y el build completo de Runtime con 233/233
+CTest secuenciales, incluidos FX-03, presentación GPU y audio. Runtime fijó
+las dos identidades en locks nativos
+verificados y subió el PR #55. Faltan los checks de esas ramas, publicar solo
+los paquetes de software autorizados y consumir sus URL públicas. La prueba
+física en CI y el incidente de regularidad/audio descrito arriba mantienen
+CA-08 y CA-11 abiertos.
+
+Los dos prereleases de software se publicaron con solo ZIP y checksum. Las
+descargas sin credenciales desde las URL canónicas de los locks conservaron
+los hashes indicados y pasaron manifiestos, atestaciones y verificadores de
+paquete. El consumidor externo y Runtime configurado desde esos prefijos
+públicos pasaron; Runtime repitió 233/233 CTest secuenciales, con GPU/audio
+local. Los checks de código de Engine y Runtime quedaron verdes; falta
+revalidar el commit documental final de Tessera. La matriz física de CI
+continúa pendiente, por lo que CA-08 y el cierre del MVP no se declaran
+aprobados.

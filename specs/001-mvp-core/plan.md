@@ -3,7 +3,7 @@
 **Característica:** `001-mvp-core`  
 **Fecha y aprobación:** 2026-10-19  
 **Alineación aprobada:** diez correcciones de QA de la especificación y la constitución.  
-**Estado:** aprobado; fases 0–4 completadas localmente, con ClownMDEmu seleccionado, Engine nativo, replay/checkpoints Mega Drive y observación/sustitución FX-03 validados. Fase 5 en curso: T033 cerrada; Runtime (T030/T031), mediciones (T032) y entrega (T034–T036) pendientes.
+**Estado:** aprobado; fases 0–4 y T030/T033/T034 completadas localmente. Los paquetes de software de Tessera y Engine están publicados y Runtime pasó 233/233 CTest locales con ambos prefijos públicos. Fase 5 abierta: T031 por CI física, T032 por el incidente de regularidad/audio, y T035–T036 por sus dependencias de aceptación.
 **Especificación:** [spec.md](spec.md).  
 **Norma aplicable:** [docs/constitution.md](../../docs/constitution.md).
 

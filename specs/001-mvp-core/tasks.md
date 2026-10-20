@@ -3,7 +3,7 @@
 **Característica:** `001-mvp-core`  
 **Aprobación:** 2026-10-19; 36 tareas aprobadas por el usuario.  
 **Alineación aprobada:** diez correcciones de QA, conservando tareas, fases y dependencias.  
-**Estado:** fases 0–4 completadas localmente; T001–T029 verificadas en su alcance. La validación de Runtime, las mediciones comparativas y la aceptación final siguen pendientes. Resultados en [fase 3](../../docs/phase-3-results.md) y [fase 4](../../docs/phase-4-progress.md).
+**Estado:** fases 0–4 y T030/T033/T034 verificadas localmente. T031 mantiene pendiente el perfil físico en CI; T032, T035 y T036 siguen abiertos. Resultados en [fase 3](../../docs/phase-3-results.md), [fase 4](../../docs/phase-4-progress.md) y [línea base](../../docs/performance-baseline.md).
 **Fuentes:** [especificación](spec.md), [plan técnico](plan.md), [investigación](research.md),
 [modelo de datos](data-model.md), [contrato nativo](contracts/native-api.md) y
 [guía de validación](quickstart.md).  
@@ -198,7 +198,11 @@ distribución sin multiplicar PR ni repetir compilaciones remotas innecesarias.
 
 ### Integración final de las historias
 
-- [ ] T030 [US1] Incorporar configuración/selección explícita del proveedor nativo y opciones de contenido/paquete en `C:/ayther/AYTHER-Runtime/src/runtime_application.cpp` y `C:/ayther/AYTHER-Runtime/src/runtime_options.cpp`; consumir el paquete local de Engine probado y validar la resolución del proveedor sin exigir un core libretro para Tessera. Preparar la actualización de `C:/ayther/AYTHER-Runtime/dependencies/ayther-engine.lock.json` únicamente con identidad/procedencia verificables cuando exista el paquete requerido; T035 cierra ese paso sin locks de releases inexistentes. Transportar estados completos de controles por frame y propagar resultados/estados del proveedor nativo, incluidos final de traza y rechazos, sin avance espurio ni aplicación de pendientes por entradas inválidas.
+- [x] T030 [US1] Incorporar configuración/selección explícita del proveedor nativo y opciones de contenido/paquete en `C:/ayther/AYTHER-Runtime/src/runtime_application.cpp` y `C:/ayther/AYTHER-Runtime/src/runtime_options.cpp`; consumir el paquete local de Engine probado y validar la resolución del proveedor sin exigir un core libretro para Tessera. Preparar la actualización de `C:/ayther/AYTHER-Runtime/dependencies/ayther-engine.lock.json` únicamente con identidad/procedencia verificables cuando exista el paquete requerido; T035 cierra ese paso sin locks de releases inexistentes. Transportar estados completos de controles por frame y propagar resultados/estados del proveedor nativo, incluidos final de traza y rechazos, sin avance espurio ni aplicación de pendientes por entradas inválidas.
+  Evidencia: Runtime pasó 3/3 pruebas nativas con los ZIP borrador exactos de
+  Engine rc.22 y Tessera mvp.2; fijó ambos en locks nativos separados para
+  conservar rc.19 como valor predeterminado de la CI actual. La descarga desde
+  las URL públicas y el cierre de entrega corresponden a T035.
 - [ ] T031 [US2] Crear y registrar `C:/ayther/AYTHER-Runtime/tests/tessera_runtime_test.cpp`: Runtime→Engine→Tessera con FX-03, activación/desactivación, controles, rechazo, invalidación, respaldo, entradas y audio original. Declarar GPU/controlador/configuración y versiones; verificar presentación y audio, su regularidad y cortes, y separar esta evidencia del núcleo sin GPU y de Engine. Ejecutar el perfil equivalente en la CI declarada; una prueba omitida o recurso ausente mantiene el criterio pendiente. Verificar los casos de coincidencias/solapamientos de FX-03 y la propagación de resultados de entradas, fin de traza y pendientes. Medir intervalos monotónicos entre entregas al presentador en milisegundos con p50/p95/p99/máximo; registrar presentación efectiva disponible como serie separada. Cortes de audio: episodios, muestras faltantes y duración total/máxima; el silencio previsto es válido. Identificar punto de instrumentación, origen y cobertura.
 
 ### Consolidación y entrega comunes
@@ -311,9 +315,9 @@ sin fingir que carece de dependencias del núcleo compartido.
 | Demo Engine/Lab copiada | ROM/fuentes intactas, procedencia y hashes verificados; 3.000 frames y checkpoints reproducidos por Tessera y Engine. No programa FM/PSG. | T002, T019, T021, T024 y T034 completadas. |
 | FX-01 | Autónomo y Engine cerrados; perfiles, estados completos 1…3000, entrada/control, reset, tres checkpoints y continuación K+1. | T009, T010, T012, T014, T018 y T024 completadas. |
 | FX-02 | ROM separada con fuente MIT, hashes, control/acción B, estado observable, vídeo y transición silencio→PSG→silencio verificados por Tessera y Engine. | T005 semilla; T020, T021 y T024 completadas. |
-| FX-03 | ROM, imágenes y `.ay` firmado reproducibles; catálogo, override, solapamientos, respaldo y conservación de originales verificados en Engine–Tessera. Consumo Runtime pendiente. | T026, T028 y T029 completadas; T031 pendiente. |
+| FX-03 | ROM, imágenes y `.ay` firmado reproducibles; catálogo, override, solapamientos, respaldo y conservación de originales verificados en Engine–Tessera y Runtime local con GPU/audio. | T026, T028–T030 completadas; CI física de T031 pendiente. |
 | Negativos y saturación | Contratos, corrupción de TLV/estado, primer guardado, interrupción, errores E/S, cancelación con cola saturada y respaldo de presentación verificados. Consolidación de robustez cerrada localmente; Runtime pendiente. | T007, T010, T012, T014, T022, T023, T027–T029 y T033 completadas; T031 pendiente. |
-| CI y distribución | Núcleo dev/Release/ASAN validado localmente y Engine nativo probado; CI de los tres PR borradores aprobada; falta paquete Engine/Tessera versionado, lock Runtime nativo y runner GPU/audio físico. Revisión técnica local de distribución completada; publicación y CI física pendientes. | T003, T014, T018, T024 y T034 completadas; T031, T035–T036 pendientes. |
+| CI y distribución | Núcleo dev/Release/ASAN y Engine nativo probados; ambos prereleases públicos, checksums, atestaciones y locks Runtime nativos verificados. Las descargas públicas permitieron consumidor externo y Runtime 233/233 local; CI de código de Engine/Runtime verde. El perfil físico en CI sigue pendiente. | T003, T014, T018, T024, T030 y T034 completadas; T031, T035–T036 pendientes por su gate/aprobación final. |
 
 | Requisito o criterio | Tareas y evidencia principal |
 | --- | --- |
