@@ -1,11 +1,13 @@
 # Guía de validación del MVP
 
-**Estado:** fases 0–3 completadas localmente al 2026-10-19; Gate 0 seleccionó
+**Estado:** fases 0–4 completadas localmente al 2026-10-19; Gate 0 seleccionó
 ClownMDEmu, Gate 2 acredita FX-01 desde Engine y Gate 3 acredita Mega Drive,
 FX-02 y checkpoints entre procesos. Consultar los resultados y límites de
 [fase 3](../../docs/phase-3-results.md), [fase 2](../../docs/phase-2-results.md),
 [fase 1](../../docs/phase-1-results.md) y [fase 0](../../docs/phase-0-results.md).
-FX-03, presentación con `.ay` y Runtime permanecen pendientes.
+FX-03 y la presentación Engine–Tessera con `.ay` están verificadas localmente.
+La fase 5 inició el consumo nativo sin GPU en Runtime; presentación efectiva,
+audio de dispositivo, métricas completas y CI permanecen pendientes.
 
 ## Comprobaciones disponibles hoy
 

@@ -25,6 +25,23 @@ de 32 bits; se lee el valor de CPU por nombre. No se instalaron herramientas.
 La enumeración de GPU no acredita presentación, timestamps efectivos ni audio
 de Runtime. Esas comprobaciones siguen pendientes en su fase declarada.
 
+La fase 5 configuró un build local `C:/ayther/AYTHER-Runtime/out/build/tessera-local`
+con MSVC v145, CRT `/MD`, Engine instalado en
+`C:/ayther/AYTHER-Engine/install/windows-native` y Tessera en
+`C:/ayther/AYTHER-Tessera/install/windows-dev`. El probe de enlace y el test
+FX-03 sin GPU pasaron; este perfil no sustituye la prueba de presentación
+efectiva ni el perfil CI de Runtime. El `install/` preexistente de Runtime
+permanece fuera de Git.
+
+El test `integration.robustness` pasó en `windows-dev` y
+`windows-diagnostics` (AddressSanitizer), junto con `unit.state_format`,
+`integration.state_store` e `integration.checkpoint` en diagnósticos.
+La cobertura nueva ejercita entradas incompletas, transacciones consecutivas,
+traza truncada, EOF repetido, productor saturado y snapshot retenido tras
+cerrar la sesión. Los fallos controlados de E/S siguen cubiertos por
+`integration.state_store`. UBSan no está configurado en Windows y no se le
+atribuye cobertura.
+
 ## Consumo local de Engine y Runtime
 
 - Paquete Engine comprobado mediante enlace: `C:/ayther/AYTHER-Engine/install/windows-release-engine-vpx`,

@@ -81,6 +81,15 @@ tessera_copy_diagnostic_runtime(tessera_megadrive_observation_test)
 add_test(NAME integration.megadrive_observation COMMAND tessera_megadrive_observation_test)
 set_tests_properties(integration.megadrive_observation PROPERTIES LABELS "integration;phase4;MegaDrive" TIMEOUT 45)
 
+add_executable(tessera_robustness_test integration/robustness_test.cpp)
+target_include_directories(tessera_robustness_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_robustness_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_robustness_test)
+add_test(NAME integration.robustness COMMAND tessera_robustness_test)
+set_tests_properties(integration.robustness PROPERTIES
+    LABELS "integration;phase5;robustness" TIMEOUT 60)
+
 add_executable(tessera_audio_fixture_generator backend_probe/main.cpp)
 target_link_libraries(tessera_audio_fixture_generator PRIVATE Tessera::build_options
     nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
