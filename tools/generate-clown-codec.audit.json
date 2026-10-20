@@ -1,0 +1,2658 @@
+{
+  "format_version": 1,
+  "backend_commit": "88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+  "source_hashes": {
+    "libraries/clown68000/libraries/clowncommon/clowncommon.h": "9bc5aecbe015da72dffba23033f754c377e7d713c19455871c663a4b7726bf61",
+    "libraries/clown68000/source/common/instruction.h": "c3f4a402e2e78ecc7e7c4b8950a8083f17712402a58735ec54ccdb60df0e2fdc",
+    "libraries/clown68000/source/common/opcode.c": "4ca94a978e0354ddd2a43e72127012cd0aaee7f6779fd44ce64a86e925d8b529",
+    "libraries/clown68000/source/common/opcode.h": "af8118ee3ac9f8521c5d5349232291a518a54cef6a88c1a690a88f7aa66e063f",
+    "libraries/clown68000/source/disassembler/disassembler.c": "3db515dc5d3af2c76746635e736fc76f275391b79e547a4b31b384ba92d95071",
+    "libraries/clown68000/source/disassembler/disassembler.h": "b3afb993ffe826818be961575e30c1f5133e073046da5a0082382d0ba6b0f6c7",
+    "libraries/clown68000/source/disassembler/main.c": "2dcb14897bbf8860552de7846f312a4ce6b708897166a844f45fa61101a885ee",
+    "libraries/clown68000/source/disassembler/opcode.c": "a3f0bd02384de7eb6a4a4bf5960cc6d5c0a1a27df59554ccb264587db3b1b91c",
+    "libraries/clown68000/source/disassembler/opcode.h": "5561fc1229f9f25bceb9d2e3187bea98858288e820b58172232d251dec2d5f6e",
+    "libraries/clown68000/source/interpreter/clown68000.c": "bbaeb58106f9266035258b14283a91147fb433d1e41c455a03e8f6981c03ab09",
+    "libraries/clown68000/source/interpreter/clown68000.h": "5836c604418f7b14df9c6ab8f17a398ddc708702f48d58d5a806b894a24b9fa2",
+    "libraries/clown68000/source/interpreter/microcode-generator/emit-instructions.c": "79ff2a6eeac39f3a84e78adddc99ee3e8f66317669917dd1b4d82198f018c9de",
+    "libraries/clown68000/source/interpreter/microcode-generator/emit-instructions.h": "898fa11da896f7be5429601259e950c9706f70095c021db615963bb3662208f9",
+    "libraries/clown68000/source/interpreter/microcode-generator/emit.c": "72eb8b808305aaa5043913cdebf2f2b26a19d5f90bee02746d7d7ea9c0262677",
+    "libraries/clown68000/source/interpreter/microcode-generator/emit.h": "3afe2a80f64d983cc21fcd01d54ea8161ed67f43204d191eb37abb4cd27d8657",
+    "libraries/clown68000/source/interpreter/microcode-generator/generator.c": "9455e5d2a74a225898ec78803aec1d918ea36be69e49c1d6baa2475ee77d36b8",
+    "libraries/clown68000/source/interpreter/microcode-generator/instruction-properties.c": "2a6bd4e87564ddb1884760e773dd8660350a8c270c8d3d21b599f1c3d99f8516",
+    "libraries/clown68000/source/interpreter/microcode-generator/instruction-properties.h": "5b2fc957fef2273afcc0dcd21dc8525e3906f2d3771fa616dcb6e5cd82576931",
+    "libraries/clown68000/source/interpreter/microcode.c": "a1162203a0494bc1573c8683f6df91f5b35f1a2c411e0f60018fc58ba9b11bf1",
+    "libraries/clown68000/source/interpreter/unity.c": "5ccc069226645c8aa3f01692a393b420da90ee2866baf07540499156aa8207c7",
+    "libraries/clowncommon/clowncommon.h": "cfc50a2bc54f74b0d43c00329131569b5c788914071c008f9039732224dfc869",
+    "libraries/clownz80/libraries/clowncommon/clowncommon.h": "9bc5aecbe015da72dffba23033f754c377e7d713c19455871c663a4b7726bf61",
+    "libraries/clownz80/source/common.c": "4ac67329fff19a88dd9e79fbf8a3415ed5400355d2487c2d5334da31a4649ca3",
+    "libraries/clownz80/source/common.h": "d5e9314794f5a37b8d90ecb5681264d32a5523e27253c64b61bbd6ef728bf198",
+    "libraries/clownz80/source/disassembler-test.c": "40665b037af0c0ff8f3e3d83ceb6f5eddbb42ca0712cede285624327ec346756",
+    "libraries/clownz80/source/disassembler.c": "404679a1cc829fe10a8b129d5dcefa2995ee11411dacfe62e398b4b346b16815",
+    "libraries/clownz80/source/disassembler.h": "8ace0f40f714a661efc50322e3e023579ad7cf510b9d60b71c0401be1e684dfe",
+    "libraries/clownz80/source/interpreter.c": "10f2288dcd797bf0df145f32754b1417a8eb72aec486527ee23bc76d43d2209b",
+    "libraries/clownz80/source/interpreter.h": "b177ab04ebe9019bfef1859e1c64393258fd80e129b92b84e9841ee3ca15d32d",
+    "libraries/clownz80/unity.c": "2652222e84aa6269d990766532085f7d8a7302e20faf9bb4cd39fb1c71b32fc2",
+    "source/bus-common.c": "61b7f4dd9469af173e265f33ba942c7ad0d9db2c1e1585849d65f9382744ac7a",
+    "source/bus-common.h": "ac18359201dc41264d0e53168e13c2395cfec53f0a88030b15885e6fe6e91b52",
+    "source/bus-main-m68k.c": "365e5ebda48b85ae3b60d4c03744fd3db0113b71c06c6b51aca2de03f4e184fd",
+    "source/bus-main-m68k.h": "fe0bdacf426f0cd6f5117f86b802e43f905a4d5b9517c99569d013d81cdd734f",
+    "source/bus-sub-m68k.c": "7cfa9801c4adc38f47ba0bcb0179899b8341d3a3a1ac3cd9f5ad13d7e6c112d9",
+    "source/bus-sub-m68k.h": "cc109c48ca801aac4bc4129a200662537350361d301878d637ecad2edd15984f",
+    "source/bus-z80.c": "c60386cb77646b1661af679141aa2481372b4f487667b79fb1bfd98ac786f8b6",
+    "source/bus-z80.h": "9f200c5fd683eb9e58cc6f28f95e8621f09307cb29343e06308d550c012401d1",
+    "source/cdc.c": "ee6096c8d5f696b9b3b54a6f1287fc68a8868c33f9b6454013c3cd6b11db651a",
+    "source/cdc.h": "0379bc8a8089d4d732f70df5021093ce57c75440ead586702feacd7f86b33d90",
+    "source/cdda.c": "a2e0c2c87ae693926170b971622d90eaf9509c199b1022aa450310a48f6124f7",
+    "source/cdda.h": "20185e0127173797bc76d66b677fc3c6c014d7ae9c0c70a232144dbc7be13c5c",
+    "source/clownmdemu.c": "326d35104b39edb321ab36d08d6cce1cbe642e869c2f6c0c67a231f15c863a7e",
+    "source/clownmdemu.h": "3fa2adcb6a4bc448ff556327dd8e8fe2027f4bcf638b5c42e1808cdad2b57923",
+    "source/controller-manager.c": "6a4470172ba544ae03576c6de14b56bc606ad0eec9b057b488602091aa335fe1",
+    "source/controller-manager.h": "46b188814f350a870adf1a4c159eb9c7f24ca44326b9033fb65d5fd8ad332e71",
+    "source/controller-multitap-ea.c": "1b139e1351129302de0b5e6ff388df68e9c74a2b477ceec07820ae03dbebce36",
+    "source/controller-multitap-ea.h": "40abf4c3cb74ffa1093c7af59e10271fa21aeedf9eea406f778f4a8216ece109",
+    "source/controller-multitap-sega.c": "d409cfbd456d2a1b4856d6de3db5da87ffcf42df79ba6d69de675b5b6f7902eb",
+    "source/controller-multitap-sega.h": "e1fb8a0460fdd291f0249ea8f3647d40adcb8358eab1dafae71d15b47592ad41",
+    "source/controller.c": "fb6a1cfabf94d7c6779b8a96c55ee4ec9570844e397e09732dc4c9aad5e62422",
+    "source/controller.h": "d44c53d21b477fa44b0837dee0acbb29909bd48129bc78cd34cac20990cf3efe",
+    "source/fm-channel.c": "927660b9d1fefe5b270cd3e1dbfa063aab8b7d2eac84a8e34239e7f51ad5e54e",
+    "source/fm-channel.h": "c127e6d47277250bd4459ea3bfa7ac4d7b122615a1da270b8d2b3d181d3f37dc",
+    "source/fm-lfo.c": "f1761c118576a02d6e567120cfe85e42f6f3d88478c73cae51659e5ba1248480",
+    "source/fm-lfo.h": "f9e174623f8983f51c4fc916a6d8c1f3213bdf64d61126cc623525047c6c3955",
+    "source/fm-operator.c": "63c98d2dcf4a4b47f4551351e609fb7783024fdb391361aec889da24e6a3d973",
+    "source/fm-operator.h": "9868845c594de9849b1f576c59182c356b38edcb5d4e3e5b5ffef29bb8399358",
+    "source/fm-phase.c": "40ca214eb180afd5ea8874f32bafa17c3b5b36ea235fd35a4414d3a6ef0587e2",
+    "source/fm-phase.h": "2a48964d5dfca4739a5fe5a494cf7612b19ef26d532ffb45ed64329087f2603b",
+    "source/fm.c": "e1888c56b57c9295b26804f9cf796092359ef1dabc9944feed0ab96bea19e550",
+    "source/fm.h": "b21a8720bfc1eed9258eff47ba74624004d18222fbdcdffea373992be5579475",
+    "source/io-port.c": "a825a4e390038cd724edefb351f7dc67a5048cd36c26d4048419f47bebcdf222",
+    "source/io-port.h": "7cb7a4000f55508e9f054a2c60269f108bb29c511dc2a288409cd037125d3092",
+    "source/log.c": "854ab2846b0a2582152d5be7fed21b870a89bf48e75810857c9b90516b778b85",
+    "source/log.h": "5d2e8f322add91d5c6a88faac87192f8f546ec4e1ecef1ec77497e8a0d73faf5",
+    "source/low-pass-filter.c": "801e6f694851b87f638f286e44ed1968356b510af7662e78c042b737ac27e85a",
+    "source/low-pass-filter.h": "2ff8394d50bb0165a3373fa6ca24ebe547059e5d7fbb98799d3e88c7571b99e2",
+    "source/mega-cd-boot-rom.c": "58bd8613ec35887b63a61233b68a903876fe30cda0f2031e5db23f44016f36c1",
+    "source/pcm.c": "cb38d64bf158414f7d2713c7b52749424d0dde3d6dd138781fd987ed96841066",
+    "source/pcm.h": "610d89a8a68f6e7d10d1de2644c916a48ebe3e7834aee2f738eff5cdcd5d0128",
+    "source/psg.c": "7419ab08482322a1132181958f54675a7b020e52e3d247f8f83026a19578a4c7",
+    "source/psg.h": "a156e9d230d62128722a57bd5f48e3a7fdfa9737bb39d0b6035ce0be3b35e522",
+    "source/sync.c": "029d9d91811ec5af158a302a9fe2c16e7684fb07fd7dde693a0a636311e48120",
+    "source/sync.h": "511e2d9fe6168d9a29ac75e1ea417effbe918031df769b61ab0e7289958828d9",
+    "source/vdp.c": "609e2d2f0dc8ab53f6eb7aaae526a5491f6f0c1774381d78cf1d3fa5d15df4b1",
+    "source/vdp.h": "be4fac26ab68d0376c7065ff8518080356541dd0c160025d18aa4450116fb7c6",
+    "unity.c": "9c2126e406ea6f38611e3c2322178a1598bf7e50e4df6e0a90be27910fff25f1"
+  },
+  "roots": [
+    "state",
+    "m68k",
+    "z80",
+    "vdp.state",
+    "fm.state",
+    "psg.state",
+    "controller_manager.state",
+    "mega_cd.m68k",
+    "mega_cd.cdc",
+    "mega_cd.cdda.state",
+    "mega_cd.pcm.state",
+    "mega_cd.cdd"
+  ],
+  "sections": [
+    {
+      "tag": 1,
+      "path": "state",
+      "payload_offset": 0,
+      "wire_bytes": 925853
+    },
+    {
+      "tag": 2,
+      "path": "m68k",
+      "payload_offset": 925853,
+      "wire_bytes": 87
+    },
+    {
+      "tag": 3,
+      "path": "z80",
+      "payload_offset": 925940,
+      "wire_bytes": 35
+    },
+    {
+      "tag": 4,
+      "path": "vdp.state",
+      "payload_offset": 925975,
+      "wire_bytes": 128573
+    },
+    {
+      "tag": 5,
+      "path": "fm.state",
+      "payload_offset": 1054548,
+      "wire_bytes": 1270
+    },
+    {
+      "tag": 6,
+      "path": "psg.state",
+      "payload_offset": 1055818,
+      "wire_bytes": 33
+    },
+    {
+      "tag": 7,
+      "path": "controller_manager.state",
+      "payload_offset": 1055851,
+      "wire_bytes": 27
+    },
+    {
+      "tag": 8,
+      "path": "mega_cd.m68k",
+      "payload_offset": 1055878,
+      "wire_bytes": 87
+    },
+    {
+      "tag": 9,
+      "path": "mega_cd.cdc",
+      "payload_offset": 1055965,
+      "wire_bytes": 10285
+    },
+    {
+      "tag": 10,
+      "path": "mega_cd.cdda.state",
+      "payload_offset": 1066250,
+      "wire_bytes": 17
+    },
+    {
+      "tag": 11,
+      "path": "mega_cd.pcm.state",
+      "payload_offset": 1066267,
+      "wire_bytes": 65647
+    },
+    {
+      "tag": 12,
+      "path": "mega_cd.cdd",
+      "payload_offset": 1131914,
+      "wire_bytes": 15
+    }
+  ],
+  "generator_sha256": "d0c5763b1e2ec5014e1ad015403b182ab256fb7340221aa8a91f61af15b9ecb9",
+  "template_sha256": "f1f9da76a4b030a0e89b7f646ef5f092fec3e699c49c7bdfc6aa826c552263c3",
+  "excluded_host_context": [
+    "callbacks",
+    "cartridge_buffer",
+    "cartridge_buffer_length",
+    "all configuration fields"
+  ],
+  "wire": "section-tag-u32le then explicit fixed-width scalar fields in declaration order; arrays fixed by schema",
+  "payload_wire_bytes": 1131929,
+  "leaf_declarations": [
+    {
+      "path": "state.m68k.ram[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        32768
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.m68k.h_int_pending",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.m68k.v_int_pending",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.m68k.frozen_by_dma_transfer",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.z80.ram[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        8192
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.z80.cycle_countdown",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "state.z80.bank",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 511
+    },
+    {
+      "path": "state.z80.bus_requested",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.z80.reset_held",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.z80.frozen_by_dma_transfer",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.io_ports[].mask",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.io_ports[].cached_write",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.external_ram.buffer[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        65536
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.external_ram.size",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 65536
+    },
+    {
+      "path": "state.external_ram.non_volatile",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.external_ram.data_size",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "state.external_ram.device_type",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.external_ram.mapped_in",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.cartridge_bankswitch[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.cartridge_inserted",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.current_scanline",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.vdp_dma_transfer_countdown",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "state.mega_cd.m68k.bus_requested",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.m68k.reset_held",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.prg_ram.buffer[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        262144
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.prg_ram.bank",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "state.mega_cd.prg_ram.write_protect",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.mega_cd.word_ram.buffer[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        131072
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.word_ram.in_1m_mode",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.word_ram.dmna",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.word_ram.ret",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.communication.flag",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.communication.command[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.communication.status[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.irq.enabled[]",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.irq.irq1_pending",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.irq.irq3_countdown",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "state.mega_cd.irq.irq3_countdown_master",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "state.mega_cd.rotation.large_stamp_map",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.rotation.large_stamp",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.rotation.repeating_stamp_map",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.rotation.stamp_map_address",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_address",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_width",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_height",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_height_in_tiles",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_x_offset",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.mega_cd.rotation.image_buffer_y_offset",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "state.mega_cd.cd_inserted",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "state.mega_cd.hblank_address",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.stop_watch",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.mega_cd.delayed_dma_word",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "state.low_pass_filters.fm[].previous_sample",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.low_pass_filters.fm[].previous_output",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.low_pass_filters.psg[].previous_sample",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        1
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.low_pass_filters.psg[].previous_output",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        1
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.low_pass_filters.pcm[].previous_samples[]",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        2,
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.low_pass_filters.pcm[].previous_outputs[]",
+      "c_type": "cc_s16l",
+      "dimensions": [
+        2,
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    {
+      "path": "state.sync.m68k.cycles_available",
+      "c_type": "cc_s32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    {
+      "path": "state.sync.mcd_m68k.cycles_available",
+      "c_type": "cc_s32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    {
+      "path": "m68k.data_registers[]",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "m68k.address_registers[]",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "m68k.supervisor_stack_pointer",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "m68k.user_stack_pointer",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "m68k.program_counter",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "m68k.status_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "m68k.instruction_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "m68k.halted",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "m68k.stopped",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "m68k.pending_interrupt",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "z80.register_mode",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 2
+    },
+    {
+      "path": "z80.cycles",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "z80.program_counter",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "z80.stack_pointer",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "z80.a",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.f",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.b",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.c",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.d",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.e",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.h",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.l",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.a_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.f_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.b_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.c_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.d_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.e_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.h_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.l_",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.ixh",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.ixl",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.iyh",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.iyl",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.r",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.i",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "z80.interrupts_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "z80.interrupt_pending",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.access.write_pending",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.access.address_register",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.access.code_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.access.increment",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.access.selected_buffer",
+      "c_type": "VDP_Access",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4,
+      "enum_values": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "path": "vdp.state.dma.enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.dma.mode",
+      "c_type": "VDP_DMAMode",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 2,
+      "enum_values": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "path": "vdp.state.dma.source_address_high",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.dma.source_address_low",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.dma.length",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.plane_a_address",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.plane_b_address",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.window_address",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.sprite_table_address",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.hscroll_address",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "vdp.state.window.aligned_right",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.window.aligned_bottom",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.window.horizontal_boundary",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.window.vertical_boundary",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.plane_width_shift",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 5,
+      "maximum": 7
+    },
+    {
+      "path": "vdp.state.plane_height_bitmask",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.extended_vram_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.display_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.v_int_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.h_int_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.h40_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.v30_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.mega_drive_mode_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.shadow_highlight_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.double_resolution_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.sprite_tile_index_rebase",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.plane_a_tile_index_rebase",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.plane_b_tile_index_rebase",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.background_colour",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 63
+    },
+    {
+      "path": "vdp.state.h_int_interval",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.currently_in_vblank",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.allow_sprite_masking",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.hscroll_mask",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.vscroll_mode",
+      "c_type": "VDP_VScrollMode",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 1,
+      "enum_values": [
+        0,
+        1
+      ]
+    },
+    {
+      "path": "vdp.state.debug.selected_register",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.debug.hide_layers",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.debug.forced_layer",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "vdp.state.vram[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        65536
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.cram[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        64
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.vsram[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        64
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.vsram_cache[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.sprite_table_cache[][]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        128,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.needs_updating",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.rows[].total",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        480
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 32
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.rows[].sprites[].table_index",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        480,
+        32
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.rows[].sprites[].y_in_sprite",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        480,
+        32
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 63
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.rows[].sprites[].width",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        480,
+        32
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "path": "vdp.state.sprite_row_cache.rows[].sprites[].height",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        480,
+        32
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "path": "vdp.state.previous_data_writes[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "vdp.state.kdebug_buffer_index",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 254
+    },
+    {
+      "path": "vdp.state.kdebug_buffer[]",
+      "c_type": "char",
+      "dimensions": [
+        256
+      ],
+      "wire_bits": 8,
+      "minimum": -128,
+      "maximum": 127
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.position",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.step",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.f_number_and_block",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 16383
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.key_code",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 31
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.detune",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].phase.multiplier",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 1,
+      "maximum": 30
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].countdown",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 1,
+      "maximum": 3
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].cycle_counter",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].delta_index",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].attenuation",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 1023
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].total_level",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 1016
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].sustain_level",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 992
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].key_scale",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].rates[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        4,
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 31
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].envelope_mode",
+      "c_type": "FM_Operator_EnvelopeMode",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 3,
+      "enum_values": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].key_on",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].amplitude_modulation_on",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].ssgeg.enabled",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].ssgeg.attack",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].ssgeg.alternate",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].ssgeg.hold",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.operators[].ssgeg.invert",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6,
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].state.feedback_divisor",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 2,
+      "maximum": 9
+    },
+    {
+      "path": "fm.state.channels[].state.algorithm",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "fm.state.channels[].state.operator_1_previous_samples[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        6,
+        2
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.channels[].state.amplitude_modulation_shift",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "fm.state.channels[].state.phase_modulation_sensitivity",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "fm.state.channels[].pan_left",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channels[].pan_right",
+      "c_type": "cc_bool",
+      "dimensions": [
+        6
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channel_3_metadata.frequencies[]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.channel_3_metadata.per_operator_frequencies_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.channel_3_metadata.csm_mode_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.port",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.address",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.dac_sample",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.dac_enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.dac_test",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.raw_timer_a_value",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "fm.state.timers[].value",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "fm.state.timers[].counter",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "fm.state.timers[].enabled",
+      "c_type": "cc_bool",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "fm.state.cached_address_27",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.cached_upper_frequency_bits",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.cached_upper_frequency_bits_fm3_multi_frequency",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.leftover_cycles",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.status",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.busy_flag_counter",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.lfo.frequency",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "fm.state.lfo.amplitude_modulation",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.lfo.phase_modulation",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.lfo.sub_counter",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.lfo.counter",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "fm.state.lfo.enabled",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "psg.state.tones[].countdown",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "psg.state.tones[].countdown_master",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "psg.state.tones[].attenuation",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 15
+    },
+    {
+      "path": "psg.state.tones[].output_bit",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        3
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "psg.state.noise.countdown",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "psg.state.noise.attenuation",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 15
+    },
+    {
+      "path": "psg.state.noise.fake_output_bit",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "psg.state.noise.real_output_bit",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "psg.state.noise.frequency_mode",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "psg.state.noise.type",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "psg.state.noise.shift_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "psg.state.latched_command.channel",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "path": "psg.state.latched_command.is_volume_command",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "controller_manager.state.ea_multitap.controllers[].countdown",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        4
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "controller_manager.state.ea_multitap.controllers[].strobes",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "controller_manager.state.ea_multitap.controllers[].th_bit",
+      "c_type": "cc_bool",
+      "dimensions": [
+        4
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "controller_manager.state.ea_multitap.selected_controller",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "controller_manager.state.sega_multitaps[].th_bit",
+      "c_type": "cc_bool",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "controller_manager.state.sega_multitaps[].tl_bit",
+      "c_type": "cc_bool",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "controller_manager.state.sega_multitaps[].pulses",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        2
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.m68k.data_registers[]",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.m68k.address_registers[]",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.m68k.supervisor_stack_pointer",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.m68k.user_stack_pointer",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.m68k.program_counter",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.m68k.status_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.m68k.instruction_register",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.m68k.halted",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.m68k.stopped",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.m68k.pending_interrupt",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "mega_cd.cdc.buffered_sectors[][]",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        5,
+        1026
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdc.current_sector",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.cdc.sectors_remaining",
+      "c_type": "cc_u32l",
+      "dimensions": [],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.cdc.host_data_word_index",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdc.dma_address",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdc.host_data_buffered_sector_index",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "path": "mega_cd.cdc.buffered_sectors_read_index",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "path": "mega_cd.cdc.buffered_sectors_write_index",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "path": "mega_cd.cdc.buffered_sectors_total",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 5
+    },
+    {
+      "path": "mega_cd.cdc.device_destination",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdc.hack_counter",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdc.host_data_target_sub_cpu",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.cdc.cdc_reading",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.cdc.host_data_bound",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.cdda.state.volume",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdda.state.master_volume",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdda.state.target_volume",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdda.state.fade_step",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdda.state.fade_remaining",
+      "c_type": "cc_u16l",
+      "dimensions": [],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.cdda.state.subtract_fade_step",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.cdda.state.playing",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.cdda.state.paused",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].disabled",
+      "c_type": "cc_bool",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].volume",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].panning[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        8,
+        2
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 15
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].frequency",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].loop_address",
+      "c_type": "cc_u16l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 16,
+      "minimum": 0,
+      "maximum": 65535
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].start_address",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.pcm.state.channels[].address",
+      "c_type": "cc_u32l",
+      "dimensions": [
+        8
+      ],
+      "wire_bits": 32,
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    {
+      "path": "mega_cd.pcm.state.wave_ram[]",
+      "c_type": "cc_u8l",
+      "dimensions": [
+        65536
+      ],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.pcm.state.sounding",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "path": "mega_cd.pcm.state.current_wave_bank",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 15
+    },
+    {
+      "path": "mega_cd.pcm.state.current_channel",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 7
+    },
+    {
+      "path": "mega_cd.cdd.status",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.current_track",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.current_m",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.current_s",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.current_f",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.first_track",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.last_track",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.lead_out_m",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.lead_out_s",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.lead_out_f",
+      "c_type": "cc_u8l",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 255
+    },
+    {
+      "path": "mega_cd.cdd.loaded",
+      "c_type": "cc_bool",
+      "dimensions": [],
+      "wire_bits": 8,
+      "minimum": 0,
+      "maximum": 1
+    }
+  ],
+  "schema_sha256": "3fffabc5b4e97e04506138221ce7f03f7c6576e6bafaea6ca18e9f0d35549cfc"
+}
