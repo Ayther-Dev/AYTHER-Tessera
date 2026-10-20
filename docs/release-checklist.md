@@ -98,6 +98,28 @@ La revisión siguiente agrega `SOURCE_AVAILABILITY.md` al prefijo instalado y
 registra SHA de commit y estado limpio en `package-metadata.json`. Configuración
 Release y consumidor C11/C++20 pasaron; el último candidato ZIP de SHA
 `42b8870a…` antecede a este cambio y debe regenerarse antes de publicarse.
+
+**Candidato con oferta de fuentes (2026-10-20):** Tessera `488f8aa` se configuró
+con árbol limpio y produjo dos ZIP byte a byte idénticos,
+`tessera-v0.1.0-mvp.1-windows-x86_64.zip`, SHA-256
+`27c070dc2bb89682eb70bb22e61d45e4ea69feb8a952fad6d1c3306651509ff9`.
+Las 28 entradas incluyen el manifiesto de fuentes y licencias, sin ROM, pack,
+trust ni generador compilado. `package.installed_consumer` pasó 1/1 y verifica
+el commit, el lock de backends y el parche. El replay Release produjo 18.000
+frames completos y 4.500 continuaciones en 15 procesos sin divergencias.
+Engine `fb3d9a8`, compilado Release/VPX con ese prefijo, pasó 222/223 CTest
+en la primera ejecución: el único fallo leyó checkpoints de una revisión
+anterior. Tras generar el corpus Release compatible, el test restante pasó
+1/1 con 12 workers y 13.500 frames; la unión cubre 223/223 tests de ese build.
+Su prefijo instalado superó 44 comprobaciones de payload y dos ZIP idénticos,
+`ayther-engine-vpx-v0.1.0-rc.21-windows-x86_64.zip`, SHA-256
+`9ae983e6ed015aa133701ba154de3f8e087879ff410222f3c91b2997408acfcb`,
+contienen 122 entradas, aviso AGPL actualizado y ningún fixture excluido.
+Un consumidor externo se configuró, compiló y ejecutó desde ambos ZIP extraídos.
+Runtime se reconstruyó contra esos prefijos (rutas `Ayther_DIR`/`Tessera_DIR`
+comprobadas) y aprobó 3/3 pruebas nativas, incluida GPU y audio físicos.
+Estas identidades siguen siendo candidatas locales: aún no hay tag, asset,
+checksum publicado, atestación ni lock Runtime nativo.
 Runtime `a1fc482` configuró y enlazó con los dos paquetes extraídos y pasó
 230/230 CTest, incluidos los tres perfiles Tessera. Engine pasó 247/247 CTest
 en una pasada posterior a alinear CLI y biblioteca Tessera. En la primera, el
