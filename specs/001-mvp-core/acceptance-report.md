@@ -138,3 +138,13 @@ al solicitar 181 frames se emitieron exactamente 180, y la desactivación
 programada en el frame 181 no produjo aplicación ni respaldo espurio. Esta
 evidencia amplía T030/T032 localmente; falta su perfil nativo en CI y el lock
 publicado, por lo que no cierra T030–T032 ni CA-10/CA-11.
+
+**Corte de validación física y distribución (2026-10-20):** Runtime volvió a
+pasar 3/3 pruebas de ruta nativa con los dispositivos GPU/audio de este PC
+contra los prefijos extraídos de Tessera y Engine. Los dos ZIP reproducibles
+actuales y sus SHA-256 constan en la revisión de distribución; todavía son
+candidatos locales. Engine y Tessera aprobaron sus checks de PR en `fb3d9a8`
+y `9e4f4c9`, respectivamente. Un
+runner temporal de organización se retiró sin ejecutar jobs porque no había
+un grupo autorizado para los tres repositorios públicos. Por tanto, el perfil
+GPU/audio en CI, los assets, el lock y la aceptación siguen pendientes.

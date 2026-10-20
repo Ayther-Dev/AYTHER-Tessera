@@ -129,3 +129,25 @@ activas y cero faltantes SDL; FX-03 presentó 180 frames sin errores Vulkan.
 Timestamps efectivos de presentación y cortes acústicos físicos siguen sin
 observación. Son candidatos locales, no assets publicados: faltan revisión de
 distribución, publicación autorizada de paquetes, lock real y CI sobre ese lock.
+
+**Corte local posterior (2026-10-20):** el candidato limpio de Tessera en
+`9e4f4c9` produjo dos ZIP reproducibles con SHA-256
+`9960c1d285019de450ac11919893f0f34517a2e88298718a8cfa8bc0b5ff0d8c`
+(28 entradas), oferta de fuentes en español y consumidor instalado aprobado.
+El candidato Engine en `fb3d9a8` produjo dos ZIP idénticos con SHA-256
+`9ae983e6ed015aa133701ba154de3f8e087879ff410222f3c91b2997408acfcb`
+(122 entradas); su aviso AGPL ya está corregido. Los ZIP excluyen los cuatro
+tipos de binarios no autorizados. Engine Release cubrió 223/223 casos entre la
+pasada inicial y la repetición del checkpoint con corpus compatible; Runtime
+pasó 3/3 pruebas de ruta nativa con GPU y audio físicos locales. El PR de Engine
+y el de Runtime están en verde; el check de Tessera para `9e4f4c9` también
+terminó en verde. Siguen pendientes la revisión final de distribución, los assets
+publicados, el lock nativo y el perfil de dispositivo en CI.
+
+Para intentar el perfil físico en CI se registró temporalmente el runner de
+organización `ayther-mvp-arnion`. Los repositorios Tessera, Engine y Runtime son
+públicos; la revisión automática rechazó habilitar jobs públicos en un grupo
+propuesto. El runner se detuvo y se eliminó del registro de la organización sin
+ejecutar jobs. Las pruebas locales conservan su evidencia, pero no sustituyen
+el gate de CI aprobado. El usuario decidió mantener la validación GPU/audio
+en los dispositivos locales y dejar ese gate de CI pendiente.
