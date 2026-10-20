@@ -105,10 +105,15 @@ std::map<std::string, std::string> fields(std::string line) {
 Json runtime_report(const fs::path &log, bool devices) {
   std::ifstream file(log);
   require(file.good(), "Cannot open Runtime benchmark log");
-  Json report = {{"costs", Json::object()}, {"frames", Json::object()}};
+  Json report = {{"costs", Json::object()}, {"frames", Json::object()},
+                 {"allocations", {{"scope", "executable_cpp_new"},
+                                   {"calls_per_frame", Json::array()},
+                                   {"bytes_per_frame", Json::array()}}}};
   std::string line;
   while (std::getline(file, line)) {
-    if (line.starts_with("AYTHER_NATIVE_COST ")) {
+    if (line.starts_with("AYTHER_NATIVE_CONFIG ")) {
+      report["config_sha256"] = fields(line).at("sha256");
+    } else if (line.starts_with("AYTHER_NATIVE_COST ")) {
       const auto values = fields(line);
       report["costs"][values.at("stage")] = {
           {"unit", values.at("unit")},
@@ -142,17 +147,65 @@ Json runtime_report(const fs::path &log, bool devices) {
           {"source_frames", std::stoull(values.at("source_frames"))},
           {"source_peak", std::stoi(values.at("source_peak"))},
           {"active_samples", std::stoull(values.at("active_samples"))},
+          {"callback_calls", std::stoull(values.at("callback_calls"))},
           {"episodes", std::stoull(values.at("episodes"))},
           {"missing_samples", std::stoull(values.at("missing_samples"))},
           {"total_ms", std::stod(values.at("total_ms"))},
           {"max_ms", std::stod(values.at("max_ms"))}};
+    } else if (line.starts_with("AYTHER_NATIVE_FLOW ")) {
+      const auto values = fields(line);
+      report["flow"] = {{"frames", std::stoull(values.at("frames"))},
+                        {"borrowed_video_bytes", std::stoull(values.at("borrowed_video"))},
+                        {"composed_frames", std::stoull(values.at("composed_frames"))},
+                        {"composed_copy_bytes", std::stoull(values.at("composed_copy"))},
+                        {"fallback_frames", std::stoull(values.at("fallback_frames"))},
+                        {"fallback_no_pack", std::stoull(values.at("fallback_no_pack"))},
+                        {"fallback_policy", std::stoull(values.at("fallback_policy"))},
+                        {"fallback_no_rule", std::stoull(values.at("fallback_no_rule"))},
+                        {"scope", values.at("scope")}};
+    } else if (line.starts_with("AYTHER_NATIVE_DEVICE_BYTES ")) {
+      const auto values = fields(line);
+      report["device_bytes"] = {{"gpu_staging", std::stoull(values.at("gpu_staging"))},
+                                {"audio_stream_queue", std::stoull(values.at("audio_stream_queue"))},
+                                {"scope", values.at("scope")}};
+    } else if (line.starts_with("AYTHER_NATIVE_EVENTS ")) {
+      const auto values = fields(line);
+      report["events"] = {{"emitted", std::stoull(values.at("emitted"))},
+                          {"retained", std::stoull(values.at("retained"))},
+                          {"batch_bytes", std::stoull(values.at("batch_bytes"))},
+                          {"losses", std::stoull(values.at("losses"))},
+                          {"scope", values.at("scope")}};
+    } else if (line.starts_with("AYTHER_NATIVE_ALLOC ")) {
+      const auto values = fields(line);
+      require(std::stoull(values.at("frame")) ==
+                  report["allocations"]["calls_per_frame"].size() + 1,
+              "Runtime allocation frame sequence is incomplete");
+      report["allocations"]["calls_per_frame"].push_back(
+          std::stoull(values.at("calls")));
+      report["allocations"]["bytes_per_frame"].push_back(
+          std::stoull(values.at("bytes")));
     } else if (line.starts_with("AYTHER_NATIVE_DONE ")) {
       report["completed"] = std::stoull(fields(line).at("frames"));
     }
   }
   require(report.value("completed", 0ULL) == 180 &&
-              report["costs"].size() == 3 && report["frames"].size() == 2,
+              report["costs"].contains("engine_step") &&
+              report["costs"].contains("runtime_hash") &&
+              report["costs"].contains("runtime_device") &&
+              report["frames"].size() == 2 && report.contains("config_sha256") &&
+              report.contains("flow") &&
+              report.contains("events") && report.contains("device_bytes") &&
+              report["flow"]["frames"] == 180 &&
+              report["flow"]["composed_frames"].get<std::uint64_t>() +
+                  report["flow"]["fallback_frames"].get<std::uint64_t>() == 180 &&
+              report["events"]["emitted"] == report["events"]["retained"] &&
+              report["events"]["losses"] == 0,
           "Runtime benchmark coverage is incomplete");
+  const auto allocation_count = report["allocations"]["calls_per_frame"].size();
+  require(allocation_count == 0 ||
+              (allocation_count == 180 &&
+               report["allocations"]["bytes_per_frame"].size() == 180),
+          "Runtime allocation coverage is incomplete");
   require(!devices || (report.contains("presentation") &&
                        report.contains("audio") &&
                        report["presentation"]["validation_errors"] == 0),
@@ -181,7 +234,22 @@ Json direct_report(const fs::path &path) {
                     {"p50", percentile(50)}, {"p95", percentile(95)},
                     {"p99", percentile(99)}, {"max", samples.back()}};
   }
-  return {{"costs", costs}, {"first", report.at("frames").at(0)},
+  const auto &observer = report.at("observer");
+  require(observer.at("event_losses") == 0,
+          "Direct benchmark lost observation events");
+  if (observer.at("mode") == "full")
+    require(observer.at("snapshot_reads") == 180 &&
+                observer.at("event_batches") == 180 &&
+                observer.at("event_records").get<std::uint64_t>() > 0,
+            "Direct observation coverage is incomplete");
+  const auto allocations = report.value("allocations", Json::object());
+  require(allocations.empty() ||
+              (allocations.at("calls_per_frame").size() == 180 &&
+               allocations.at("bytes_per_frame").size() == 180),
+          "Direct allocation coverage is incomplete");
+  return {{"costs", costs}, {"observer", observer},
+          {"allocations", allocations},
+          {"first", report.at("frames").at(0)},
           {"last", report.at("frames").at(179)},
           {"content_sha256", report.at("content")},
           {"config_sha256", report.at("config")},
@@ -263,6 +331,11 @@ int main(int argc, char **argv) {
                        L" --native-trace " + quote(output / "trace.bin") +
                        L" --frames 180", output / (name + ".log"));
       auto engine = runtime_report(output / (name + ".log"), false);
+      require(engine.at("config_sha256") ==
+                  result["direct_off"].back().at("config_sha256") &&
+                  engine.at("config_sha256") ==
+                      result["direct_full"].back().at("config_sha256"),
+              "Engine and direct Tessera did not use the same configuration");
       engine["peak_working_set_bytes"] = engine_peak;
       result["engine_headless"].push_back(std::move(engine));
       if (devices) {
@@ -272,6 +345,9 @@ int main(int argc, char **argv) {
                          L" --frames 180 --native-visible --native-audio-device",
             output / (device_name + ".log"));
         auto device = runtime_report(output / (device_name + ".log"), true);
+        require(device.at("config_sha256") ==
+                    result["engine_headless"].back().at("config_sha256"),
+                "Device and headless Runtime used different configurations");
         device["peak_working_set_bytes"] = device_peak;
         result["runtime_devices"].push_back(std::move(device));
         require(result["runtime_devices"].back()["frames"] ==

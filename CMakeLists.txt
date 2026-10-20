@@ -22,6 +22,7 @@ option(TESSERA_ENABLE_DIAGNOSTICS "Enable AddressSanitizer on Tessera bootstrap 
 option(TESSERA_ENGINE_INTEGRATION "Link a minimal installed Engine SDK consumer." OFF)
 option(TESSERA_RUNTIME_INTEGRATION "Require the native Runtime integration acceptance target." OFF)
 option(TESSERA_BUILD_BACKEND_PROBES "Build the explicitly enabled Gate 0 backend probes." OFF)
+option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
 
 if(TESSERA_RUNTIME_INTEGRATION)
     message(FATAL_ERROR "RUNTIME_INTEGRATION_UNAVAILABLE: the native Runtime product and acceptance tests are not implemented. This preset cannot pass as a bootstrap check.")

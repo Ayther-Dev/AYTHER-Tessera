@@ -55,6 +55,10 @@ file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/build_identity.hpp"
     CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n" @ONLY)
 
 add_executable(tessera_cli cli/main.cpp cli/replay_trace.cpp)
+if(TESSERA_ALLOCATION_METRICS)
+    target_sources(tessera_cli PRIVATE cli/allocation_metrics.cpp)
+    target_compile_definitions(tessera_cli PRIVATE TESSERA_ALLOCATION_METRICS=1)
+endif()
 set_target_properties(tessera_cli PROPERTIES OUTPUT_NAME tessera)
 target_link_libraries(tessera_cli PRIVATE Tessera::core Tessera::build_options nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
 target_compile_options(tessera_cli PRIVATE /utf-8)

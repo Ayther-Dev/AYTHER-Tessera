@@ -1,5 +1,8 @@
 #include "public_client.hpp"
 #include "replay_trace.hpp"
+#ifdef TESSERA_ALLOCATION_METRICS
+#include "allocation_metrics.hpp"
+#endif
 #include <windows.h>
 
 #include <chrono>
@@ -248,8 +251,17 @@ struct SnapshotReference {
 struct Observer {
   std::string mode;
   std::array<std::uint64_t, 2> cursors{};
-  std::uint64_t snapshot_reads{}, event_batches{};
+  std::uint64_t snapshot_reads{}, event_batches{}, snapshot_payload_bytes{},
+      event_batch_bytes{}, event_records{}, event_losses{};
   explicit Observer(std::string value) : mode(std::move(value)) {}
+  static std::uint64_t little_u64(const Bytes &data, std::size_t at) {
+    ensure(at <= data.size() && data.size() - at >= 8,
+           TESSERA_BACKEND_FAILURE);
+    std::uint64_t result = 0;
+    for (unsigned index = 0; index < 8; ++index)
+      result |= std::uint64_t{data[at + index]} << (8 * index);
+    return result;
+  }
   void prepare(PublicSession &session) const {
     if (mode == "off")
       return;
@@ -284,6 +296,7 @@ struct Observer {
       if (region.data.bytes != 0)
         data.insert(data.end(), region.data.data,
                     region.data.data + region.data.bytes);
+      snapshot_payload_bytes += region.data.bytes;
     }
     ++snapshot_reads;
     return data;
@@ -304,7 +317,24 @@ struct Observer {
                context);
     cursors[reader] = next;
     ++event_batches;
+    // Public event batch starts with field 1, whose array payload begins at 16.
+    ensure(data.size() >= 24, TESSERA_BACKEND_FAILURE);
+    event_records += little_u64(data, 16);
+    event_batch_bytes += data.size();
     return data;
+  }
+  void finish(PublicSession &session) {
+    if (mode == "off") return;
+    auto context = init<tessera_context_v1>();
+    std::uint64_t required = 0;
+    const auto first = tessera_losses_query_v1(
+        session.handle(), {nullptr, 0}, &required, &context);
+    if (first != TESSERA_BUFFER_TOO_SMALL) require_ok(first, context);
+    ensure(required >= 24 && required <= file_limit, TESSERA_BACKEND_FAILURE);
+    Bytes data(static_cast<std::size_t>(required));
+    require_ok(tessera_losses_query_v1(session.handle(),
+        {data.data(), data.size()}, &required, &context), context);
+    event_losses = little_u64(data, 16);
   }
   void read(PublicSession &session, const tessera_context_v1 &step_context) {
     if (mode == "off")
@@ -344,7 +374,11 @@ struct Observer {
                                                 : 1},
             {"concurrent", false},
             {"snapshot_reads", snapshot_reads},
-            {"event_batches", event_batches}};
+            {"event_batches", event_batches},
+            {"snapshot_payload_bytes", snapshot_payload_bytes},
+            {"event_batch_bytes", event_batch_bytes},
+            {"event_records", event_records},
+            {"event_losses", event_losses}};
   }
 };
 
@@ -446,7 +480,15 @@ void execute(const Arguments &args, Json &report,
   costs.step.reserve(static_cast<std::size_t>(requested));
   costs.hashes.reserve(static_cast<std::size_t>(requested));
   costs.observation.reserve(static_cast<std::size_t>(requested));
+#ifdef TESSERA_ALLOCATION_METRICS
+  report["allocations"] = {{"scope", "executable_cpp_new"},
+                            {"calls_per_frame", Json::array()},
+                            {"bytes_per_frame", Json::array()}};
+#endif
   for (std::uint64_t frame = 1; frame <= requested; ++frame) {
+#ifdef TESSERA_ALLOCATION_METRICS
+    const auto allocation_before = tessera::allocation_metrics::snapshot();
+#endif
     const auto started = Clock::now();
     const auto status = session.replay_next();
     const auto advanced = Clock::now();
@@ -467,6 +509,13 @@ void execute(const Arguments &args, Json &report,
     const auto observation_started = Clock::now();
     observer.read(session, step_context);
     const auto observed = Clock::now();
+#ifdef TESSERA_ALLOCATION_METRICS
+    const auto allocation_after = tessera::allocation_metrics::snapshot();
+    report["allocations"]["calls_per_frame"].push_back(
+        allocation_after.calls - allocation_before.calls);
+    report["allocations"]["bytes_per_frame"].push_back(
+        allocation_after.bytes - allocation_before.bytes);
+#endif
     costs.step.push_back(microseconds(started, advanced));
     costs.hashes.push_back(microseconds(hash_started, hashed));
     costs.observation.push_back(microseconds(observation_started, observed));
@@ -488,6 +537,7 @@ void execute(const Arguments &args, Json &report,
            TESSERA_BACKEND_FAILURE, "El final de la traza alteró la sesión.");
     report["eof_code"] = TESSERA_END_OF_TRACE;
   }
+  observer.finish(session);
   report["observer"] = observer.json();
   session.close();
   report["closed"] = true;

@@ -2,9 +2,10 @@
 
 **Corte local:** 2026-10-20. **Resultado:** aceptación final **pendiente**.
 La fase 5 añadió presentación Vulkan, salida SDL al dispositivo y una línea
-base comparable de tres capas. Los checks remotos de las revisiones finales,
-la distribución coordinada y todas las métricas de RF-13/CA-11 aún no tienen
-evidencia suficiente. Un test omitido no cuenta como aprobado.
+base comparable de tres capas. La ampliación local añadió asignaciones,
+copias explícitas, eventos, respaldos y etapas CPU de presentación. Los checks
+remotos de las revisiones finales y la distribución coordinada siguen
+pendientes. Un test omitido no cuenta como aprobado.
 
 | ID | Evidencia ejecutada o pendiente | Estado |
 | --- | --- | --- |
@@ -17,10 +18,10 @@ evidencia suficiente. Un test omitido no cuenta como aprobado.
 | RF-07 | Engine controls/presentation y checkpoint; respaldo/rearme locales | Local verificado; CI final pendiente |
 | RF-08 | Engine pack/presentation: manifiesto, derechos, hashes, rutas y límites | Local verificado |
 | RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones | Local verificado; revisión final T033 pendiente |
-| RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness` | Local verificado; volumen/pérdidas en benchmark pendientes |
+| RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
 | RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; CTest Runtime 4/4 | Local verificado; CI encadenada pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, p50/p95/p99, memoria y entrega; faltan asignaciones/copias/eventos/respaldo y GPU/espera separados | Pendiente |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega y etapas CPU de swapchain; ejecución GPU pura y cortes audibles físicos sin telemetría | Local parcial; CI pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
 | RC-03 | Contratos, unidad, replay, robustez y GPU/audio locales; Actions de estas revisiones no ejecutado | Pendiente |
@@ -36,7 +37,7 @@ evidencia suficiente. Un test omitido no cuenta como aprobado.
 | CA-08 | Consumidor Tessera limpio pasó; CI y cadena de paquetes Engine→Runtime sin publicar | Pendiente |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Línea base parcial con tres repeticiones y puntos/origen declarados; faltan métricas exactas y CI | Pendiente |
+| CA-11 | Tres repeticiones con 150 muestras estables cada una; los límites de medición y las métricas obtenidas están declarados en la línea base; timestamps GPU, cortes físicos y CI pendientes | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
