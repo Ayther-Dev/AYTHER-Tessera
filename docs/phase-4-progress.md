@@ -1,63 +1,20 @@
-# Fase 4 — avance local de observación
+# Fase 4 — resultado local de observación y sustitución
 
-**Estado:** T025 iniciada; T026–T028 cerradas; T029 y Gate 4 pendientes. No se ha abierto PR
-ni se ha usado GitHub Actions.
+**Estado:** T025–T029 completadas para Engine–Tessera. La validación de consumo en Runtime corresponde a T031. No se abrió PR ni se usó GitHub Actions.
 
-Tessera captura, cuando se solicita la región temporal, el índice de color y
-la paleta vigentes al renderizar cada línea de Mega Drive. El callback del VDP
-puede dividir una línea entre Window y Plane A: ambos tramos se reúnen por
-rango, y la conversión RGBA escribe solo los píxeles cubiertos por cada tramo.
-La región 5 contiene
-un registro TLV versión 1: campos 1–4 (version, width, height,
-raster_complete) en U32 y campo 5 (raster) en bytes. Cada línea del raster
-lleva 256 colores U16LE y después width índices U8. El bit 0 de
-region.flags señala filas completas; el bit 31 señala captura incompleta y
-excluye la región temporal de snapshot.complete_mask. Los otros campos y
-regiones conservan sus contratos existentes. Una captura retenida conserva sus
-bytes aunque la sesión avance.
+Tessera instrumenta una copia de la revisión fijada de ClownMDEmu mediante un parche versionado, aplicado solo en el árbol de build y rechazado si los hashes de las fuentes VDP no coinciden. El callback registra el origen ganador de cada píxel (plano, Window, sprite y slot SAT), el tile y su posición durante el render. La captura de tiles de plano A guarda la imagen RGBA de 8×8 y la máscara exacta de píxeles visibles; nunca infiere la identidad de un recurso a partir de VRAM/CRAM/SAT finales. Los modos que esta versión no puede atribuir íntegramente se declaran incompletos.
 
-La prueba integration.megadrive_observation comprueba reconstrucción del
-frame original, estado/vídeo/audio iguales con observación activa e inactiva,
-dos lectores, pérdida por presupuesto de capturas y recuperación en el siguiente
-frame completo. Los datos finales VRAM/CRAM/SAT y este raster **no identifican
-por píxel el tile o sprite de origen ni todos los cambios internos del VDP**.
-Engine debe presentar el frame original completo cuando una sustitución
-necesite esa atribución o el raster esté incompleto. Por ello, T025 no se
-declara cerrada hasta fijar y verificar la atribución temporal necesaria para
-FX-03.
+La región temporal 5 usa TLV versión 2. Conserva los campos 1–5 de raster por línea de la versión 1 y añade 6 (`source_complete` U32), 7 (celdas: coordenadas, palabra de tile, máscara visible e imagen RGBA) y 8 (procedencia por píxel). `region.flags` vale 3 solo si raster y procedencia son completos; de otro modo marca el bit 31 y la captura excluye la región de `complete_mask`. Cada lectura retenida conserva sus bytes aunque avance la sesión.
 
-FX-03 tiene ya una ROM variante reproducible con superposición de sprites,
-orden SAT y prioridad de plano, dos assets propios y un `.ay` firmado con
-identidad de ROM, metadatos, dos `[[sub]]` coincidentes y hash verificado contra
-el tile rojo realmente observado. `tests/fixtures/graphics-replacement` guarda
-los artefactos, el generador y oráculos de píxeles originales y sustituidos.
-El fixture satisface T026. La composición y Gate 4 siguen abiertos.
+Engine activa una política de observación únicamente tras la confirmación transaccional de Tessera. Con un `.ay` válido y una captura completa del mismo frame/sesión/época, busca el hash de cada tile observado en el catálogo existente, respeta la primera `[[sub]]` aplicable y prioriza el override. Decodifica los assets antes de componer; solo altera los bits visibles del plano ganador, dejando sprites y demás píxeles iguales al frame original. La salida original de Tessera sigue prestada e intacta. La presentación usa un buffer propio de Engine.
 
-Engine ya abre un pack nativo como candidato independiente después de validar
-identidad de ROM, metadatos obligatorios, reglas de tiles, rutas y referencias.
-Antes de activarlo verifica todos los hashes del índice firmado en streaming,
-con memoria acotada; un fallo conserva el pack anterior. El lector de tiles
-respeta ahora la primera entrada `[[sub]]` aplicable incluso cuando ambas son
-incondicionales; el override sigue prevaleciendo. Tests Rust y Engine con pack
-firmado cubren estos cambios. La validación nativa comprueba que un `game_id`
-con CRC32 coincide con la ROM y rechaza metadatos, reglas, imágenes y rutas
-alterados antes de activar el candidato. Los límites de tamaño y cantidad se
-prueban con metadatos declarados, sin crear archivos gigantes. Un candidato
-ZIP corrupto se rechaza conservando el paquete anterior. Esto cierra T028.
+Si faltan paquete, política confirmada, captura, completitud, versión reconocida, geometría compatible o asset válido, Engine devuelve el frame original completo con causa por frame. No conserva un caché de composición entre frames: el nuevo frame, paquete, override, control, reinicio o restore obliga a volver a validar y componer. Un fallo de restore conserva la política y su pendiente; el éxito cancela la pendiente e invalida la vista anterior. Tras reinicio, la política se rearma en la nueva época y la presentación espera la confirmación.
 
-Engine envía regiones y eventos como una sola transacción, deja una sola
-pendiente y activa su política solo al recibir confirmación del frame con
-sesión, época, número y transacción exactos. Las pruebas cubren rechazo
-íntegro, pausa, aplicación única, capacidad ausente, invariancia emulada y de
-medios originales, cancelación al cerrar y rearme tras reinicio exitoso;
-un reinicio fallido conserva la pendiente. FX-03 confirma el rearme de la
-política y la conservación del paquete. La prueba visual de ese rearme y la
-coordinación tras restaurar pertenecen a T029.
+`integration.megadrive_observation` verifica reconstrucción exacta del original, procedencia, dos lectores, pérdida por retención, recuperación y conservación de estado/vídeo/audio con observación activa e inactiva. `ayther.integration.tessera_presentation_test` prueba FX-03 con catálogo magenta, override cian, prioridad de plano y orden SAT, bytes fuera de la máscara idénticos, originales sin cambios, respaldo por pérdida o formato no soportado, recuperación, paquete, controles, reinicio y restore. El pack firmado y sus dos assets quedan en `tests/fixtures/graphics-replacement` con generador y oráculos reproducibles.
 
-Como avance de T029, la API de sesión de Engine coordina la restauración:
-ante fallo conserva política y pendiente; ante éxito invalida la vista
-prestada, conserva paquete y controles ya efectivos y descarta únicamente
-la solicitud pendiente cancelada por Tessera. Los tests de controles y FX-03
-comprueban la nueva época, la causa de cancelación y la continuidad del
-paquete. Sigue faltando la prueba de composición y respaldo visual tras
-restaurar.
+La evidencia T021 regenerada con este `build_id` reunió 15 procesos, 18.000 frames completos y 4.500 de continuación, sin divergencias. Las mediciones comparativas por etapas y el consumo en Runtime siguen asignados a T032 y T031, respectivamente.
+
+Validación local: 16/16 CTest de Tessera (incluido replay T021); 8/8 pruebas
+nativas de Engine, con checkpoint de 12 procesos contra la evidencia nueva.
+`git diff --check` no informó errores. Los cambios se guardan en commits
+locales de cada repositorio, sin PR.

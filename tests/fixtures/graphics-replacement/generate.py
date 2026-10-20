@@ -55,7 +55,7 @@ def main() -> None:
     if parsed["game_id"] != game_id:
         raise SystemExit("Engine's generated ROM and pack game ID disagree")
     metadata = {
-        "status": "overlap ROM and pack; presentation oracles pending",
+        "status": "Engine-Tessera presentation oracles verified locally; Runtime pending",
         "game_id": game_id,
         "tile_hash": parsed["tile_hash"],
         "rom_sha256": sha256(ROM),

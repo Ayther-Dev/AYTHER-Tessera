@@ -1,5 +1,5 @@
 {
-  "status": "overlap ROM and pack; presentation oracles pending",
+  "status": "Engine-Tessera presentation oracles verified locally; Runtime pending",
   "game_id": "crc32:2af4a80d",
   "tile_hash": "0x6a56a02d82cba6a1",
   "rom_sha256": "92478b869fc61dcd7a8d457b52ac6e08661c27956c774babf4768f32497d1077",

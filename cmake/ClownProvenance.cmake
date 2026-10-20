@@ -1,0 +1,35 @@
+include_guard(GLOBAL)
+
+function(tessera_prepare_clown_provenance raw_source output_variable)
+    set(patch "${PROJECT_SOURCE_DIR}/cmake/patches/clownmdemu-provenance.patch")
+    set(patched "${PROJECT_BINARY_DIR}/clown-provenance-source")
+    cmake_path(ABSOLUTE_PATH patched NORMALIZE OUTPUT_VARIABLE patched_absolute)
+    cmake_path(ABSOLUTE_PATH PROJECT_BINARY_DIR NORMALIZE OUTPUT_VARIABLE binary_absolute)
+    string(FIND "${patched_absolute}" "${binary_absolute}/" within_build)
+    if(NOT within_build EQUAL 0)
+        message(FATAL_ERROR "CLOWN_PATCH_TARGET_OUTSIDE_BUILD: ${patched_absolute}")
+    endif()
+    file(SHA256 "${raw_source}/source/vdp.c" vdp_c_hash)
+    file(SHA256 "${raw_source}/source/vdp.h" vdp_h_hash)
+    if(NOT vdp_c_hash STREQUAL "609e2d2f0dc8ab53f6eb7aaae526a5491f6f0c1774381d78cf1d3fa5d15df4b1"
+       OR NOT vdp_h_hash STREQUAL "be4fac26ab68d0376c7065ff8518080356541dd0c160025d18aa4450116fb7c6")
+        message(FATAL_ERROR "CLOWN_PROVENANCE_BASE_MISMATCH: expected pinned VDP source")
+    endif()
+    file(REMOVE_RECURSE "${patched_absolute}")
+    file(MAKE_DIRECTORY "${patched_absolute}")
+    file(COPY "${raw_source}/" DESTINATION "${patched_absolute}")
+    find_package(Git REQUIRED QUIET)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" init --quiet
+        WORKING_DIRECTORY "${patched_absolute}"
+        RESULT_VARIABLE init_result ERROR_VARIABLE init_error)
+    if(NOT init_result EQUAL 0)
+        message(FATAL_ERROR "CLOWN_PATCH_INIT_FAILED: ${init_error}")
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" apply "${patch}"
+        WORKING_DIRECTORY "${patched_absolute}"
+        RESULT_VARIABLE patch_result ERROR_VARIABLE patch_error)
+    if(NOT patch_result EQUAL 0)
+        message(FATAL_ERROR "CLOWN_PROVENANCE_PATCH_FAILED: ${patch_error}")
+    endif()
+    set(${output_variable} "${patched_absolute}" PARENT_SCOPE)
+endfunction()

@@ -90,6 +90,7 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
       backend.pixels_buffer_[offset + 3] = 255;
     }
   };
+  machine_->vdp.provenance_callback = nullptr;
   callbacks_.input_requested = [](void *data, cc_u8f player,
                                   ClownMDEmu_Button button) -> cc_bool {
     const auto &backend = self(data);
@@ -175,6 +176,14 @@ const Bytes &MegaDriveBackend::pcm() const noexcept { return pcm_; }
 
 void MegaDriveBackend::prepare_observation(std::uint64_t mask) {
   temporal_requested_ = (mask & TESSERA_REGION_TEMPORAL) != 0;
+  machine_->vdp.provenance_callback = temporal_requested_
+      ? +[](void *data, cc_u16f line, const VDP_ProvenancePixel *sources,
+            cc_u16f left, cc_u16f right, cc_u16f width, cc_u16f height) {
+          self(data).capture_provenance(line, sources, left, right, width,
+                                        height);
+        }
+      : nullptr;
+  machine_->vdp.provenance_user_data = temporal_requested_ ? this : nullptr;
   if (temporal_requested_) {
     temporal_indices_.resize(1024 * 1024);
     temporal_coverage_.resize(1024 * 1024);
@@ -191,6 +200,9 @@ void MegaDriveBackend::step(const InputState &inputs) {
   scanlines_ = 0;
   temporal_lines_.fill(false);
   temporal_complete_ = temporal_requested_;
+  temporal_source_complete_ = temporal_requested_;
+  temporal_cells_.clear();
+  temporal_sources_.clear();
   if (temporal_requested_)
     std::fill(temporal_coverage_.begin(), temporal_coverage_.end(), 0);
   pixels_buffer_.resize(1024 * 1024 * 4);
@@ -207,6 +219,15 @@ void MegaDriveBackend::step(const InputState &inputs) {
                        temporal_coverage_.begin() + line * 1024 + width_,
                        [](std::uint8_t covered) { return covered != 0; })) {
         temporal_complete_ = false;
+        break;
+      }
+  if (temporal_source_complete_ &&
+      temporal_sources_.size() != std::size_t(width_) * height_)
+    temporal_source_complete_ = false;
+  if (temporal_source_complete_)
+    for (const auto &cell : temporal_cells_)
+      if (cell.observed && cell.rows_seen != 0xFF) {
+        temporal_source_complete_ = false;
         break;
       }
   pcm_.swap(next_pcm);
@@ -262,6 +283,7 @@ void MegaDriveBackend::restore_record(
   }
   width_ = height_ = scanlines_ = 0;
   temporal_complete_ = false;
+  temporal_source_complete_ = false;
   temporal_lines_.fill(false);
   pcm_.clear();
 }

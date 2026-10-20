@@ -155,12 +155,12 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
   REQUIRE(tessera_snapshot_region_query_v1(first.id, 4, &region,
                                            &second_context) == TESSERA_OK);
   CHECK(region.kind == 5);
-  CHECK(region.flags == 1);
+  CHECK(region.flags == 3);
   const auto fields = tessera::wire::record(
       {region.data.data, static_cast<std::size_t>(region.data.bytes)});
-  REQUIRE(fields.size() == 5);
+  REQUIRE(fields.size() == 8);
   CHECK(tessera::wire::read(
-      tessera::wire::get(fields, 0, 1, TESSERA_ENCODING_U32), 0, 4) == 1);
+      tessera::wire::get(fields, 0, 1, TESSERA_ENCODING_U32), 0, 4) == 2);
   const auto width = tessera::wire::read(
       tessera::wire::get(fields, 1, 2, TESSERA_ENCODING_U32), 0, 4);
   const auto height = tessera::wire::read(
@@ -169,6 +169,19 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
   CHECK(height == 224);
   const auto rows = tessera::wire::get(fields, 4, 5, TESSERA_ENCODING_BYTES);
   REQUIRE(rows.size() == height * (width + 512));
+  CHECK(tessera::wire::read(
+      tessera::wire::get(fields, 5, 6, TESSERA_ENCODING_U32), 0, 4) == 1);
+  const auto cells = tessera::wire::get(fields, 6, 7, TESSERA_ENCODING_BYTES);
+  REQUIRE(cells.size() >= 4 + 16 + 256);
+  CHECK(tessera::wire::read(cells, 0, 4) >= 1);
+  const auto sources = tessera::wire::get(fields, 7, 8, TESSERA_ENCODING_BYTES);
+  REQUIRE(sources.size() == width * height * 8);
+  const auto plane = sources.subspan((36 * width + 36) * 8, 8);
+  CHECK(plane[4] == 1);
+  CHECK(plane[5] == 255);
+  const auto sprite = sources.subspan((67 * width + 103) * 8, 8);
+  CHECK(sprite[4] == 4);
+  CHECK(sprite[5] == 0);
   auto original = initial<tessera_original_frame_v1>();
   REQUIRE(tessera_original_frame_query_v1(observed.session, &original,
                                           &observed.context) == TESSERA_OK);

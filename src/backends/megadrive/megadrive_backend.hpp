@@ -51,6 +51,16 @@ private:
   Bytes temporal_indices_;
   Bytes temporal_coverage_;
   std::vector<std::array<std::uint16_t, 256>> temporal_palettes_;
+  struct TemporalCell {
+    std::array<std::uint8_t, 8 * 8 * 4> rgba{};
+    std::uint64_t visible{};
+    std::uint16_t tile_word{};
+    std::uint8_t rows_seen{};
+    bool observed{};
+  };
+  std::vector<TemporalCell> temporal_cells_;
+  std::vector<VDP_ProvenancePixel> temporal_sources_;
+  bool temporal_source_complete_{};
   std::array<bool, 1024> temporal_lines_{};
   bool temporal_requested_{};
   bool temporal_complete_{};
@@ -62,6 +72,12 @@ private:
   std::uint64_t frame_{};
 
   static MegaDriveBackend &self(void *data) noexcept;
+  void capture_provenance(std::uint32_t line,
+                          const VDP_ProvenancePixel *sources,
+                          std::uint32_t left, std::uint32_t right,
+                          std::uint32_t width, std::uint32_t height);
+  [[nodiscard]] std::array<std::uint8_t, 8 * 8 * 4>
+  tile_rgba(std::uint16_t word) const;
   [[nodiscard]] RegionData temporal_region() const;
 };
 

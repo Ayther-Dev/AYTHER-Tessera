@@ -24,6 +24,7 @@ original. Engine prueba que el hash del catálogo coincide
 con el tile observado, que el paquete firmado carga con la ROM real y que la
 primera regla gana.
 
-**Estado:** la ROM superpuesta, el pack y los oráculos son reproducibles. La
-composición HD en Engine y la validación en Runtime siguen pendientes. El
-fixture por sí solo no declara cumplido Gate 4.
+**Estado:** la ROM, el pack y los oráculos son reproducibles. La prueba local
+`ayther.integration.tessera_presentation_test` verifica composición, override,
+respaldo, recuperación y conservación de estado/vídeo/PCM originales mediante
+Engine–Tessera. La validación del consumo en Runtime corresponde a T031.

@@ -8,7 +8,9 @@ if(NOT EXISTS "${TESSERA_CLOWN_SOURCE}/source/clownmdemu.c")
     message(FATAL_ERROR "CLOWN_SOURCE_REQUIRED: prepare the pinned source with tools/bootstrap-backends.ps1 before configuring.")
 endif()
 set(CC_USE_C99_INTEGERS ON CACHE BOOL "Use fixed C99 integers in ClownMDEmu" FORCE)
-add_subdirectory("${TESSERA_CLOWN_SOURCE}" "${PROJECT_BINARY_DIR}/clown-product" EXCLUDE_FROM_ALL)
+include("${PROJECT_SOURCE_DIR}/cmake/ClownProvenance.cmake")
+tessera_prepare_clown_provenance("${TESSERA_CLOWN_SOURCE}" TESSERA_CLOWN_PRODUCT_SOURCE)
+add_subdirectory("${TESSERA_CLOWN_PRODUCT_SOURCE}" "${PROJECT_BINARY_DIR}/clown-product" EXCLUDE_FROM_ALL)
 
 set(core_sources api/native_api.cpp backends/synthetic/synthetic_backend.cpp session/session.cpp
     session/presentation_transaction.cpp session/session_restore.cpp
@@ -23,7 +25,7 @@ add_library(Tessera::core ALIAS tessera_core)
 target_include_directories(tessera_core PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
-target_include_directories(tessera_core SYSTEM PRIVATE "${TESSERA_CLOWN_SOURCE}/source")
+target_include_directories(tessera_core SYSTEM PRIVATE "${TESSERA_CLOWN_PRODUCT_SOURCE}/source")
 target_link_libraries(tessera_core PRIVATE
     "$<BUILD_INTERFACE:Tessera::build_options>" "$<BUILD_INTERFACE:PicoSHA2::PicoSHA2>"
     "$<BUILD_INTERFACE:clownmdemu-core>")
@@ -35,6 +37,8 @@ file(GLOB_RECURSE identity_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/session/*.*" "${CMAKE_CURRENT_SOURCE_DIR}/observation/*.*"
     "${CMAKE_CURRENT_SOURCE_DIR}/backends/*.*")
 list(APPEND identity_sources "${CMAKE_CURRENT_LIST_FILE}" "${PROJECT_SOURCE_DIR}/CMakeLists.txt"
+    "${PROJECT_SOURCE_DIR}/cmake/ClownProvenance.cmake"
+    "${PROJECT_SOURCE_DIR}/cmake/patches/clownmdemu-provenance.patch"
     "${PROJECT_SOURCE_DIR}/cmake/dependencies.lock.json" "${PROJECT_SOURCE_DIR}/cmake/Diagnostics.cmake"
     "${PROJECT_SOURCE_DIR}/cmake/TesseraPackage.cmake" "${PROJECT_SOURCE_DIR}/cmake/TesseraConfig.cmake.in")
 list(SORT identity_sources)
