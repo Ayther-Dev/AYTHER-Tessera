@@ -34,7 +34,7 @@ pendientes. Un test omitido no cuenta como aprobado.
 | CA-04 | Dos lectores, retención, observación activada/inactiva y misma salida | Local verificado |
 | CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local verificado; CI GPU pendiente |
 | CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Local verificado |
-| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime añadió entrada inválida, control fuera de orden y pack ausente sin avanzar frame. Matriz final T033 abierta | Pendiente |
+| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime añadió entrada inválida, control fuera de orden y pack ausente sin avanzar frame. Matriz T033 cerrada localmente (6/6 y 4/4 ASan); falta CI | Pendiente |
 | CA-08 | Consumidor Tessera limpio pasó; CI y cadena de paquetes Engine→Runtime sin publicar | Pendiente |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
@@ -83,7 +83,7 @@ entradas completas y rechazos; transacción pendiente y cancelaciones; captura
 inmutable/retención; checkpoint y publicación atómica; detección por contenido;
 procedencia/precedencia gráfica y respaldo; fixture de audio independiente;
 métricas con punto/origen/cobertura y alcance de idioma externo. Los casos
-negativos se asignan a las suites citadas arriba y a T033/T031 donde continúan
+negativos se asignan a las suites citadas arriba y a T031 donde continúan
 abiertos.
 
 **Gate de cierre:** ejecutar T030–T035 sin omisiones, publicar la cadena de
@@ -91,3 +91,27 @@ artefactos verificables Tessera→Engine→Runtime, actualizar el lock real y
 obtener checks obligatorios de los tres PR mínimos. Después repetir esta matriz
 con SHAs de commit, URLs de CI y resultados sin pendientes. Hasta entonces
 T036 no se marca completada y el MVP no se declara aceptado.
+
+**Corte de revisión 2026-10-20:** hay un PR borrador por repositorio:
+[Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
+[Engine #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48) y
+[Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55).
+El [Core checks de Tessera](https://github.com/Ayther-Dev/AYTHER-Tessera/actions/runs/39434356326)
+pasó sobre `2549a0b`; Engine fija esa revisión. Runtime pasó 230/230 CTest
+locales tras recompilar con el commit `a1fc482`. Los checks de Runtime
+y Engine `3deb4c2` pasaron, incluido el [Required CI gate](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39440336838).
+La cobertura C++ remota dio 82,39 % total y 79,42 % en líneas cambiadas,
+sin reducir umbrales. Falta paquete Engine publicado con su lock Runtime
+actualizado, runner GPU/audio físico y la revisión final de T034. Ninguno de estos avances
+equivale a aceptación CA-08 o CA-11.
+
+La [comparación progresiva](../../docs/performance-baseline.md) usó FX-03 en
+3×180 frames, 30 de calentamiento por serie: Engine mínimo p50 `step`
+1.474,5/1.482,8/1.501,3 µs; con observación completa
+3.011,4/3.106,8/2.962,5 µs; la composición añadió p50
+85,2/89,7/84,4 µs en `engine_frame`. Runtime con dispositivos midió
+`engine_step` 3.131,2/3.196,5/3.231,2 µs, `engine_frame`
+132,9/130,8/126,5 µs y `runtime_device` 288/282/272 µs. Los hashes
+originales coincidieron en las rutas comparables y no hubo pérdidas de eventos
+ni solicitudes SDL sin datos; la presentación efectiva y los cortes acústicos
+físicos no están medidos. CA-11 permanece pendiente.

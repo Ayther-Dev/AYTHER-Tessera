@@ -3,13 +3,18 @@
 Núcleo abierto de emulación multisistema para ejecución determinista,
 observabilidad estructurada y sustitución de gráficos y audio en ejecución.
 
-**Estado:** fases 0 y 1 completadas (T001–T014); **Gate 0 cerrado en validación local**.
+**Estado:** fases 0–4 completadas localmente (T001–T029) y fase 5 en curso
+(T033 cerrada; T030–T032 y T034–T036 abiertas). El MVP aún no está aceptado.
 Se seleccionó ClownMDEmu tras compararlo con ares y comprobar estado completo,
 PCM canónico, replay, restauración entre procesos y respaldo original íntegro.
 La fase 1 añade la API C, núcleo sintético autónomo y CLI con observación retenida,
-controles transaccionales y replay por procesos. Consultar los
-[resultados de fase 1](docs/phase-1-results.md) y el alcance de
-[fase 0](docs/phase-0-results.md). La integración con Engine comienza en fase 2.
+controles transaccionales y replay por procesos; las fases 2–4, la integración
+nativa con Engine, checkpoints y observación/sustitución. Hay un PR borrador por
+repositorio (Tessera #1, Engine #48 y Runtime #55); falta publicar la cadena de
+paquetes Tessera→Engine→Runtime. Consultar los resultados de las
+[fases 0](docs/phase-0-results.md), [1](docs/phase-1-results.md),
+[2](docs/phase-2-results.md) y [3](docs/phase-3-results.md), y el progreso de las
+[fases 4](docs/phase-4-progress.md) y [5](docs/phase-5-progress.md).
 
 ## Alcance y arquitectura aprobados
 

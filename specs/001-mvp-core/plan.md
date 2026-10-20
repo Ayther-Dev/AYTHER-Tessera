@@ -3,7 +3,7 @@
 **Característica:** `001-mvp-core`  
 **Fecha y aprobación:** 2026-10-19  
 **Alineación aprobada:** diez correcciones de QA de la especificación y la constitución.  
-**Estado:** aprobado; fases 0–3 completadas localmente, con ClownMDEmu seleccionado, Engine nativo y replay/checkpoints Mega Drive validados. FX-03, Runtime y mediciones completas del MVP pendientes.
+**Estado:** aprobado; fases 0–4 completadas localmente, con ClownMDEmu seleccionado, Engine nativo, replay/checkpoints Mega Drive y observación/sustitución FX-03 validados. Fase 5 en curso: T033 cerrada; Runtime (T030/T031), mediciones (T032) y entrega (T034–T036) pendientes.
 **Especificación:** [spec.md](spec.md).  
 **Norma aplicable:** [docs/constitution.md](../../docs/constitution.md).
 

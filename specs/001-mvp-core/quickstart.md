@@ -6,8 +6,10 @@ FX-02 y checkpoints entre procesos. Consultar los resultados y límites de
 [fase 3](../../docs/phase-3-results.md), [fase 2](../../docs/phase-2-results.md),
 [fase 1](../../docs/phase-1-results.md) y [fase 0](../../docs/phase-0-results.md).
 FX-03 y la presentación Engine–Tessera con `.ay` están verificadas localmente.
-La fase 5 validó localmente GPU y audio de dispositivo en Runtime; métricas
-completas y CI de la cadena final permanecen pendientes.
+La fase 5 validó localmente la ruta Runtime de GPU y audio con dispositivos de
+prueba y ejecutó la comparación progresiva FX-03. Los checks de los tres
+PR borradores pasaron; faltan el paquete nativo versionado, su lock y la
+prueba física GPU/audio en runner.
 
 ## Comprobaciones disponibles hoy
 

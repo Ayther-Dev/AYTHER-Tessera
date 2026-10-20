@@ -312,8 +312,8 @@ sin fingir que carece de dependencias del núcleo compartido.
 | FX-01 | Autónomo y Engine cerrados; perfiles, estados completos 1…3000, entrada/control, reset, tres checkpoints y continuación K+1. | T009, T010, T012, T014, T018 y T024 completadas. |
 | FX-02 | ROM separada con fuente MIT, hashes, control/acción B, estado observable, vídeo y transición silencio→PSG→silencio verificados por Tessera y Engine. | T005 semilla; T020, T021 y T024 completadas. |
 | FX-03 | ROM, imágenes y `.ay` firmado reproducibles; catálogo, override, solapamientos, respaldo y conservación de originales verificados en Engine–Tessera. Consumo Runtime pendiente. | T026, T028 y T029 completadas; T031 pendiente. |
-| Negativos y saturación | Contratos, corrupción de TLV/estado, primer guardado, interrupción, errores E/S, cancelación con cola saturada y respaldo de presentación verificados. Robustez final/Runtime pendiente. | T007, T010, T012, T014, T022, T023 y T027–T029 completadas; T033 pendiente. |
-| CI y distribución | Núcleo dev/Release/ASAN validado localmente y Engine nativo probado; CTest usa el job existente, sin ejecutar Actions. Runtime y revisión de distribución pendientes. | T003, T014, T018 y T024 completadas; T031, T034–T036 pendientes. |
+| Negativos y saturación | Contratos, corrupción de TLV/estado, primer guardado, interrupción, errores E/S, cancelación con cola saturada y respaldo de presentación verificados. Consolidación de robustez cerrada localmente; Runtime pendiente. | T007, T010, T012, T014, T022, T023, T027–T029 y T033 completadas; T031 pendiente. |
+| CI y distribución | Núcleo dev/Release/ASAN validado localmente y Engine nativo probado; CI de los tres PR borradores aprobada; falta paquete Engine/Tessera versionado, lock Runtime nativo y runner GPU/audio físico. Revisión de distribución pendiente. | T003, T014, T018 y T024 completadas; T031, T034–T036 pendientes. |
 
 | Requisito o criterio | Tareas y evidencia principal |
 | --- | --- |

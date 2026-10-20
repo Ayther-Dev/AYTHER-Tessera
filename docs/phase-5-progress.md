@@ -1,8 +1,11 @@
 # Fase 5 — progreso local
 
-Fecha: 2026-10-20. Estado: **en curso**; T030–T036 siguen abiertas hasta
-acreditar todos sus criterios. Sin PR, Actions ni cambio del lock publicado
-de Runtime. La matriz detallada está en
+Fecha: 2026-10-20. Estado: **en curso**; T033 cerrada y T030–T032 y T034–T036
+abiertas hasta acreditar todos sus criterios. PR borradores
+[Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
+[Engine #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48) y
+[Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55); el lock
+publicado de Runtime no cambió. La matriz detallada está en
 [`acceptance-report.md`](../specs/001-mvp-core/acceptance-report.md).
 
 ## Runtime: GPU, dispositivo de audio y proveedor nativo
@@ -55,13 +58,16 @@ completos, 4.500 continuados y cero divergencias (`summary.json` local de
 `t021-44556-404038921`; 646,52 s).
 Engine compiló e instaló la conversión RGBA→BGRA para Vulkan y pasó 5/5
 pruebas nativas afectadas. `integration.robustness` y los diagnósticos ASan
-previos siguen documentados, pero T033/T034 requieren consolidación final.
+quedaron consolidados en T033 (6/6 local y 4/4 ASan); T034 requiere
+consolidación final.
 
 ## Entrega y aceptación
 
-El workflow Engine aún fija Tessera `dfef722`; Runtime aún bloquea Engine
+El workflow Engine fija Tessera `2549a0b`; Runtime aún bloquea Engine
 `v0.1.0-rc.19`. Se verificaron los ocho contextos protegidos de Runtime en
-GitHub, pero ninguna rama de trabajo tiene una ejecución remota. T035 exige
+GitHub; los tres PR borradores tienen sus checks actuales aprobados:
+Tessera `2549a0b`, Engine `3deb4c2` (incluido su gate C++ combinado) y
+Runtime `a1fc482`. T035 exige
 publicar la cadena real de paquetes con hashes/procedencia y repetir los
 checks sin omisiones, incluido un entorno GPU/audio declarado. T036 y la
 aceptación final permanecen pendientes.

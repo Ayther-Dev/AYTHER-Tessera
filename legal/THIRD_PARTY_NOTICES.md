@@ -138,24 +138,21 @@ incluidas las relativas a interacción remota de versiones modificadas. La
 sección 2, permite crear y ejecutar obras cubiertas sin transmitirlas. No se
 identifica en esos términos un impedimento para la evaluación local autorizada.
 
-El alcance construido de Gate 0 es el ejecutable headless ClownMDEmu: core,
-intérpretes clown68000/clownz80 y sus revisiones de clowncommon, más harness,
-codec y media propios MIT y headers nlohmann/json y PicoSHA2 con sus avisos.
-Ese ejecutable combinado de evaluación se trata bajo AGPLv3, conservando los
-avisos y licencias aplicables de cada fuente; el código propio conserva también
-su concesión MIT. La matriz técnica aprobó Gate 0 y su selección local para
-la integración posterior, sin iniciar la fase 1.
-Esta etapa no publica ni distribuye el binario combinado ni ofrece interacción
-remota; tampoco acredita cumplimiento de una distribución pública futura.
+La evaluación Gate 0 dio paso a un backend Mega Drive compilado en Tessera con
+ClownMDEmu, clown68000/clownz80 y las revisiones fijadas de clowncommon. El
+paquete instalado de Tessera exporta ese núcleo y Engine lo consume en su
+sesión nativa; Runtime consume Engine. Los avisos y licencias de cada fuente
+se conservan. La ejecución local y la publicación de ramas de código fuente
+no acreditan por sí solas la clausura de una distribución binaria futura.
 
-El smoke del SDK Engine es otro ejecutable: no incorpora ClownMDEmu ni sus CPU.
-La integración de producto con Engine MPL-2.0 queda fuera de esta clausura local.
+El smoke aislado del SDK Engine no incorpora ClownMDEmu, pero la ruta nativa
+Engine→Tessera sí forma parte de la integración actual.
 Una API C, un wrapper o separar bibliotecas no elimina por sí mismo obligaciones
 AGPL. La ruta de obra mayor/licencia secundaria de MPL-2.0, sección 3.3, debe
 evaluarse sobre los archivos y avisos concretos de la futura combinación;
 no se da por resuelta para Engine, Runtime o Lab por este enlace mínimo.
 
-T034 comprobará antes de distribuir la clausura real, fuentes correspondientes
+T034 debe comprobar antes de distribuir la clausura real, fuentes correspondientes
 y scripts necesarios, avisos y términos AGPL/MPL aplicables; si se ofrece
 interacción remota con una versión modificada, también la obligación AGPL de
 ofrecer las fuentes correspondientes a sus usuarios. Esta estrategia permite
