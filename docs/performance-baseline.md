@@ -122,11 +122,50 @@ La reproducción FX-02 activa entregó 144.143 frames fuente, pico PCM 1.022,
 solicitudes de datos no cubiertas durante 180 frames. Ese contador mide demanda no cubierta
 en el stream; no acredita cortes audibles reales ni el reloj del hardware.
 
-Quedan pendientes timestamps de ejecución GPU y telemetría del dispositivo
-para cortes audibles exactos. La comparación sigue siendo local y no fija
-umbrales ni mejora frente a otro emulador. CA-11 y la aceptación final siguen
-pendientes de CI en el perfil declarado y de estas coberturas, si se exigen
-como medidas físicas.
+### Timestamps GPU y cobertura de audio, 2026-10-20
+
+Evidencia: `build/evidence/phase5-benchmark-gpu-wait-split-retry/summary.json`.
+Runtime creó un pool de consultas Vulkan cuando la familia gráfica declaró
+`timestampValidBits=64`; la GPU NVIDIA informó `timestampPeriod=1 ns`. Un
+timestamp `TOP_OF_PIPE`, otro en `COLOR_ATTACHMENT_OUTPUT` tras la compuerta
+del semáforo de imagen y otro `BOTTOM_OF_PIPE` delimitan espera de imagen y
+trabajo posterior del command buffer.
+El resultado se lee tras la fence correspondiente y los dos últimos frames
+se drenan fuera de las etapas temporizadas. Hubo 180 muestras por repetición,
+0 errores de validación y la misma configuración/hash de ROM en las tres
+rutas. Se registraron por separado espera/adquisición, grabación y submit/
+present en CPU. El timestamp de presentación efectiva permanece no disponible.
+
+| Repetición | GPU trabajo p50 / p95 / p99 / máximo (µs) | GPU espera imagen p50 / p95 / p99 / máximo (µs) | Entrega p95 (ms) |
+| --- | --- | --- | --- |
+| 1 | 86,112 / 474,592 / 485,728 / 503,136 | 0,128 / 0,256 / 6,368 / 8,672 | 17,799 |
+| 2 | 85,376 / 635,392 / 640,192 / 640,928 | 0,128 / 0,256 / 0,256 / 0,256 | 18,330 |
+| 3 | 125,088 / 954,432 / 956,928 / 974,944 | 0,128 / 0,608 / 0,608 / 0,608 | 18,118 |
+
+Los p50 CPU de adquisición/grabación/submit fueron 32,1/92,6/145,6 µs,
+21,7/76,5/106,1 µs y 21,5/76,2/82,5 µs. El tramo GPU total p50 fue
+86,272/85,504/125,216 µs. Cada serie GPU tiene 180 muestras; los
+percentiles excluyen los 30 frames de calentamiento.
+
+`gpu_execute` mide del punto posterior a la espera de imagen al final del
+command buffer; `gpu_image_wait` mide desde su inicio hasta ese punto, y
+`gpu_command_span` conserva el total. Son tiempos de etapas Vulkan en el reloj
+del dispositivo, no FPS ni tiempo acústico; el trabajo puede solaparse con
+CPU y no se suman sus percentiles. Los altos percentiles de trabajo se
+conservan y aún no justifican un presupuesto. Un intento previo falló en la
+tercera repetición por `VK_ERROR_OUT_OF_DATE_KHR` al presentar el primer frame
+(`build/evidence/phase5-benchmark-gpu-wait-split/devices-2.log`); el runner lo
+rechazó y la repetición completa quedó registrada por separado.
+El método sigue la [guía oficial de profiling de Vulkan](https://docs.vulkan.org/guide/latest/profiling.html).
+
+En las tres repeticiones SDL llamó 295/295/296 veces al callback de audio,
+con 0 episodios y 0 muestras demandadas sin disponibilidad en el stream.
+Así queda medida la definición aprobada en el límite Runtime→SDL; el conteo
+de bytes solicitado por SDL puede variar con buffering y remuestreo según
+su [contrato de callback](https://wiki.libsdl.org/SDL3/SDL_AudioStreamCallback).
+No existe en esta ruta un contador de cortes acústicos físicos del altavoz.
+La aceptación final sigue pendiente de la CI y de la consolidación completa
+de T032; no se afirma una mejora frente a otro emulador.
 
 Para repetir localmente, ejecutar `tools/generate-native-fixtures.ps1` con el
 build de Tessera y `make_test_pack.exe` de Engine, y luego ejecutar

@@ -21,7 +21,7 @@ pendientes. Un test omitido no cuenta como aprobado.
 | RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
 | RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; CTest Runtime 4/4 | Local verificado; CI encadenada pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega y etapas CPU de swapchain; ejecución GPU pura y cortes audibles físicos sin telemetría | Local parcial; CI pendiente |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): 3 repeticiones, asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU y 180 timestamps GPU por serie; 295–298 callbacks SDL sin demanda descubierta. La serie GPU puede incluir espera de semáforo; el dispositivo no expone cortes acústicos físicos. | Local parcial; CI pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
 | RC-03 | Contratos, unidad, replay, robustez y GPU/audio locales; Actions de estas revisiones no ejecutado | Pendiente |
@@ -37,7 +37,7 @@ pendientes. Un test omitido no cuenta como aprobado.
 | CA-08 | Consumidor Tessera limpio pasó; CI y cadena de paquetes Engine→Runtime sin publicar | Pendiente |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Tres repeticiones con 150 muestras estables cada una; los límites de medición y las métricas obtenidas están declarados en la línea base; timestamps GPU, cortes físicos y CI pendientes | Pendiente |
+| CA-11 | Tres repeticiones con 150 muestras estables cada una y 180 timestamps GPU por serie; límites y variación declarados en la línea base. Falta completar comparación progresiva de T032 y validar CI. | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera

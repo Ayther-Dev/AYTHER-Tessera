@@ -184,6 +184,14 @@ Json runtime_report(const fs::path &log, bool devices) {
           std::stoull(values.at("calls")));
       report["allocations"]["bytes_per_frame"].push_back(
           std::stoull(values.at("bytes")));
+    } else if (line.starts_with("AYTHER_NATIVE_GPU_TIMESTAMP ")) {
+      const auto values = fields(line);
+      report["gpu_timestamp"] = {
+          {"supported", std::stoull(values.at("supported"))},
+          {"valid_bits", std::stoull(values.at("valid_bits"))},
+          {"period_ns", std::stod(values.at("period_ns"))},
+          {"samples", std::stoull(values.at("samples"))},
+          {"scope", values.at("scope")}};
     } else if (line.starts_with("AYTHER_NATIVE_DONE ")) {
       report["completed"] = std::stoull(fields(line).at("frames"));
     }
@@ -208,6 +216,12 @@ Json runtime_report(const fs::path &log, bool devices) {
           "Runtime allocation coverage is incomplete");
   require(!devices || (report.contains("presentation") &&
                        report.contains("audio") &&
+                       report.contains("gpu_timestamp") &&
+                       report["gpu_timestamp"]["supported"] == 1 &&
+                       report["gpu_timestamp"]["samples"] == 180 &&
+                       report["costs"].contains("gpu_execute") &&
+                       report["costs"].contains("gpu_image_wait") &&
+                       report["costs"].contains("gpu_command_span") &&
                        report["presentation"]["validation_errors"] == 0),
           "Device benchmark coverage is incomplete");
   return report;
