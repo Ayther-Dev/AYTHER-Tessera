@@ -1,6 +1,6 @@
 # Fase 4 — avance local de observación
 
-**Estado:** T025 iniciada; T026 y T027 cerradas; T028–T029 y Gate 4 pendientes. No se ha abierto PR
+**Estado:** T025 iniciada; T026–T028 cerradas; T029 y Gate 4 pendientes. No se ha abierto PR
 ni se ha usado GitHub Actions.
 
 Tessera captura, cuando se solicita la región temporal, el índice de color y
@@ -41,8 +41,9 @@ respeta ahora la primera entrada `[[sub]]` aplicable incluso cuando ambas son
 incondicionales; el override sigue prevaleciendo. Tests Rust y Engine con pack
 firmado cubren estos cambios. La validación nativa comprueba que un `game_id`
 con CRC32 coincide con la ROM y rechaza metadatos, reglas, imágenes y rutas
-alterados antes de activar el candidato. T028 sigue abierta hasta completar
-su matriz de límites e integridad frente a un paquete anterior cargado.
+alterados antes de activar el candidato. Los límites de tamaño y cantidad se
+prueban con metadatos declarados, sin crear archivos gigantes. Un candidato
+ZIP corrupto se rechaza conservando el paquete anterior. Esto cierra T028.
 
 Engine envía regiones y eventos como una sola transacción, deja una sola
 pendiente y activa su política solo al recibir confirmación del frame con
