@@ -1,6 +1,6 @@
 # Fase 4 — avance local de observación
 
-**Estado:** T025 iniciada; T026–T029 y Gate 4 pendientes. No se ha abierto PR
+**Estado:** T025 iniciada; T026 y T027 cerradas; T028–T029 y Gate 4 pendientes. No se ha abierto PR
 ni se ha usado GitHub Actions.
 
 Tessera captura, cuando se solicita la región temporal, el índice de color y
@@ -31,8 +31,7 @@ orden SAT y prioridad de plano, dos assets propios y un `.ay` firmado con
 identidad de ROM, metadatos, dos `[[sub]]` coincidentes y hash verificado contra
 el tile rojo realmente observado. `tests/fixtures/graphics-replacement` guarda
 los artefactos, el generador y oráculos de píxeles originales y sustituidos.
-El fixture satisface el contenido solicitado en T026; la dependencia T025 y
-su consumo por composición aún faltan, por lo que T026 y Gate 4 siguen abiertos.
+El fixture satisface T026. La composición y Gate 4 siguen abiertos.
 
 Engine ya abre un pack nativo como candidato independiente después de validar
 identidad de ROM, metadatos obligatorios, reglas de tiles, rutas y referencias.
@@ -40,6 +39,16 @@ Antes de activarlo verifica todos los hashes del índice firmado en streaming,
 con memoria acotada; un fallo conserva el pack anterior. El lector de tiles
 respeta ahora la primera entrada `[[sub]]` aplicable incluso cuando ambas son
 incondicionales; el override sigue prevaleciendo. Tests Rust y Engine con pack
-firmado cubren estos cambios. Esto avanza T028, pero no la cierra: falta el
-variante completa de FX-03, la presentación visual y pruebas integradas de
-controles.
+firmado cubren estos cambios. La validación nativa comprueba que un `game_id`
+con CRC32 coincide con la ROM y rechaza metadatos, reglas, imágenes y rutas
+alterados antes de activar el candidato. T028 sigue abierta hasta completar
+su matriz de límites e integridad frente a un paquete anterior cargado.
+
+Engine envía regiones y eventos como una sola transacción, deja una sola
+pendiente y activa su política solo al recibir confirmación del frame con
+sesión, época, número y transacción exactos. Las pruebas cubren rechazo
+íntegro, pausa, aplicación única, capacidad ausente, invariancia emulada y de
+medios originales, cancelación al cerrar y rearme tras reinicio exitoso;
+un reinicio fallido conserva la pendiente. FX-03 confirma el rearme de la
+política y la conservación del paquete. La prueba visual de ese rearme y la
+coordinación tras restaurar pertenecen a T029.
