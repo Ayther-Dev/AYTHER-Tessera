@@ -41,9 +41,10 @@ evidencia suficiente. Un test omitido no cuenta como aprobado.
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
 desde fuente MIT. Los SHA-256 coinciden con los manifiestos. ROM, pack y
-registro de confianza de Engine, y la ROM FX-03 derivada, se excluyeron del
-índice Git; Runtime consume las rutas generadas. Falta limpiar esas copias de
-la historia de las ramas antes de cualquier push o PR.
+registro de confianza de Engine, y la ROM FX-03 derivada, se excluyeron de las
+ramas publicables (Tessera desde `1f9389d` y Runtime desde `91b85da`, ambas
+basadas en `main`). `git rev-list --objects main..HEAD` no devuelve esas rutas.
+Runtime consume las rutas generadas. Las ramas históricas quedan solo locales.
 `tessera_runtime_gpu_audio` verificó cuatro frames de readback (pack activo,
 desactivado y reactivado), 90 entregas reguladas y 89 intervalos. La GPU fue
 NVIDIA GeForce RTX 3060 Laptop GPU, controlador 32.0.16.1656. El test
@@ -72,8 +73,7 @@ métricas con punto/origen/cobertura y alcance de idioma externo. Los casos
 negativos se asignan a las suites citadas arriba y a T033/T031 donde continúan
 abiertos.
 
-**Gate de cierre:** ejecutar T030–T035 sin omisiones, limpiar de la historia
-publicable los binarios excluidos por decisión del usuario, publicar la cadena de
+**Gate de cierre:** ejecutar T030–T035 sin omisiones, publicar la cadena de
 artefactos verificables Tessera→Engine→Runtime, actualizar el lock real y
 obtener checks obligatorios de los tres PR mínimos. Después repetir esta matriz
 con SHAs de commit, URLs de CI y resultados sin pendientes. Hasta entonces

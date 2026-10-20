@@ -34,9 +34,10 @@ fuera de dominio, controles fuera de orden y pack ausente rechazan sin avanzar
 frame; faltan pendientes y EOF en Runtime.
 
 Tras la decisión de distribución del usuario, ROM y packs de Engine/Lab y ROM
-FX-03 se generan bajo `build/` y quedan fuera del índice Git. Se repitieron
-Tessera 16/16, Engine 5/5 y Runtime 4/4 con esas rutas. La historia anterior
-de las ramas debe limpiarse antes de publicar PR.
+FX-03 se generan bajo `build/` y quedan fuera de las ramas publicables. Se
+repitieron Tessera 16/16, Engine 5/5 y Runtime 4/4 con esas rutas. Las ramas
+anteriores se conservaron localmente como respaldo; los commits publicables
+`1f9389d` y `91b85da` no contienen esos objetos.
 
 ## Rendimiento y suites
 

@@ -5,11 +5,12 @@ Actions de las revisiones finales**. Objetivo aprobado: tres PR coordinados,
 uno por Tessera, Engine y Runtime. No abrir un PR por tarea.
 
 El usuario confirmó que no hay permiso verificable para publicar la ROM/pack
-Engine/Lab ni la ROM FX-03 derivada. Se retiraron del índice Git de Tessera y
-Runtime y se generan en `build/` con `tools/generate-native-fixtures.ps1`.
-Antes de cualquier push hay que limpiar también esas copias de la historia de
-las ramas publicables y comprobar un checkout limpio; ningún binario generado
-se subirá como artifact de Actions.
+Engine/Lab ni la ROM FX-03 derivada. Se generan en `build/` con
+`tools/generate-native-fixtures.ps1`. Las ramas locales publicables de Tessera
+(`1f9389d`) y Runtime (`91b85da`) parten de `main` con commits netos sin los
+binarios: `git rev-list --objects main..HEAD` no muestra ROM, pack ni trust
+generados. Las ramas previas se conservan solo como respaldo local y no deben
+subirse. Ningún binario generado se subirá como artifact de Actions.
 
 | Repositorio | Validación local de este corte | CI remota exigida antes de T036 |
 | --- | --- | --- |
@@ -42,7 +43,7 @@ matrices nuevas por tarea, cron ni ejecuciones manuales para validar cambios
 intermedios. Antes de cada push, registrar `git diff --check`, CTest pertinente,
 hashes de binarios/fixtures y el resultado de `acceptance-report.md`.
 
-**Bloqueadores actuales:** limpieza de historia publicable; métricas exactas de asignaciones, copias,
+**Bloqueadores actuales:** métricas exactas de asignaciones, copias,
 eventos/pérdidas, respaldos y tiempo GPU puro; contador de cortes audibles del
 dispositivo frente a demanda aproximada de SDL; negativos Runtime de entradas
 y pendientes; revisión final de derechos/idioma; artefactos publicados y CI
