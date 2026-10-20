@@ -48,9 +48,10 @@ anteriores se conservaron localmente como respaldo; los commits publicables
 ejecuta tres repeticiones de Tessera autónoma sin y con observación, Engine
 sin ventana y Runtime regulado con dispositivos. Cada repetición contiene 180
 frames y descarta 30 de calentamiento. Percentiles, memoria máxima, hashes de
-binarios, hardware y límites están en `docs/performance-baseline.md`. Faltan
-asignaciones, bytes copiados, pérdidas/eventos, respaldos y GPU/espera
-separados. No se fijó un umbral de FPS.
+binarios, hardware y límites están en `docs/performance-baseline.md`. La
+comparación progresiva posterior separó asignaciones, copias, eventos,
+respaldos, ejecución GPU, espera de imagen y entrega al presentador. No se
+fijó un umbral de FPS.
 
 Tessera pasó 16/16 CTest breves, incluido consumidor instalado. Se repitió el
 replay largo con la ROM generada fuera de Git: 15 procesos, 18.000 frames
@@ -71,3 +72,14 @@ Runtime `a1fc482`. T035 exige
 publicar la cadena real de paquetes con hashes/procedencia y repetir los
 checks sin omisiones, incluido un entorno GPU/audio declarado. T036 y la
 aceptación final permanecen pendientes.
+
+**Recorrido sobre paquetes extraídos:** Tessera `d074cb4` y Engine `3deb4c2`
+produjeron ZIP reproducibles sin ROM ni pack; Engine activó la dependencia
+nativa. El consumidor externo compiló y ejecutó, y Runtime `a1fc482` pasó
+230/230 CTest usando ambos prefijos extraídos. FX-03 produjo 179 intervalos
+de entrega en 180 frames, p95=18,105 ms, cero errores Vulkan y cero faltantes
+SDL; FX-02 activo produjo 287.128 muestras no silenciosas, p95 de entrega
+18,002 ms y cero faltantes SDL. Los hashes de paquetes y el alcance exacto de
+las mediciones figuran en `docs/release-checklist.md` y
+`docs/performance-baseline.md`. Sigue faltando la presentación efectiva y la
+observación acústica física, además de publicación/lock/CI del candidato.

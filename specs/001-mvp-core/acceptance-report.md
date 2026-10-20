@@ -115,3 +115,18 @@ La [comparación progresiva](../../docs/performance-baseline.md) usó FX-03 en
 originales coincidieron en las rutas comparables y no hubo pérdidas de eventos
 ni solicitudes SDL sin datos; la presentación efectiva y los cortes acústicos
 físicos no están medidos. CA-11 permanece pendiente.
+
+**Evidencia adicional sobre candidatos locales extraídos (2026-10-20):**
+Tessera `d074cb4` y Engine `3deb4c2` generaron ZIP reproducibles y libres de
+ROM/pack/trust/generador; Engine activó Tessera nativa, pasó su replay de
+36.000 frames y un consumidor externo compiló y ejecutó. Runtime `a1fc482`
+consumió ambos prefijos y pasó 230/230 CTest. En el dispositivo local, FX-03
+presentó 180 frames (p95 de entrega 18,105 ms) y FX-02 entregó 287.128
+muestras activas; SDL informó cero muestras faltantes en ambas pasadas.
+Los hashes SHA-256 de los ZIP, el origen de las series y sus límites están en
+[`docs/release-checklist.md`](../../docs/release-checklist.md) y
+[`docs/performance-baseline.md`](../../docs/performance-baseline.md).
+El test de dispositivo valida readback y callbacks locales; no aporta
+timestamps efectivos de presentación ni observación acústica física. Faltan
+revisión de distribución, paquetes publicados, lock Runtime nativo y CI del
+candidato; CA-08/CA-11 y T034–T036 siguen abiertos.

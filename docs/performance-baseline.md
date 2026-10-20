@@ -245,3 +245,34 @@ por traza evitaba confirmar la política de Engine y produjo 180 respaldos
 `policy_unconfirmed`; se corrigió mediante `AytherSession::native_replay_next`
 y la serie publicada arriba es la repetición completa posterior a la
 corrección. La comparación no acredita aún CI ni aceptación final.
+
+### Candidatos empaquetados y dispositivo, 2026-10-20
+
+Se repitió el recorrido sobre ZIP locales extraídos, sin rutas de biblioteca a
+los árboles de fuente: Tessera `d074cb4` (SHA-256 del ZIP
+`42b8870ab8d83744c895f6d5cef5ab3d98b36b5bd74c135c8d0520b1af12b907`),
+Engine `3deb4c2` compilado con Tessera activa (ZIP
+`5bd460bfe713ac5b3b86b9ebf3caef564ee5f9930dd8d33c69d47f2880808c3e`)
+y Runtime `a1fc482` (ejecutable
+`3361fe5ca12e514069e0960a13ddfd81c0a91c86086107d86ee06b9c48edc5b9`).
+El consumidor externo de Engine compiló y ejecutó desde ambos prefijos
+extraídos. Runtime pasó 230/230 CTest en esta configuración, incluidos los
+tres tests Tessera. Ambos ZIP son reproducibles byte por byte en dos pasadas;
+ninguno contiene ROM, pack, registro de confianza ni generador compilado.
+
+En la NVIDIA GeForce RTX 3060 Laptop GPU, con 180 frames regulados y 30 de
+calentamiento, FX-03 dio 179 intervalos de entrega: p50/p95/p99/máximo
+16,708/18,105/18,593/19,059 ms; `gpu_execute` p50/p95/p99
+95,648/464,288/467,808 µs; `runtime_device` p50/p95/p99
+333,2/632,1/1.188,6 µs. Hubo cero errores Vulkan. SDL recibió 144.143
+frames de origen, 296 callbacks y cero episodios o muestras faltantes, con
+silencio previsto (`active_samples=0`). Con FX-02 y entrada activa, la misma
+ruta dio entrega p50/p95/p99/máximo 16,734/18,002/18,587/18,779 ms,
+`gpu_execute` 86,688/465,344/469,728 µs y `runtime_device`
+323,7/686,6/956,8 µs. El stream recibió 144.143 frames de origen, pico PCM
+1.022, 287.128 muestras activas, 296 callbacks y cero episodios o muestras
+faltantes. Ambas pasadas obtuvieron 180 timestamps de comandos GPU con
+`valid_bits=64` y `period_ns=1`; los timestamps efectivos de presentación
+permanecen indisponibles. Estas cifras son una observación de una pasada por
+fixture sobre paquetes locales: no sustituyen las tres repeticiones de la
+comparación progresiva ni demuestran ausencia de cortes audibles físicos.

@@ -63,3 +63,22 @@ El workflow de release existente todavía construye Engine sin Tessera; T035
 requiere un candidato nativo verificable y su lock real antes de declarar
 entrega completa. Runtime no tiene runner autohospedado registrado (consulta
 GitHub de 2026-10-20), por lo que GPU/audio físico siguen pendientes.
+
+**Candidato local extraído (2026-10-20):** Tessera `d074cb4` instaló C11/C++20,
+CLI, licencias, inventario y avisos; dos ZIP idénticos SHA-256
+`42b8870ab8d83744c895f6d5cef5ab3d98b36b5bd74c135c8d0520b1af12b907`
+(27 entradas). Engine `3deb4c2` se recompiló con `AYTHER_ENABLE_TESSERA=ON`
+contra ese paquete, pasó 44 comprobaciones de payload y 12 replays nativos
+con 36.000 frames sin divergencias. Dos ZIP Engine idénticos SHA-256
+`5bd460bfe713ac5b3b86b9ebf3caef564ee5f9930dd8d33c69d47f2880808c3e`
+(122 entradas) se extrajeron junto con Tessera; un consumidor externo compiló
+y ejecutó. Ninguno de los ZIP lleva ROM, pack, trust ni generador compilado.
+Runtime `a1fc482` configuró y enlazó con los dos paquetes extraídos y pasó
+230/230 CTest, incluidos los tres perfiles Tessera. Una primera pasada Engine
+tuvo 246/247 resultados correctos porque `AYTHER_TESSERA_CLI` seguía apuntando
+a una revisión vieja; corregida la ruta al CLI del paquete, el replay faltante
+pasó 1/1. La validación de dispositivo local de FX-02 entregó 287.128 muestras
+activas y cero faltantes SDL; FX-03 presentó 180 frames sin errores Vulkan.
+Timestamps efectivos de presentación y cortes acústicos físicos siguen sin
+observación. Son candidatos locales, no assets publicados: faltan revisión de
+distribución, publicación autorizada de paquetes, lock real y CI sobre ese lock.
