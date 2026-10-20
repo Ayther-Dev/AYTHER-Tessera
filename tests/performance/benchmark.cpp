@@ -154,6 +154,7 @@ Json runtime_report(const fs::path &log, bool devices) {
           {"source_peak", std::stoi(values.at("source_peak"))},
           {"active_samples", std::stoull(values.at("active_samples"))},
           {"callback_calls", std::stoull(values.at("callback_calls"))},
+          {"measurement", "sdl_callback_refill_request_estimate"},
           {"episodes", std::stoull(values.at("episodes"))},
           {"missing_samples", std::stoull(values.at("missing_samples"))},
           {"total_ms", std::stod(values.at("total_ms"))},

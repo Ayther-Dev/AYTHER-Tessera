@@ -23,7 +23,7 @@ pendiente. Un test omitido no cuenta como aprobado.
 | RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
 | RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
 | RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos | Local verificado; CI física pendiente |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, espera de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. Una de seis repeticiones tuvo 337 muestras faltantes y espera GPU elevada; la presentación efectiva física no expone timestamps. | Local parcial; incidente y CI pendiente |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, adquisición de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. Una de seis repeticiones tuvo 337 muestras de demanda adicional estimada por SDL y adquisición CPU elevada; la presentación efectiva física no expone timestamps. | Local parcial; incidente de regularidad y CI pendiente |
 | RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
 | RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
 | RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime | Pendiente del perfil físico CI |
@@ -39,7 +39,7 @@ pendiente. Un test omitido no cuenta como aprobado.
 | CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código verdes y Runtime 233/233 local | Pendiente del perfil físico CI |
 | CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
 | CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo | Local verificado; CI final pendiente |
-| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un episodio de 337 muestras faltantes y p99 de entrega 33,463 ms activó avisos; la causa y el perfil físico en CI siguen pendientes. | Pendiente |
+| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un callback pidió 337 muestras adicionales estimadas y el p99 de entrega llegó a 33,463 ms; la causa del pico y el perfil físico en CI siguen pendientes. | Pendiente |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
@@ -162,11 +162,20 @@ consumidor instalado y consumidor externo de los ZIP extraídos. Runtime pasó
 lock y aceptación T035–T036 continúan pendientes.
 
 La comparación progresiva del par revisado se repitió dos veces (6×180 frames).
-En una repetición apareció un episodio SDL de 337 muestras faltantes durante
-7,021 ms y p99 de entrega 33,463 ms, acompañado por p99 de espera GPU al
-adquirir imagen de 36,267 ms; las otras cinco repeticiones no lo reprodujeron.
-Se conservan ambas series en la línea base. Los presupuestos locales de aviso
-detectaron el caso y CA-11 no se declara cerrado.
+En una repetición FX-03 apareció demanda SDL adicional estimada de 337 muestras
+(7,021 ms a 48 kHz) y p99 de entrega 33,463 ms, con p99 CPU de adquisición
+de 36,267 ms; las otras cinco repeticiones no lo reprodujeron. El audio fuente
+de FX-03 era silencio esperado. `additional_amount` no prueba pérdida de PCM
+en el dispositivo, y las medidas agregadas no prueban simultaneidad de ambos
+picos. Se conservan ambas series en la línea base. Los presupuestos locales de
+aviso detectaron el caso y CA-11 no se declara cerrado.
+
+La revisión del contrato SDL precisó el alcance de `missing_samples`: en este
+runner suma `additional_amount` del callback previo a la extracción de datos;
+SDL permite sobreestimación y no informa cuántas muestras llegaron al altavoz.
+Por tanto, no se atribuye un corte acústico a FX-03 silencioso. Falta un
+oráculo local que distinga demanda de relleno de PCM no entregado a tiempo;
+el perfil físico en CI sigue siendo requisito independiente.
 
 El borrador de Tessera `v0.1.0-mvp.2` pasó su workflow Release y ofrece un ZIP
 SHA-256 `40ae6447b3a5dd7ca4bd4aaed2fccc436118fd53bec6c97deeb6c2593bed5a8f`
@@ -201,9 +210,9 @@ traza y hashes estables dentro de cada modo. En las seis repeticiones hubo
 180 composiciones, 361 eventos sin pérdidas y cero demanda adicional de audio
 no disponible. La entrega tuvo p99 18,261–19,141 ms y máximo hasta 24,681 ms;
 `runtime_device` p99 llegó a 2,506 ms en una repetición. La línea base ahora
-separa esos resultados de los límites del binario anterior. El episodio previo
-de 337 muestras y la falta de CI física siguen sin resolver, por lo que
-T032/CA-11 permanecen abiertos.
+separa esos resultados de los límites del binario anterior. La demanda SDL
+adicional estimada de 337 muestras y la falta de CI física siguen pendientes
+de caracterización, por lo que T032/CA-11 permanecen abiertos.
 
 La prueba FX-02 con audio activo, sobre los mismos paquetes públicos, añadió
 dos series de 3×180 frames con B mantenido: 287.128 muestras activas por
@@ -211,3 +220,11 @@ repetición, hashes estables, cero pérdidas de eventos y cero demanda faltante
 en el stream SDL. La entrega dio p99 18,103–18,929 ms y máximo hasta
 27,683 ms. Este indicador del callback no mide cortes audibles del dispositivo;
 el perfil físico en CI sigue pendiente por decisión del usuario.
+
+Una tercera serie FX-02, ejecutada con el Runtime exacto de los paquetes
+públicos y el runner recompilado, confirmó el campo
+`measurement=sdl_callback_refill_request_estimate` en el JSON: 3×180 frames,
+PCM activo, cero solicitud SDL adicional y un máximo aislado de entrega de
+31,680 ms. La evidencia local está en
+`build/evidence/phase5-fx02-refill-semantics-exact/summary.json`; el máximo
+no se etiqueta como corte de audio.

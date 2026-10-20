@@ -363,8 +363,9 @@ tres repeticiones de 180 frames por modo y 30 frames de calentamiento; el
 informe JSON queda bajo `build/evidence`. `docs/performance-baseline.md` define
 el punto y límite de cada serie. La validación GPU obtiene un readback del
 renderer además de comprobar la entrega al swapchain; los timestamps efectivos
-de presentación no están disponibles. Las demandas SDL de audio son un
-indicador de falta de datos en el stream, no una medición de salida audible.
+de presentación no están disponibles. Las demandas SDL de audio indican
+relleno solicitado al stream; pueden sobreestimar los bytes necesarios y no
+prueban pérdida de PCM ni cortes audibles del dispositivo.
 
 El perfil compatible con el lock Engine rc.19 conserva
 `AYTHER_ENABLE_TESSERA_NATIVE=OFF`. Para el cierre del MVP deben ejecutarse

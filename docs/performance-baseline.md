@@ -53,9 +53,9 @@ El punto de entrega es el retorno de `VkSwapchain::end_frame`, con reloj
 monotónico. Los timestamps de presentación efectiva no están disponibles en
 este backend y se informan separadamente como `unavailable`. El callback de
 SDL observa demanda de bytes adicionales del stream tras precargar cuatro
-frames; su contador de faltantes es una **aproximación de falta de datos en el
-stream**, no una medición de interrupciones audibles ni de muestras realmente
-perdidas por el hardware. La prueba adicional FX-02 con B pulsado entregó PCM
+frames; el campo `missing_samples` suma **solicitudes estimadas de relleno**,
+no mide interrupciones audibles ni muestras realmente perdidas por el hardware.
+La prueba adicional FX-02 con B pulsado entregó PCM
 activo (`source_peak=1022`, `active_samples=478628` en 300 frames) y no
 silencio constante. El ensayo FX-03 de GPU leyó el render offscreen de 960×720:
 1.224 píxeles magenta con pack, cero sin pack y el mismo hash al reactivarlo;
@@ -401,16 +401,29 @@ hashes originales y presentados equivalentes entre etapas, 180 composiciones,
 `build/evidence/phase5-progressive-fx03-de825-repeat/summary.json`. La primera
 serie registró p99 de entrega 18,289/33,463/18,865 ms; en la segunda,
 18,470/18,254/18,536 ms. En la repetición central de la primera serie hubo
-un intervalo máximo de 49,140 ms y un episodio SDL de 337 muestras faltantes
-(7,021 ms). El p99 de espera CPU al adquirir la imagen GPU subió allí a
+un intervalo máximo de 49,140 ms y un callback SDL que pidió 337 muestras
+adicionales (7,021 ms a 48 kHz). El p99 CPU de `gpu_acquire_cpu` subió allí a
 36.267,3 µs, frente a 57,9 y 85,0 µs en las otras dos repeticiones. En la
 segunda serie, las seis cifras comparables de audio y entrega no reprodujeron
-el incidente: tres repeticiones con cero muestras faltantes y p99 de espera de
-adquisición de 93,3/66,2/82,0 µs. La coincidencia temporal apunta a una
-espera de presentación como contribuyente, pero no identifica su causa. El
+el incidente: tres repeticiones con cero demanda adicional y p99 de adquisición
+de 93,3/66,2/82,0 µs. Son medidas agregadas de la misma repetición, sin
+marcas temporales que prueben simultaneidad. `gpu_acquire_cpu` engloba
+`vkWaitForFences`, `vkAcquireNextImageKHR` y el inicio del comando; no permite
+atribuir el pico a una de esas llamadas. El
 límite local de aviso de entrega y el de audio se activaron: no se descarta el
 episodio por la repetición favorable ni se extrapola una tasa de fallos desde
 seis observaciones.
+El callback SDL precede a la obtención de datos y `additional_amount` expresa
+bytes que el stream quisiera añadir, con posible sobreestimación por buffering
+o remuestreo; no es un contador de PCM efectivamente perdido. El campo
+`missing_samples` del informe conserva su nombre heredado, pero aquí solo
+representa **demanda adicional estimada**. FX-03 generó silencio previsto
+(`source_peak=0`, `active_samples=0`), por lo que tampoco es evidencia de un
+corte acústico audible. Queda por caracterizar la cola de presentación de esa
+repetición y ejecutar el perfil físico de aceptación en CI. T032 no puede
+usar este contador como oráculo definitivo de cortes: requiere una medición
+que distinga la solicitud de relleno de PCM no entregado a tiempo. El informe
+actual tampoco identifica el frame o instante del callback positivo.
 El pico de memoria por proceso fue 16,3–16,9 MiB en Tessera mínima,
 21,6–21,7 MiB con observación, 22,0–22,1 MiB en Engine mínimo,
 24,1–24,4 MiB con composición y 242,7–281,4 MiB en Runtime con dispositivos.
@@ -480,8 +493,8 @@ stream, no cortes audibles del hardware.
 Los límites de aviso de `d074cb4` anteriores pertenecen a ese binario y
 perfil. En la pareja pública, los p99 de observación directa, entrega CPU y
 dos máximos de intervalo mostraron colas distintas; no se interpretan como
-regresión causal frente a `d074cb4` ni se oculta el episodio previo de 337
-muestras faltantes. Para una siguiente validación del **mismo par público**,
+regresión causal frente a `d074cb4` ni se oculta la demanda SDL adicional
+estimada de 337 muestras en FX-03. Para una siguiente validación del **mismo par público**,
 un margen provisional de aproximadamente 25 % sobre los mayores valores
 medidos da avisos de 8,8 ms para p99 de Tessera observada, 4,2 ms para Engine
 observado, 3,2 ms para `runtime_device`, 24,0 ms para p99 de entrega y 30,9 ms
@@ -513,3 +526,16 @@ dos máximos superaron 25 ms sin producir demanda faltante según el callback.
 0,324–0,489 ms. Se conserva el máximo de 27,683 ms como variación real de
 entrega, sin equipararlo a una interrupción acústica. Este perfil tampoco
 mide el reloj de salida ni sustituye la validación física en CI.
+
+Una tercera serie FX-02 de 3×180 frames comprobó el nombre explícito del
+indicador en el JSON (`measurement=sdl_callback_refill_request_estimate`) con
+el Runtime de SHA-256 `808f6f2e6742260c6727e065900da50dc767db6ce563211d1b7d662e66bad895`
+y el runner recompilado SHA-256
+`2261e8bf577f6eea3482a1871e4504bb35232bec7f5f35596162922b0819faf4`.
+Evidencia ignorada por Git:
+`build/evidence/phase5-fx02-refill-semantics-exact/summary.json`. Conservó
+configuración y traza de las dos series anteriores. Sus tres repeticiones
+tuvieron 287.128 muestras PCM activas cada una, cero solicitud adicional
+registrada, p99 de entrega 18,120–19,030 ms y máximos 18,540–31,680 ms.
+El máximo aislado de 31,680 ms sin solicitud adicional refuerza que un
+intervalo largo de entrega y el indicador SDL no son la misma medición.

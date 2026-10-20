@@ -48,9 +48,11 @@ hashes de binarios/fixtures y el resultado de `acceptance-report.md`.
 
 **Bloqueadores actuales:** el perfil local separa asignaciones C++, copias,
 eventos/pérdidas, respaldos, espera de imagen y trabajo GPU; no ofrece
-timestamps efectivos del dispositivo. Una repetición presentó 337 muestras
-faltantes y un p99 de entrega de 33,463 ms, por encima del aviso local; se
-conserva el incidente para T032/CA-11. La prueba GPU/audio física en CI sigue
+timestamps efectivos del dispositivo. Una repetición FX-03 presentó demanda
+SDL adicional estimada de 337 muestras sobre silencio esperado y un p99 de
+entrega de 33,463 ms, por encima del aviso local; el contador no prueba pérdida
+de PCM ni corte audible. Se conserva el pico de regularidad para T032/CA-11.
+La prueba GPU/audio física en CI sigue
 pendiente por decisión del usuario. T031/T032/T035/T036 y CA-08/CA-11 no se
 declaran cerrados.
 
@@ -217,7 +219,8 @@ repeticiones dieron cero demanda adicional de audio no disponible. La entrega
 al presentador tuvo p99 18,261–19,141 ms y máximo hasta 24,681 ms; una
 repetición tuvo `runtime_device` p99 de 2,506 ms. La
 [línea base](performance-baseline.md) conserva tanto esa variación como el
-episodio anterior de 337 muestras; T032 y CA-11 siguen abiertos.
+demanda SDL adicional estimada de 337 muestras en FX-03; T032 y CA-11 siguen
+abiertos.
 
 **Audio activo FX-02:** dos series adicionales de 3×180 frames con B mantenido
 produjeron 287.128 muestras activas por repetición y cero demanda faltante
