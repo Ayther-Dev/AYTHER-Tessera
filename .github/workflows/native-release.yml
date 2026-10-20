@@ -1,0 +1,110 @@
+name: Native software candidate
+
+on:
+  push:
+    tags:
+      - 'v0.1.0-mvp.*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: tessera-native-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Windows native package and draft
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      ASSET_NAME: tessera-${{ github.ref_name }}-windows-x86_64.zip
+    steps:
+      - name: Check out the exact tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a rerun or an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ('${{ github.run_attempt }}' -ne '1') {
+            throw 'Use a new tag for a corrected candidate.'
+          }
+          gh release view '${{ github.ref_name }}' --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw 'A release already exists for this immutable tag.'
+          }
+
+      - name: Prepare exact pinned source inputs
+        run: |
+          ./tools/bootstrap-dependencies.ps1 -Download
+          ./tools/bootstrap-backends.ps1 -Download -SelectedOnly
+
+      - name: Configure, build and test Release
+        run: |
+          ./tools/check.ps1 -Preset windows-release -Stage Configure -Jobs 2
+          ./tools/check.ps1 -Preset windows-release -Stage Build -Jobs 2
+          ctest --test-dir build/windows-release -C Release --output-on-failure -j 2
+          if ($LASTEXITCODE -ne 0) { throw 'Release CTest failed.' }
+
+      - name: Install and verify the corresponding source
+        run: |
+          cmake --install build/windows-release --prefix "$env:RUNNER_TEMP/tessera-install"
+          if ($LASTEXITCODE -ne 0) { throw 'Install failed.' }
+          $metadata = Get-Content "$env:RUNNER_TEMP/tessera-install/share/tessera/package-metadata.json" -Raw |
+            ConvertFrom-Json
+          if ($metadata.source.revision -cne '${{ github.sha }}' -or
+              $metadata.source.clean_at_configure -ne $true) {
+            throw 'Package source does not match the clean release tag.'
+          }
+
+      - name: Package twice and reject drift
+        run: |
+          $epoch = [long](git show -s --format=%ct HEAD)
+          $root = [IO.Path]::GetFileNameWithoutExtension($env:ASSET_NAME)
+          ./tools/package-native-release.ps1 `
+            -InputDirectory "$env:RUNNER_TEMP/tessera-install" `
+            -OutputFile "release-out/$env:ASSET_NAME" `
+            -ArchiveRoot $root -SourceDateEpoch $epoch
+          ./tools/package-native-release.ps1 `
+            -InputDirectory "$env:RUNNER_TEMP/tessera-install" `
+            -OutputFile "repro-out/$env:ASSET_NAME" `
+            -ArchiveRoot $root -SourceDateEpoch $epoch
+          $first = (Get-FileHash "release-out/$env:ASSET_NAME" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $second = (Get-FileHash "repro-out/$env:ASSET_NAME" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($first -cne $second) { throw 'Repeated packaging differed.' }
+          [IO.File]::WriteAllText('release-out/CHECKSUMS.sha256',
+            "$first *$env:ASSET_NAME`n", [Text.UTF8Encoding]::new($false))
+
+      - name: Attest the software ZIP
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-out/${{ env.ASSET_NAME }}
+
+      - name: Create a draft with only authorized software and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          @'
+          Candidato nativo de Tessera para Windows x64. El paquete incluye la API C,
+          CLI, referencia al código fuente correspondiente, inventario y licencias.
+          El backend Mega Drive incorpora componentes Clown bajo AGPL. El tag y el
+          commit registrado en el paquete identifican las fuentes exactas.
+          No incluye ROM, pack de contenido, registro de confianza ni generador
+          compilado. El borrador permanece sin publicar hasta cerrar la revisión
+          de distribución y el lock nativo de Runtime.
+          '@ | Set-Content release-notes.md -Encoding utf8NoBOM
+          gh release create '${{ github.ref_name }}' `
+            "release-out/$env:ASSET_NAME" release-out/CHECKSUMS.sha256 `
+            --repo '${{ github.repository }}' --verify-tag --draft --prerelease `
+            --title "Tessera ${{ github.ref_name }}" --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Draft candidate creation failed.' }

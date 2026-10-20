@@ -26,23 +26,24 @@ if(GIT_FOUND)
         set(tessera_source_clean_json true)
     endif()
 endif()
-file(CONFIGURE OUTPUT "${tessera_package_directory}/SOURCE_AVAILABILITY.md" CONTENT [=[# Tessera corresponding source
+file(CONFIGURE OUTPUT "${tessera_package_directory}/SOURCE_AVAILABILITY.md" CONTENT [=[# Código fuente correspondiente de Tessera
 
-This software package was configured from commit `@tessera_source_revision@` of
-https://github.com/Ayther-Dev/AYTHER-Tessera. The source tree was clean at
-configuration: `@tessera_source_clean_json@`. For a tagged release, obtain the
-source at the matching tag and verify it resolves to this commit.
+Este paquete se configuró desde el commit `@tessera_source_revision@` de
+https://github.com/Ayther-Dev/AYTHER-Tessera. El árbol de fuentes estaba limpio
+al configurarlo: `@tessera_source_clean_json@`. Para una entrega con tag,
+obtenga las fuentes de ese tag y compruebe que apunta al commit indicado.
 
-The repository contains CMake build/install scripts, the Mega Drive backend
-source lock at `third_party/backends/sources.lock.json`, the download and hash
-checks in `tools/bootstrap-backends.ps1`, and the exact ClownMDEmu modification
-in `cmake/patches/clownmdemu-provenance.patch`. The source lock identifies
-the separate ClownMDEmu, clown68000, clownz80, and clowncommon revisions.
-Their original license texts accompany this package under `licenses/`.
+El repositorio contiene los scripts CMake de compilación e instalación, el lock
+de fuentes del backend Mega Drive en `third_party/backends/sources.lock.json`,
+la descarga y verificación de hashes en `tools/bootstrap-backends.ps1` y el
+parche exacto de ClownMDEmu en
+`cmake/patches/clownmdemu-provenance.patch`. El lock identifica por separado
+las revisiones de ClownMDEmu, clown68000, clownz80 y clowncommon. Sus textos de
+licencia originales acompañan al paquete bajo `licenses/`.
 
-Engine is a separate dependency and its source and notices are provided by
-its own package. No ROM, content pack, trust registry, or fixture generator
-binary is part of this distribution.
+Engine es una dependencia separada y aporta sus propias fuentes y avisos.
+Esta distribución no incluye ROM, pack de contenido, registro de confianza
+ni generador compilado de fixtures.
 ]=] @ONLY)
 install(FILES "${tessera_package_directory}/SOURCE_AVAILABILITY.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/tessera")
