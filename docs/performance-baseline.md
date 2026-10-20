@@ -392,6 +392,25 @@ porcentual calculada a partir de cero. Los 180 respaldos fueron la consecuencia
 prevista del fixture, no un objetivo de reducción. La presentación efectiva y
 la salida acústica física no aportan una serie observable en este hardware;
 estos límites se refieren a entrega, comandos GPU y demanda del stream.
+
+**Comprobación con el ZIP revisado `de825e5` y Engine `fb3d9a8`:** se ejecutaron
+dos series independientes de 3×180 frames (30 de calentamiento), ambas con
+hashes originales y presentados equivalentes entre etapas, 180 composiciones,
+361 eventos y cero pérdidas por repetición. Los informes locales están en
+`build/evidence/phase5-progressive-fx03-de825/summary.json` y
+`build/evidence/phase5-progressive-fx03-de825-repeat/summary.json`. La primera
+serie registró p99 de entrega 18,289/33,463/18,865 ms; en la segunda,
+18,470/18,254/18,536 ms. En la repetición central de la primera serie hubo
+un intervalo máximo de 49,140 ms y un episodio SDL de 337 muestras faltantes
+(7,021 ms). El p99 de espera CPU al adquirir la imagen GPU subió allí a
+36.267,3 µs, frente a 57,9 y 85,0 µs en las otras dos repeticiones. En la
+segunda serie, las seis cifras comparables de audio y entrega no reprodujeron
+el incidente: tres repeticiones con cero muestras faltantes y p99 de espera de
+adquisición de 93,3/66,2/82,0 µs. La coincidencia temporal apunta a una
+espera de presentación como contribuyente, pero no identifica su causa. El
+límite local de aviso de entrega y el de audio se activaron: no se descarta el
+episodio por la repetición favorable ni se extrapola una tasa de fallos desde
+seis observaciones.
 El pico de memoria por proceso fue 16,3–16,9 MiB en Tessera mínima,
 21,6–21,7 MiB con observación, 22,0–22,1 MiB en Engine mínimo,
 24,1–24,4 MiB con composición y 242,7–281,4 MiB en Runtime con dispositivos.

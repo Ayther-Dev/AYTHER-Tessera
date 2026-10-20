@@ -159,3 +159,10 @@ y Engine `fb3d9a8`: metadato de fuente limpia, paquete reproducible,
 consumidor instalado y consumidor externo de los ZIP extraídos. Runtime pasó
 3/3 pruebas nativas con este par exacto. La publicación, procedencia remota,
 lock y aceptación T035–T036 continúan pendientes.
+
+La comparación progresiva del par revisado se repitió dos veces (6×180 frames).
+En una repetición apareció un episodio SDL de 337 muestras faltantes durante
+7,021 ms y p99 de entrega 33,463 ms, acompañado por p99 de espera GPU al
+adquirir imagen de 36,267 ms; las otras cinco repeticiones no lo reprodujeron.
+Se conservan ambas series en la línea base. Los presupuestos locales de aviso
+detectaron el caso y CA-11 no se declara cerrado.
