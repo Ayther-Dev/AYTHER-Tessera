@@ -6,6 +6,46 @@ set(TESSERA_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/tessera")
 set(TESSERA_INSTALL_ASANDIR "${CMAKE_INSTALL_LIBDIR}/tessera-asan")
 set(tessera_package_directory "${CMAKE_CURRENT_BINARY_DIR}/package")
 file(MAKE_DIRECTORY "${tessera_package_directory}")
+find_package(Git QUIET)
+set(tessera_source_revision "unverified")
+set(tessera_source_clean_json false)
+if(GIT_FOUND)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${PROJECT_SOURCE_DIR}" rev-parse HEAD
+        OUTPUT_VARIABLE tessera_git_revision OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE tessera_git_revision_result ERROR_QUIET)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${PROJECT_SOURCE_DIR}" status --porcelain --untracked-files=no
+        OUTPUT_VARIABLE tessera_git_status OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE tessera_git_status_result ERROR_QUIET)
+    string(LENGTH "${tessera_git_revision}" tessera_git_revision_length)
+    if(tessera_git_revision_result EQUAL 0 AND
+       tessera_git_revision_length EQUAL 40 AND
+       tessera_git_revision MATCHES "^[0-9a-f]+$")
+        set(tessera_source_revision "${tessera_git_revision}")
+    endif()
+    if(tessera_git_status_result EQUAL 0 AND tessera_git_status STREQUAL "")
+        set(tessera_source_clean_json true)
+    endif()
+endif()
+file(CONFIGURE OUTPUT "${tessera_package_directory}/SOURCE_AVAILABILITY.md" CONTENT [=[# Tessera corresponding source
+
+This software package was configured from commit `@tessera_source_revision@` of
+https://github.com/Ayther-Dev/AYTHER-Tessera. The source tree was clean at
+configuration: `@tessera_source_clean_json@`. For a tagged release, obtain the
+source at the matching tag and verify it resolves to this commit.
+
+The repository contains CMake build/install scripts, the Mega Drive backend
+source lock at `third_party/backends/sources.lock.json`, the download and hash
+checks in `tools/bootstrap-backends.ps1`, and the exact ClownMDEmu modification
+in `cmake/patches/clownmdemu-provenance.patch`. The source lock identifies
+the separate ClownMDEmu, clown68000, clownz80, and clowncommon revisions.
+Their original license texts accompany this package under `licenses/`.
+
+Engine is a separate dependency and its source and notices are provided by
+its own package. No ROM, content pack, trust registry, or fixture generator
+binary is part of this distribution.
+]=] @ONLY)
+install(FILES "${tessera_package_directory}/SOURCE_AVAILABILITY.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/tessera")
 set_target_properties(tessera_core PROPERTIES EXPORT_NAME core)
 install(TARGETS tessera_core EXPORT TesseraTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
@@ -83,6 +123,7 @@ file(CONFIGURE OUTPUT "${tessera_package_directory}/package-metadata.json" CONTE
   "version": "@PROJECT_VERSION@",
   "abi": {"major": 1, "minor": 0, "pointer_bytes": 8, "platform": "windows-x64-msvc", "runtime": "/MD"},
   "build": {"id": "@build_id@", "configuration": "@CMAKE_BUILD_TYPE@", "compiler_id": "@CMAKE_CXX_COMPILER_ID@", "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@", "diagnostics": @tessera_diagnostics_json@},
+  "source": {"repository": "https://github.com/Ayther-Dev/AYTHER-Tessera", "revision": "@tessera_source_revision@", "clean_at_configure": @tessera_source_clean_json@},
   "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": ["PicoSHA2 1.0.1", "ClownMDEmu 88ef45a", "clown68000 bb19838", "clownz80 aa4cae3", "clowncommon ecee31f/ddeff17"], "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
   "scope": {"core": "synthetic-and-megadrive", "candidate_backends_included": true, "fixtures_included": false, "distribution_review": "T034-pending"},
   "asan_runtime": {"included": @tessera_diagnostics_json@, "file": "@tessera_asan_dll_name@", "sha256": "@tessera_asan_sha256@", "origin": "local-compiler-toolchain", "scope": "local-development-distribution-review-T034"}

@@ -85,6 +85,7 @@ foreach(path IN ITEMS include/tessera/tessera.h lib/tessera_core.lib bin/tessera
         lib/tessera-backend/clownz80-interpreter.lib
         lib/tessera-backend/clownz80-common.lib
         share/tessera/package-metadata.json share/tessera/dependencies.lock.json
+        share/tessera/SOURCE_AVAILABILITY.md
         share/tessera/THIRD_PARTY_NOTICES.md share/tessera/DEPENDENCIES.csv
         share/tessera/licenses/LICENSE share/tessera/licenses/picosha2-1.0.1/LICENSE
         share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT
@@ -100,8 +101,20 @@ endforeach()
 file(READ "${relocated}/share/tessera/package-metadata.json" metadata)
 string(JSON package_version GET "${metadata}" version)
 string(JSON package_abi GET "${metadata}" abi major)
+string(JSON source_revision GET "${metadata}" source revision)
+string(LENGTH "${source_revision}" source_revision_length)
 if(NOT package_version VERSION_EQUAL "0.1.0" OR NOT package_abi EQUAL 1)
     message(FATAL_ERROR "PACKAGE_METADATA_INVALID: identidad publicada incorrecta.")
+endif()
+if(NOT source_revision_length EQUAL 40 OR
+        NOT source_revision MATCHES "^[0-9a-f]+$")
+    message(FATAL_ERROR "PACKAGE_SOURCE_UNVERIFIED: falta revision exacta.")
+endif()
+file(READ "${relocated}/share/tessera/SOURCE_AVAILABILITY.md" source_offer)
+if(NOT source_offer MATCHES "${source_revision}" OR
+        NOT source_offer MATCHES "third_party/backends/sources.lock.json" OR
+        NOT source_offer MATCHES "cmake/patches/clownmdemu-provenance.patch")
+    message(FATAL_ERROR "PACKAGE_SOURCE_OFFER_INCOMPLETE: fuente o parche no identificados.")
 endif()
 run_checked(PACKAGE_CLI_FAILED "${relocated}/bin/tessera.exe" backend list)
 message(STATUS "Paquete reubicado consumido sin dependencias privadas; negativos de versión, CRT, arquitectura y toolset rechazados.")
