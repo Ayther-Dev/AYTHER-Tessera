@@ -3,7 +3,7 @@
 **Característica:** `001-mvp-core`  
 **Fecha y aprobación:** 2026-10-19  
 **Alineación aprobada:** diez correcciones de QA de la especificación y la constitución.  
-**Estado:** aprobado; fases 0–4 y T030/T033/T034 completadas localmente. Los paquetes de software de Tessera y Engine están publicados y Runtime pasó 233/233 CTest locales con ambos prefijos públicos. Fase 5 abierta: T031 por CI física, T032 por el incidente de regularidad/audio, y T035–T036 por sus dependencias de aceptación.
+**Estado:** aprobado; T001–T036 verificadas. Los paquetes Tessera/Engine están publicados, Runtime pasó 233/233 CTest locales con ambos prefijos públicos y el perfil GPU/audio físico pasó en CI privado. La auditoría de aceptación T036 está cerrada.
 **Especificación:** [spec.md](spec.md).  
 **Norma aplicable:** [docs/constitution.md](../../docs/constitution.md).
 
@@ -63,8 +63,8 @@ futuros, no configuraciones de compilación ya funcionales.
 | Idioma consistente | Código, comentarios y logs propios nuevos en inglés; documentación y mensajes al usuario en español. Fuentes externas conservan idioma, avisos y procedencia; sus copias de referencia permanecen intactas. |
 
 La comprobación documental es conforme antes y después del diseño. Los gates
-técnicos siguen pendientes. La norma es `docs/constitution.md`; la plantilla
-pendiente de `.specify/memory/constitution.md` no la sustituye.
+técnicos siguen pendientes. La norma es `docs/constitution.md`; la copia
+idéntica de `.specify/memory/constitution.md` facilita las comprobaciones.
 
 ## Arquitectura y responsabilidades
 
@@ -329,8 +329,8 @@ specs/001-mvp-core/
 
 [Decisiones](research.md), [modelo de datos](data-model.md),
 [contrato nativo](contracts/native-api.md), [tareas](tasks.md) y
-[guía de validación](quickstart.md). Las 36 tareas siguen pendientes; esta
-alineación documental no implementa código ni ejecuta los checks del MVP.
+[guía de validación](quickstart.md). El estado actual de las 36 tareas se
+registra en [tasks.md](tasks.md); el plan conserva la arquitectura aprobada.
 
 ### Código y pruebas a implementar
 

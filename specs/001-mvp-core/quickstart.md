@@ -1,16 +1,16 @@
 # Guía de validación del MVP
 
-**Estado:** fases 0–4 completadas localmente al 2026-10-19; Gate 0 seleccionó
+**Estado:** T001–T036 verificadas al 2026-10-20; Gate 0 seleccionó
 ClownMDEmu, Gate 2 acredita FX-01 desde Engine y Gate 3 acredita Mega Drive,
 FX-02 y checkpoints entre procesos. Consultar los resultados y límites de
 [fase 3](../../docs/phase-3-results.md), [fase 2](../../docs/phase-2-results.md),
 [fase 1](../../docs/phase-1-results.md) y [fase 0](../../docs/phase-0-results.md).
 FX-03 y la presentación Engine–Tessera con `.ay` están verificadas localmente.
-La fase 5 validó localmente la ruta Runtime de GPU y audio con dispositivos de
-prueba y ejecutó la comparación progresiva FX-03. Tessera y Runtime tienen
-sus checks actuales aprobados; Engine revalida el pin nuevo de Tessera en el
-PR borrador. Faltan el paquete nativo versionado, su lock y la
-prueba física GPU/audio en runner.
+La fase 5 validó la ruta Runtime con GPU/audio físico en
+[CI privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+y ejecutó la comparación progresiva FX-03/FX-02. Los dos paquetes de software
+están publicados, Runtime fija sus locks nativos y los tres PR tienen checks
+aprobados. La auditoría final T036 consta en `acceptance-report.md`.
 
 ## Comprobaciones disponibles hoy
 

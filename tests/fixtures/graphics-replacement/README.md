@@ -26,4 +26,6 @@ primera regla gana.
 **Estado:** la ROM, el pack y los oráculos son reproducibles. La prueba local
 `ayther.integration.tessera_presentation_test` verifica composición, override,
 respaldo, recuperación y conservación de estado/vídeo/PCM originales mediante
-Engine–Tessera. La validación del consumo en Runtime corresponde a T031.
+Engine–Tessera. Runtime verificó readback y hashes originales en
+[CI físico privado](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+durante T031.

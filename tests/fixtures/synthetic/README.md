@@ -17,7 +17,9 @@ La [CLI](../../../docs/cli.md) genera content.bin, memory.bin, config.bin y
 trace.bin/trace.json mediante `demo --fixture-dir DIRECTORIO`. La configuración
 y las trazas incorporan el build_id consultado: regenerarlas para cada build.
 `integration.replay` acepta el recorrido autónomo con doce procesos, 36.000
-frames y oráculo independiente completo. Esto deja pendiente T018 por Engine.
+frames y oráculo independiente completo. T018 verificó el consumo nativo
+desde Engine; los resultados constan en la
+[matriz de aceptación](../../../specs/001-mvp-core/acceptance-report.md).
 
 ## Datos y generación reproducible
 

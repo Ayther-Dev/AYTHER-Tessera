@@ -419,11 +419,10 @@ o remuestreo; no es un contador de PCM efectivamente perdido. El campo
 `missing_samples` del informe conserva su nombre heredado, pero aquí solo
 representa **demanda adicional estimada**. FX-03 generó silencio previsto
 (`source_peak=0`, `active_samples=0`), por lo que tampoco es evidencia de un
-corte acústico audible. Queda por caracterizar la cola de presentación de esa
-repetición y ejecutar el perfil físico de aceptación en CI. T032 no puede
-usar este contador como oráculo definitivo de cortes: requiere una medición
-que distinga la solicitud de relleno de PCM no entregado a tiempo. El informe
-actual tampoco identifica el frame o instante del callback positivo.
+corte acústico audible. En ese corte faltaban la caracterización del callback
+para esta configuración y el perfil físico en CI; ambas evidencias posteriores
+figuran al final de esta línea base. El informe de aquella repetición tampoco
+identifica el frame o instante del callback positivo.
 El pico de memoria por proceso fue 16,3–16,9 MiB en Tessera mínima,
 21,6–21,7 MiB con observación, 22,0–22,1 MiB en Engine mínimo,
 24,1–24,4 MiB con composición y 242,7–281,4 MiB en Runtime con dispositivos.
@@ -565,5 +564,52 @@ en ese instante y puede sobreestimar por buffering/resampling. Duración total
 y máxima informadas: 0,000 ms en ambos perfiles. No equivalen a observación
 acústica del dispositivo. La API de presentación efectiva no expuso timestamps;
 la serie se registra por separado como `unavailable`, sin inferir tiempos de
-pantalla a partir de la entrega. T032 conserva la investigación de los picos
-locales de regularidad y la consolidación de métricas.
+pantalla a partir de la entrega. La auditoría de T032 precisa a continuación
+qué parte de la demanda SDL satisface la definición aprobada de corte.
+
+### Alcance de medición de T032, 2026-10-20
+
+Se contrastó el callback con el código de
+[SDL 3.4.8 `SDL_audiocvt.c`](https://github.com/libsdl-org/SDL/blob/release-3.4.8/src/audio/SDL_audiocvt.c):
+antes de extraer audio, SDL calcula los frames de salida pedidos, resta los
+frames de salida disponibles en el stream y comunica la diferencia como
+`additional_amount` en bytes del formato de entrada. Runtime no inserta
+datos en ese callback. Una consulta local con `SDL_GetAudioStreamFormat`,
+`SDL_GetAudioDeviceFormat` y `SDL_GetAudioStreamFrequencyRatio` devolvió
+entrada S16 estéreo 48 kHz, salida F32 estéreo 48 kHz, dispositivo F32 estéreo
+48 kHz y razón 1,0; no hay cambio de frecuencia. Por ello, en **este perfil**,
+`additional_amount / 4` cuenta frames estéreo solicitados que no estaban
+disponibles en el límite Runtime→SDL. El campo heredado `missing_samples`
+usa la unidad **frame estéreo**; `total_ms` y `max_ms` dividen esos frames por
+48.000. `episodes` agrupa callbacks consecutivos con déficit, con resolución
+de un callback. La serie no mide la señal acústica posterior ni se traslada
+sin nueva comprobación a un dispositivo con remuestreo.
+
+El candidato local anterior `de825e5` registró **un episodio de 337 frames
+estéreo**, 7,021 ms total/máximo, en una de seis repeticiones FX-03. El silencio
+de la ROM era válido, pero el déficit de datos del stream se conserva como tal.
+Las seis repeticiones del par público exacto y las nueve repeticiones FX-02
+activas dieron cero episodios y cero frames faltantes. El run físico de CI
+anterior dio cero en FX-03 y FX-02. El p99 33,463 ms y el máximo 49,140 ms
+del candidato anterior permanecen en el registro: la evidencia no atribuye
+causalmente ese pico al callback ni lo elimina por no repetirse. Los avisos
+del par público se derivan de sus máximos medidos y se aplican solo a ese
+hardware/perfil; el incidente anterior sirve como caso de investigación, no
+como un umbral de aceptación inventado.
+
+Para comprobar que los contadores opcionales no alteran las salidas, se
+ejecutaron replays directos de 180 frames sobre la misma ROM FX-03 con
+`TESSERA_ALLOCATION_METRICS=ON` (`build/windows-dev`, ejecutable SHA-256
+`231b95623cdc773b24293f3fc9aba0db9831ec3171b1e02b83afdc2bd92c4147`)
+y `OFF` (`build/windows-release`, SHA-256
+`f13e01d1634c524a76624c4ee9bcd2540cf0014f0b53c82bb105934735b60582`).
+Los modos de observación `off` y `full` completaron 180/180 frames en ambos
+builds: **0 diferencias de vídeo y PCM originales** entre los 180 pares de
+frames por modo. Las configuraciones se generaron para cada build desde la
+misma ROM/traza lógica; los digests de estado no se comparan porque incluyen
+el `build_id` distinto de cada backend. Los reportes locales ignorados por Git
+están en `build/evidence/phase5-metrics-switch-{dev,release}/direct-{off,full}-0.json`
+y la comparación en `build/evidence/phase5-metrics-switch/compare.json`.
+Esta comprobación directa se separa del benchmark completo: los dos intentos
+de integración se detuvieron posteriormente por identidad de backend distinta
+en el Runtime fijado, sin invalidar los cuatro reportes directos completos.

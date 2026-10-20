@@ -1,18 +1,23 @@
 # Fase 5 — progreso local
 
-Fecha: 2026-10-20. Estado: **en curso**; T030, T031, T033 y T034 cerradas;
-T032, T035 y T036 abiertas hasta acreditar sus criterios. PR borradores
+Fecha: 2026-10-20. Estado: **T030–T036 cerradas**, con trazabilidad en la
+[matriz de aceptación](../specs/001-mvp-core/acceptance-report.md). PR borradores
 [Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
 [Engine #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48) y
 [Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55); el lock
-publicado de Runtime no cambió. La matriz detallada está en
-[`acceptance-report.md`](../specs/001-mvp-core/acceptance-report.md).
+predeterminado de Runtime no cambió; sus locks nativos fijan los dos paquetes
+públicos. Los párrafos de validaciones anteriores conservan el estado de aquel
+candidato y no sustituyen este corte final.
 
 T031 pasó el [perfil GPU/audio en CI físico privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
 con Runtime `7bccf53`; el runner efímero se retiró al terminar. El workflow
 corrió sin subir ROM, pack ni trust y no requirió un cuarto PR. Las métricas
 exactas y sus límites de interpretación constan en la
 [línea base](performance-baseline.md).
+T032 cerró la comparación progresiva, los contadores ON/OFF y la definición
+del déficit de frames estéreo en el stream SDL para el formato físico 48 kHz
+sin remuestreo; conserva el episodio aislado de 337 frames del candidato
+anterior y la variación de entrega sin atribución causal.
 
 ## Runtime: GPU, dispositivo de audio y proveedor nativo
 
@@ -68,7 +73,7 @@ pruebas nativas afectadas. `integration.robustness` y los diagnósticos ASan
 quedaron consolidados en T033 (6/6 local y 4/4 ASan); T034 requiere
 consolidación final.
 
-## Entrega y aceptación
+## Entrega y aceptación — historial de candidatos
 
 El workflow Engine fija Tessera `5704605`; Runtime aún bloquea Engine
 `v0.1.0-rc.19`. Se verificaron los ocho contextos protegidos de Runtime en

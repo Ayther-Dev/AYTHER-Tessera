@@ -1,6 +1,6 @@
 # Informe de aceptación — MVP
 
-**Corte local:** 2026-10-20. **Resultado:** aceptación final **pendiente**.
+**Corte local:** 2026-10-20. **Resultado:** aceptación técnica del MVP **conforme**.
 La fase 5 añadió presentación Vulkan, salida SDL al dispositivo y una línea
 base comparable de tres capas. La ampliación local añadió asignaciones,
 copias explícitas, eventos, respaldos, etapas CPU de presentación y una
@@ -8,39 +8,42 @@ comparación progresiva FX-03 con hashes por frame. Los checks de código de
 las tres revisiones están verdes y los dos paquetes de software se publicaron
 y consumieron desde URL pública. El perfil físico GPU/audio pasó en
 [CI privado de Lab](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830).
-T032, T035 y T036 siguen abiertos; un test omitido no cuenta como aprobado.
+T032 cerró la definición y comparación de métricas; T035 verificó la cadena
+publicada y T036 auditó la trazabilidad. Un test omitido no cuenta como aprobado.
+Los cortes posteriores de este informe conservan su fecha y describen el
+estado histórico de cada candidato, no el estado final.
 
 | ID | Evidencia ejecutada o pendiente | Estado |
 | --- | --- | --- |
-| RF-01 | `integration.cli`, `integration.replay`, Engine nativo y Runtime headless; replay/EOF en benchmark | Local verificado; CI pendiente |
-| RF-02 | Fase 3/4: 15 procesos, 18.000 frames, 4.500 continuados y oráculos FX-02 | Local verificado; CI final pendiente |
-| RF-03 | `contract.native_api`, `integration.megadrive_session`, Engine backend/provider | Local verificado |
-| RF-04 | `contract.snapshot`, `integration.megadrive_observation` | Local verificado |
-| RF-05 | Engine `tessera_presentation_test` y Runtime `tessera_runtime_gpu_audio`; readback 1.224/0/0/1.224 píxeles magenta | Local y CI GPU verificados |
-| RF-06 | `contract.snapshot`, Engine controls/presentation, Runtime confirmación 1/2/3 y rechazos de máscara, orden y pack sin avance | Local y perfil nativo CI verificados |
-| RF-07 | Engine controls/presentation y checkpoint; respaldo/rearme locales | Local verificado; CI final pendiente |
-| RF-08 | Engine pack/presentation: manifiesto, derechos, hashes, rutas y límites | Local verificado |
-| RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones; matriz T033 revalidada en `windows-dev` y ASan | Local verificado; CI final pendiente |
-| RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Local verificado; CI final pendiente |
-| RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Local verificado |
-| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos y perfil físico en CI privado | Local y CI física verificados |
-| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, adquisición de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. El perfil físico en CI midió FX-03/FX-02; una de seis repeticiones locales tuvo 337 muestras de demanda adicional estimada por SDL y adquisición CPU elevada. La presentación efectiva física no expone timestamps. | CI física verificada; consolidación T032 pendiente |
-| RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Local verificado; revisión final pendiente |
-| RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Local verificado |
-| RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime y [perfil físico CI](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Perfil físico verificado; aceptación final pendiente |
-| RC-04 | Código propio nuevo en inglés, mensajes/documentos en español; fuentes externas intactas con idioma, avisos y procedencia | Local verificado en T034 |
-| RC-05 | ZIP públicos Tessera/Engine, fuente y avisos, hashes/atestaciones, consumidor externo y Runtime desde prefijos públicos | Local verificado |
-| CA-01 | FX-01/02/03 presentes y con manifiestos, fuentes/generadores y hashes | Local verificado; entrega pendiente |
-| CA-02 | Replay completo de fases 1/3/4 y oráculos independientes, dos procesos | Local verificado; CI final pendiente |
-| CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3; consolidación T033 6/6 local y 4/4 ASan | Local verificado; CI pendiente |
-| CA-04 | Dos lectores, retención, observación activada/inactiva y misma salida | Local verificado |
-| CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Local y CI GPU verificados |
-| CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Local verificado |
-| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime rechazó entrada inválida, control fuera de orden y pack ausente sin avanzar frame en el perfil CI físico. Matriz T033 cerrada localmente (6/6 y 4/4 ASan) | Revisión final T036 pendiente |
-| CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código previos verdes, Runtime 233/233 local y perfil físico CI privado | Coordinación final T035 pendiente |
-| CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Local verificado |
-| CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo en [CI físico](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Local y CI física verificados; aceptación final pendiente |
-| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base. Un callback pidió 337 muestras adicionales estimadas y el p99 de entrega llegó a 33,463 ms; el perfil físico en CI pasó, pero la causa del pico y la consolidación T032 siguen pendientes. | Pendiente |
+| RF-01 | `integration.cli`, `integration.replay`, Engine nativo y Runtime headless; replay/EOF en benchmark | Conforme |
+| RF-02 | Fase 3/4: 15 procesos, 18.000 frames, 4.500 continuados y oráculos FX-02 | Conforme |
+| RF-03 | `contract.native_api`, `integration.megadrive_session`, Engine backend/provider | Conforme |
+| RF-04 | `contract.snapshot`, `integration.megadrive_observation` | Conforme |
+| RF-05 | Engine `tessera_presentation_test` y Runtime `tessera_runtime_gpu_audio`; readback 1.224/0/0/1.224 píxeles magenta | Conforme |
+| RF-06 | `contract.snapshot`, Engine controls/presentation, Runtime confirmación 1/2/3 y rechazos de máscara, orden y pack sin avance | Conforme |
+| RF-07 | Engine controls/presentation y checkpoint; respaldo/rearme locales | Conforme |
+| RF-08 | Engine pack/presentation: manifiesto, derechos, hashes, rutas y límites | Conforme |
+| RF-09 | `unit.state_format`, `integration.state_store`, `integration.checkpoint` y replay de continuaciones; matriz T033 revalidada en `windows-dev` y ASan | Conforme |
+| RF-10 | `contract.snapshot`, `integration.megadrive_observation`, `integration.robustness`; benchmark: 361 eventos retenidos y 0 pérdidas | Conforme |
+| RF-11 | `unit.system_detector`, Engine provider, Runtime proveedor explícito | Conforme |
+| RF-12 | Engine→Tessera y Runtime→Engine→Tessera por API nativa; Runtime 233/233 CTest locales con paquetes públicos y perfil físico en CI privado | Conforme |
+| RF-13 | [Línea base](../../docs/performance-baseline.md): asignaciones C++ por frame, copias explícitas, eventos, respaldos, memoria, entrega, etapas CPU, adquisición de imagen y trabajo GPU separados; comparación progresiva FX-03 con hashes originales por etapa y composición 180/180. El perfil físico en CI midió FX-03/FX-02; un candidato anterior tuvo un episodio de 337 frames estéreo no disponibles en el límite Runtime→SDL, 7,021 ms, conservado como variación sin inferir un corte acústico. La presentación efectiva física no expone timestamps; cuatro replays directos comprobaron vídeo/PCM con contadores ON/OFF. | Conforme |
+| RC-01 | Stack fijado, `legal/DEPENDENCIES.csv`, builds locales | Conforme |
+| RC-02 | Núcleo y suite sin Engine/UI/GPU: CTest 16/16 breves | Conforme |
+| RC-03 | Contratos, unidad, replay y robustez en CI de código; GPU/audio locales 233/233 Runtime y [perfil físico CI](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Conforme |
+| RC-04 | Código propio nuevo en inglés, mensajes/documentos en español; fuentes externas intactas con idioma, avisos y procedencia | Conforme |
+| RC-05 | ZIP públicos Tessera/Engine, fuente y avisos, hashes/atestaciones, consumidor externo y Runtime desde prefijos públicos | Conforme |
+| CA-01 | FX-01/02/03 presentes y con manifiestos, fuentes/generadores y hashes | Conforme |
+| CA-02 | Replay completo de fases 1/3/4 y oráculos independientes, dos procesos | Conforme |
+| CA-03 | Checkpoints 500/1.500/2.500, continuación K+1 y errores E/S de fase 3; consolidación T033 6/6 local y 4/4 ASan | Conforme |
+| CA-04 | Dos lectores, retención, observación activada/inactiva y misma salida | Conforme |
+| CA-05 | FX-03 con precedencia/solapamientos Engine; Runtime Vulkan con readback y respaldo | Conforme |
+| CA-06 | FX-02 oráculos de silencio→PSG→silencio y Runtime audio activo 180 frames | Conforme |
+| CA-07 | Negativos de estados/pack/controles/EOF en fases 1–4 y `integration.robustness`; Runtime rechazó entrada inválida, control fuera de orden y pack ausente sin avanzar frame en el perfil CI físico. Matriz T033 cerrada localmente (6/6 y 4/4 ASan) | Conforme |
+| CA-08 | Ambos paquetes de software publicados y verificados desde URL pública; checks de código previos verdes, Runtime 233/233 local y perfil físico CI privado | Conforme |
+| CA-09 | Detección/override/ambigüedad y despacho registrados en pruebas de fases 1–3 | Conforme |
+| CA-10 | Pruebas Engine y Runtime locales, GPU FX-03 y audio FX-02; mismo backend nativo en [CI físico](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830) | Conforme |
+| CA-11 | Dos series de 3×180 frames progresivos con hashes conservados, composición real y presupuestos locales derivados de la base del par público. El candidato anterior registró un déficit de 337 frames estéreo (7,021 ms) en un callback y p99 de entrega de 33,463 ms; se informan ambos sin atribución causal. El perfil físico en CI pasó y los contadores ON/OFF conservaron vídeo/PCM. | Conforme con límites de medición declarados |
 
 **Fixtures:** las fuentes Engine/Lab copiadas permanecen intactas. La ROM
 canónica y FX-03 se generan desde fuente MPL bajo `build/`; FX-02 se genera
@@ -86,13 +89,52 @@ inmutable/retención; checkpoint y publicación atómica; detección por conteni
 procedencia/precedencia gráfica y respaldo; fixture de audio independiente;
 métricas con punto/origen/cobertura y alcance de idioma externo. Los casos
 negativos se asignan a las suites citadas arriba; el perfil nativo de T031
-pasó en CI físico. La auditoría final de trazabilidad corresponde a T036.
+pasó en CI físico. La auditoría T036 cotejó los diez grupos con spec, plan,
+contratos, suites y evidencias de ejecución.
 
-**Gate de cierre:** ejecutar T030–T035 sin omisiones, publicar la cadena de
-artefactos verificables Tessera→Engine→Runtime, actualizar el lock real y
-obtener checks obligatorios de los tres PR mínimos. Después repetir esta matriz
-con SHAs de commit, URLs de CI y resultados sin pendientes. Hasta entonces
-T036 no se marca completada y el MVP no se declara aceptado.
+**Gate de cierre:** T030–T035 ejecutadas sin omisiones; cadena de paquetes
+Tessera→Engine→Runtime, locks nativos y checks de los tres PR comprobados.
+La matriz RF-01–RF-13, RC-01–RC-05 y CA-01–CA-11 no tiene pendientes. T036
+completó la revisión de spec/código/tests, constitución, fixtures y distribución.
+Los PR siguen en borrador; esta aceptación técnica no implica merge.
+
+**Auditoría T036 (2026-10-20):** se cotejaron los 13 RF, 5 RC y 11 CA de la
+especificación con las 29 filas anteriores; T001–T036 conservan sus dependencias
+y están verificadas. Las seis reglas de [la constitución](../../docs/constitution.md)
+coinciden byte a byte con la copia de `.specify/memory/constitution.md`.
+Los enlaces locales de spec, plan, quickstart, tareas, informe, línea base,
+distribución y fixtures resolvieron. Se verificaron 16/16 CTest breves de
+Tessera, 5/5 nativos de Engine, 4/4 de Runtime y 4/4 diagnósticos ASan; la
+evidencia de replay largo registra 18.000 frames y 4.500 continuaciones en
+15 procesos, sin divergencias. La suite completa de Runtime con los paquetes
+públicos pasó 233/233. Los diez grupos de QA aprobados, sus casos negativos,
+oráculos funcionales y unidades/cobertura de medición quedaron trazados.
+
+**Revisiones y CI del candidato:**
+[Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
+`37a3755`, [Core checks 39491062238](https://github.com/Ayther-Dev/AYTHER-Tessera/actions/runs/39491062238);
+[Engine #48](https://github.com/Ayther-Dev/AYTHER-Engine/pull/48),
+`4a6ce4d`, [CI 39474684974](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39474684974);
+[Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55),
+`7bccf53`, [CI 39489138796](https://github.com/Ayther-Dev/AYTHER-Runtime/actions/runs/39489138796)
+y [QA 39489139052](https://github.com/Ayther-Dev/AYTHER-Runtime/actions/runs/39489139052).
+El [perfil GPU/audio físico 39490219830](https://github.com/Ayther-Dev/AYTHER-Lab/actions/runs/39490219830)
+pasó en el CI privado de Lab sin PR ni artifacts de fixtures. FX-03/FX-02
+ejecutaron 180 frames, 179 intervalos y 180 timestamps GPU cada uno, con
+cero errores de validación y cero demanda adicional de audio. FX-03 conservó
+hashes y readback 1.224/0/0/1.224; FX-02 produjo 287.128 muestras PCM activas.
+
+**Distribución:** [Tessera mvp.2](https://github.com/Ayther-Dev/AYTHER-Tessera/releases/tag/v0.1.0-mvp.2)
+ZIP SHA-256 `40ae6447b3a5dd7ca4bd4aaed2fccc436118fd53bec6c97deeb6c2593bed5a8f`;
+[Engine rc.22](https://github.com/Ayther-Dev/AYTHER-Engine/releases/tag/native-v0.1.0-rc.22)
+ZIP SHA-256 `4f17c34cde082b39a21c4a5216d77bc53e161df896487f1f9e50ab8a3fc1bdf2`.
+Las descargas públicas coinciden con los locks nativos de Runtime; inventario
+de 28/122 entradas sin ROM, pack, trust ni generador compilado. FX-01/02/03
+se generan localmente con procedencia, licencias y hashes documentados. El
+alcance del déficit de audio se limita al stream Runtime→SDL con dispositivo
+48 kHz sin remuestreo; no se afirma observación acústica ni timestamps de
+presentación efectiva. El episodio anterior de 337 frames/7,021 ms y la
+variación de entrega siguen informados en la [línea base](../../docs/performance-baseline.md).
 
 **Corte de revisión 2026-10-20:** hay un PR borrador por repositorio:
 [Tessera #1](https://github.com/Ayther-Dev/AYTHER-Tessera/pull/1),
@@ -237,4 +279,15 @@ el commit de Runtime, el ejecutable y los fixtures locales por SHA-256; las
 tres pruebas nativas y dos perfiles de 180 frames completaron todas sus etapas.
 El runner efímero se retiró y no publicó ROM, pack ni trust. Esta evidencia
 cierra T031 y elimina las referencias anteriores a CI física pendiente como
-bloqueador actual; T032, T035 y T036 siguen abiertos por sus propios criterios.
+bloqueador actual.
+
+**Actualización T032 (2026-10-20):** la auditoría del código de SDL 3.4.8 y
+el formato real de entrada/salida 48 kHz sin remuestreo identificó el punto
+Runtime→stream donde se cuentan frames estéreo no disponibles. Se conservaron
+un episodio anterior de 337 frames y su duración de 7,021 ms, así como el
+pico de entrega, sin inferir simultaneidad ni acústica física. El par público
+y FX-02 activo registraron cero episodios; la comparación de contadores
+opcionales ON/OFF produjo 0 diferencias de vídeo/PCM en 180 frames por modo.
+La [línea base](../../docs/performance-baseline.md) identifica cobertura,
+versiones y límites. T032 cierra sus mediciones sin inventar un umbral de
+rendimiento; T035 y T036 continúan abiertos.

@@ -6,6 +6,8 @@ Estado al 2026-10-20: tres PR borradores abiertos, uno por repositorio:
 [Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55).
 Se publicaron solo dos prereleases de software, Tessera mvp.2 y Engine rc.22,
 tras revisar distribución y fijar los locks de Runtime. No se abrió otro PR.
+T035 y la auditoría T036 están cerradas; los apartados fechados inferiores
+conservan el estado histórico de cada candidato.
 
 El usuario autorizó el 2026-10-20 publicar únicamente los paquetes de software
 Tessera y Engine nativo tras cerrar la revisión de distribución y actualizar el
@@ -22,7 +24,7 @@ compilado. Ningún binario generado se sube como artifact de Actions.
 
 | Repositorio | Validación local de este corte | CI remota exigida antes de T036 |
 | --- | --- | --- |
-| Tessera | ZIP público mvp.2, consumidor C/C++, replay y comparación progresiva FX-03/FX-02 | `Core checks` y workflow de release mvp.2 aprobados; revalidación del commit documental final pendiente |
+| Tessera | ZIP público mvp.2, consumidor C/C++, replay y comparación progresiva FX-03/FX-02 | `Core checks` y workflow de release mvp.2 aprobados; revalidación del commit documental final en curso |
 | Engine | ZIP público rc.22, 44 checks de payload y consumidor externo de la pareja | CI completa del PR #48 y workflow nativo rc.22 aprobados; pin Tessera `c69b9a3` |
 | Runtime | Build con los dos prefijos públicos y 233/233 CTest locales, incluidos FX-03, GPU y audio | Todos los checks del PR #55 aprobados; locks nativos reales junto al lock rc.19 predeterminado |
 
@@ -47,7 +49,7 @@ matrices nuevas por tarea, cron ni ejecuciones manuales para validar cambios
 intermedios. Antes de cada push, registrar `git diff --check`, CTest pertinente,
 hashes de binarios/fixtures y el resultado de `acceptance-report.md`.
 
-**Bloqueadores actuales:** el perfil local separa asignaciones C++, copias,
+**Historial de bloqueadores del candidato anterior:** el perfil local separa asignaciones C++, copias,
 eventos/pérdidas, respaldos, espera de imagen y trabajo GPU; no ofrece
 timestamps efectivos del dispositivo. Una repetición FX-03 presentó demanda
 SDL adicional estimada de 337 muestras sobre silencio esperado y un p99 de
@@ -241,5 +243,30 @@ validación y cero demanda adicional de audio estimada por el callback SDL.
 Los percentiles y la cobertura exacta están en la
 [línea base](performance-baseline.md). ROM, pack y trust quedaron locales; no
 se abrió PR de Lab ni se cargaron artifacts de fixture. T031 queda completada
-y desbloquea la coordinación de T035. La aceptación final y T032 siguen
-abiertas por sus criterios propios.
+y desbloquea la coordinación de T035.
+
+**Actualización T032, 2026-10-20:** la
+[línea base](performance-baseline.md) documenta la auditoría del callback SDL
+3.4.8, el formato de dispositivo 48 kHz sin remuestreo, el episodio anterior
+de 337 frames estéreo no disponibles (7,021 ms) y la preservación del pico
+de entrega sin atribución causal. Cuatro replays directos con contadores de
+asignación ON/OFF y observación off/full conservaron vídeo/PCM original
+durante 180 frames cada uno. Los presupuestos del par público proceden solo
+de sus medidas y variación. T032 queda completada; T035/T036 y la aceptación
+final siguen pendientes de sus comprobaciones propias.
+
+**Cierre T035, 2026-10-20:** los tres PR borradores siguen siendo los únicos
+PR de código: Tessera #1 (`37a3755`), Engine #48 (`4a6ce4d`) y Runtime #55
+(`7bccf53`). Sus checks obligatorios actuales pasaron: [Core checks de
+Tessera](https://github.com/Ayther-Dev/AYTHER-Tessera/actions/runs/39491062238),
+[CI de Engine](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39474684974),
+[CI de Runtime](https://github.com/Ayther-Dev/AYTHER-Runtime/actions/runs/39489138796)
+y [QA de Runtime](https://github.com/Ayther-Dev/AYTHER-Runtime/actions/runs/39489139052).
+El job GPU opt-in de Engine quedó omitido conforme a su matriz; el perfil
+físico equivalente pasó en el CI privado de Lab. Los únicos releases del MVP
+siguen siendo Tessera mvp.2 y Engine rc.22, con un ZIP de software y checksum
+cada uno. Se volvieron a comparar los SHA-256 de los ZIP públicos con los
+locks nativos de Runtime y se inventariaron sus 28/122 entradas: ningún
+fixture binario excluido. El usuario autorizó publicar esos paquetes de
+software; no se abrieron tags ni PR por tarea. La revisión de trazabilidad
+completa T036 permanece como gate de aceptación final.

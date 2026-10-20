@@ -2,7 +2,7 @@
 
 **Identificador:** `001-mvp-core`  
 **Creada y aprobada:** 2026-10-19  
-**Estado:** aprobada; fases 0–4 implementadas y validadas localmente (FX-03 incluido) y fase 5 en curso: T033 cerrada; T030–T032 y T034–T036 abiertas. Lock nativo publicado, runner GPU/audio y aceptación final pendientes.
+**Estado:** aprobada; T001–T036 verificadas. Los locks nativos y los dos paquetes de software públicos coinciden; el perfil GPU/audio pasó en CI físico privado. La auditoría de aceptación T036 está cerrada.
 **Solicitud:** guardar el MVP aprobado, incorporando la demo de Engine/Lab y
 los fixtures pendientes; actualizarlo con integración nativa Engine→Tessera,
 detección y despacho por consola y mediciones de rendimiento.  
@@ -499,7 +499,7 @@ de los artefactos publicados, conforme a la decisión del usuario del 2026-10-20
   la ROM y el pack generados deben registrarse expresamente antes de publicarlos,
   según el [registro de procedencia](../../tests/fixtures/ayther-engine-synthetic/PROVENANCE.md).
 
-### Fixtures obligatorios pendientes
+### Fixtures obligatorios del MVP
 
 | ID | Pendiente | Entregable y condición de aceptación |
 | --- | --- | --- |
@@ -512,6 +512,13 @@ reproducibles. Los datos adicionales para corrupción, saturación e
 incompatibilidad se incorporarán al desarrollar las pruebas correspondientes.
 Ningún pendiente se considera aprobado por la mera presencia de archivos o por
 comparar silencio, una imagen sin cambio de sustitución o un manifiesto vacío.
+
+**Estado de verificación:** FX-01 pasó replay determinista y consumo desde
+Engine; FX-02 pasó oráculos de estado, vídeo y audio activo por API autónoma y
+Engine, además de Runtime con dispositivo; FX-03 pasó composición, precedencia,
+respaldo y readback en Engine/Runtime y el perfil físico de CI. ROM, pack y
+trust generados permanecen locales por la decisión de distribución. La
+[matriz de aceptación](acceptance-report.md) conserva los runs y hashes.
 
 ### Referencias de elaboración
 
