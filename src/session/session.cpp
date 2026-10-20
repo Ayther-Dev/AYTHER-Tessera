@@ -72,6 +72,7 @@ InputState Session::validate_inputs(
 }
 void Session::step(const InputState &input, tessera_context_v1 &ctx) {
   // The backend prepares output buffers before committing its machine state.
+  machine->prepare_observation(pending ? pending->regions : region_mask);
   machine->step(input);
   ++generation;
   if (pending) {

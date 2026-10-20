@@ -34,6 +34,7 @@ public:
   [[nodiscard]] std::uint64_t tick_hz() const noexcept override {
     return megadrive::CanonicalAudio::master_clock_hz;
   }
+  void prepare_observation(std::uint64_t mask) override;
   void step(const InputState &inputs) override;
   [[nodiscard]] Bytes machine_record() const override;
   void restore_record(std::span<const std::uint8_t> record,
@@ -47,6 +48,11 @@ private:
   megadrive::CanonicalAudio audio_{{48000, 32768, 4096}};
   std::array<std::uint16_t, 256> palette_{};
   Bytes pixels_buffer_ = Bytes(1024 * 1024 * 4);
+  Bytes temporal_indices_;
+  std::vector<std::array<std::uint16_t, 256>> temporal_palettes_;
+  std::array<bool, 1024> temporal_lines_{};
+  bool temporal_requested_{};
+  bool temporal_complete_{};
   Bytes pcm_;
   std::vector<cc_s16l> scratch_ = std::vector<cc_s16l>(32768);
   std::vector<std::int16_t> staging_;
@@ -55,6 +61,7 @@ private:
   std::uint64_t frame_{};
 
   static MegaDriveBackend &self(void *data) noexcept;
+  [[nodiscard]] RegionData temporal_region() const;
 };
 
 [[nodiscard]] std::unique_ptr<IEmulatedSystem>

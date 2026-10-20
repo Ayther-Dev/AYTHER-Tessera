@@ -15,7 +15,8 @@ set(core_sources api/native_api.cpp backends/synthetic/synthetic_backend.cpp ses
     persistence/state_format.cpp persistence/state_store.cpp
     observation/snapshot_store.cpp observation/event_stream.cpp
     systems/system_detector.cpp systems/system_registry.cpp
-    backends/megadrive/megadrive_backend.cpp backends/megadrive/canonical_audio.cpp
+    backends/megadrive/megadrive_backend.cpp backends/megadrive/megadrive_observation.cpp
+    backends/megadrive/canonical_audio.cpp
     backends/megadrive/clown_state_codec.cpp)
 add_library(tessera_core STATIC ${core_sources})
 add_library(Tessera::core ALIAS tessera_core)

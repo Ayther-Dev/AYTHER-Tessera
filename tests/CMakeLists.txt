@@ -71,6 +71,16 @@ tessera_copy_diagnostic_runtime(tessera_megadrive_session_test)
 add_test(NAME integration.megadrive_session COMMAND tessera_megadrive_session_test)
 set_tests_properties(integration.megadrive_session PROPERTIES LABELS "integration;phase3;MegaDrive" TIMEOUT 45)
 
+add_executable(tessera_megadrive_observation_test integration/megadrive_observation_test.cpp)
+target_include_directories(tessera_megadrive_observation_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_definitions(tessera_megadrive_observation_test PRIVATE
+    TESSERA_ORIGINAL_ROM="${PROJECT_SOURCE_DIR}/tests/fixtures/ayther-engine-synthetic/ayther_synthetic.md")
+target_link_libraries(tessera_megadrive_observation_test PRIVATE Tessera::core Tessera::build_options
+    doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_megadrive_observation_test)
+add_test(NAME integration.megadrive_observation COMMAND tessera_megadrive_observation_test)
+set_tests_properties(integration.megadrive_observation PROPERTIES LABELS "integration;phase4;MegaDrive" TIMEOUT 45)
+
 add_executable(tessera_audio_fixture_generator backend_probe/main.cpp)
 target_link_libraries(tessera_audio_fixture_generator PRIVATE Tessera::build_options
     nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)

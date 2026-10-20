@@ -38,6 +38,7 @@ public:
   [[nodiscard]] virtual std::uint32_t frame_height() const noexcept = 0;
   [[nodiscard]] virtual std::uint64_t frame_ticks() const noexcept = 0;
   [[nodiscard]] virtual std::uint64_t tick_hz() const noexcept = 0;
+  virtual void prepare_observation(std::uint64_t) {}
   virtual void step(const InputState &inputs) = 0;
   [[nodiscard]] virtual Bytes machine_record() const = 0;
   virtual void restore_record(std::span<const std::uint8_t> record,

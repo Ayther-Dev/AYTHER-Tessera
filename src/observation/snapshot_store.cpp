@@ -22,6 +22,9 @@ void Session::capture() noexcept {
     s->info.frame_id = identity();
     s->info.generation = generation;
     s->info.region_mask = s->info.complete_mask = region_mask;
+    for (const auto &r : regions)
+      if (r.kind == 5 && (r.flags & 0x80000000U) != 0)
+        s->info.complete_mask &= ~TESSERA_REGION_TEMPORAL;
     s->info.retained_bytes = bytes;
     s->info.logical_tick = machine->tick();
     s->info.region_count = static_cast<std::uint32_t>(regions.size());
