@@ -130,3 +130,11 @@ El test de dispositivo valida readback y callbacks locales; no aporta
 timestamps efectivos de presentación ni observación acústica física. Faltan
 revisión de distribución, paquetes publicados, lock Runtime nativo y CI del
 candidato; CA-08/CA-11 y T034–T036 siguen abiertos.
+
+La [serie progresiva del candidato](../../docs/performance-baseline.md) repitió
+FX-03 con el paquete Release actual en 3×180 frames y hashes comparables
+coincidentes. Una traza regenerada con ese mismo build probó EOF en Runtime:
+al solicitar 181 frames se emitieron exactamente 180, y la desactivación
+programada en el frame 181 no produjo aplicación ni respaldo espurio. Esta
+evidencia amplía T030/T032 localmente; falta su perfil nativo en CI y el lock
+publicado, por lo que no cierra T030–T032 ni CA-10/CA-11.

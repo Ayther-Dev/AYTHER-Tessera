@@ -7,8 +7,9 @@ FX-02 y checkpoints entre procesos. Consultar los resultados y límites de
 [fase 1](../../docs/phase-1-results.md) y [fase 0](../../docs/phase-0-results.md).
 FX-03 y la presentación Engine–Tessera con `.ay` están verificadas localmente.
 La fase 5 validó localmente la ruta Runtime de GPU y audio con dispositivos de
-prueba y ejecutó la comparación progresiva FX-03. Los checks de los tres
-PR borradores pasaron; faltan el paquete nativo versionado, su lock y la
+prueba y ejecutó la comparación progresiva FX-03. Tessera y Runtime tienen
+sus checks actuales aprobados; Engine revalida el pin nuevo de Tessera en el
+PR borrador. Faltan el paquete nativo versionado, su lock y la
 prueba física GPU/audio en runner.
 
 ## Comprobaciones disponibles hoy
@@ -363,3 +364,25 @@ El perfil compatible con el lock Engine rc.19 conserva
 `AYTHER_ENABLE_TESSERA_NATIVE=OFF`. Para el cierre del MVP deben ejecutarse
 los checks CI de las revisiones publicadas y el perfil nativo contra la cadena
 de paquetes finales; `docs/release-checklist.md` registra esos gates.
+
+Para repetir la comparación del candidato Release con los ZIP locales ya
+extraídos y el Runtime enlazado a ambos prefijos, ejecutar:
+
+```powershell
+build/windows-release/tests/tessera_performance_benchmark.exe `
+  build/candidates/d074/unpacked/tessera-0.1.0-windows-x86_64/bin/tessera.exe `
+  C:/ayther/AYTHER-Runtime/out/build/tessera-local/bin/RelWithDebInfo/ayther_runtime.exe `
+  build/windows-dev/native-fixtures/fx03/fx03_rom.md `
+  build/evidence/phase5-progressive-fx03-packaged-d074 --devices `
+  --pack build/windows-dev/native-fixtures/fx03/fx03.ay `
+  build/windows-dev/native-fixtures/fx03/trust.toml
+```
+
+La traza binaria nueva se escribe en ese directorio de evidencia. Para
+verificar EOF sin un frame extra, usarla con `--frames 181` y comprobar que
+Runtime informa `AYTHER_NATIVE_EOF frame=180` y
+`AYTHER_NATIVE_DONE frames=180`. Con el pack, `--native-deactivate-at 181`
+debe conservar 180 composiciones y cero respaldos. Esta comprobación solo
+sirve si la traza y el binario comparten build_id; una traza de otra revisión
+se rechaza antes de avanzar. No publicar la traza generada en Git ni como
+artifact de CI.

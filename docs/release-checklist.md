@@ -6,6 +6,11 @@ Estado al 2026-10-20: tres PR borradores abiertos, uno por repositorio:
 [Runtime #55](https://github.com/Ayther-Dev/AYTHER-Runtime/pull/55).
 No se crearon tags ni releases por tarea.
 
+El usuario autorizó el 2026-10-20 publicar únicamente los paquetes de software
+Tessera y Engine nativo tras cerrar la revisión de distribución y actualizar el
+lock de Runtime. La [revisión técnica](distribution-review.md) sigue abierta:
+los ZIP identificados aquí son candidatos locales y no se han subido.
+
 El usuario confirmó que no hay permiso verificable para publicar la ROM/pack
 Engine/Lab ni la ROM FX-03 derivada. Se generan en `build/` con
 `tools/generate-native-fixtures.ps1`. Las tres ramas publicadas se auditaron con
@@ -63,6 +68,17 @@ El workflow de release existente todavía construye Engine sin Tessera; T035
 requiere un candidato nativo verificable y su lock real antes de declarar
 entrega completa. Runtime no tiene runner autohospedado registrado (consulta
 GitHub de 2026-10-20), por lo que el perfil GPU/audio físico en CI sigue pendiente.
+El [CI completo de Engine 39451144667](https://github.com/Ayther-Dev/AYTHER-Engine/actions/runs/39451144667)
+ya terminó en verde, incluido el consumidor Windows del paquete, sobre `6bbe484`.
+El usuario indicó usar los dispositivos locales; aún faltan registro,
+configuración y ejecución del perfil de aceptación en CI. Se ejecutó de nuevo
+`ctest --test-dir C:/ayther/AYTHER-Runtime/out/build/tessera-local
+-C RelWithDebInfo --output-on-failure
+-R '^tessera_runtime_(native_headless|active_audio|gpu_audio)$'`:
+3/3 pruebas aprobadas en 8,14 s con la GPU y el audio de este PC. Se comprobó
+que la cuenta puede solicitar un token de registro sin mostrarlo, pero no hay
+runner registrado ni workflow GPU/audio activo en CI; el resultado local no
+sustituye ese gate.
 
 **Candidato local extraído (2026-10-20):** Tessera `d074cb4` instaló C11/C++20,
 CLI, licencias, inventario y avisos; dos ZIP idénticos SHA-256

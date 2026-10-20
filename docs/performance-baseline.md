@@ -306,3 +306,77 @@ faltantes. Ambas pasadas obtuvieron 180 timestamps de comandos GPU con
 permanecen indisponibles. Estas cifras son una observación de una pasada por
 fixture sobre paquetes locales: no sustituyen las tres repeticiones de la
 comparación progresiva ni demuestran ausencia de cortes audibles físicos.
+
+### Comparación progresiva del candidato empaquetado
+
+Se regeneró `build/evidence/phase5-progressive-fx03-packaged-d074/summary.json`
+con CLI Tessera Release `d074cb4`, Runtime `a1fc482` enlazado a los ZIP
+extraídos y la ROM FX-03 de SHA-256
+`92478b869fc61dcd7a8d457b52ac6e08661c27956c774babf4768f32497d1077`.
+Son tres repeticiones secuenciales de 180 frames, con 30 de calentamiento
+excluidos. Cada celda contiene p50/p95/p99 de avance, en µs, para las
+repeticiones 1/2/3. La comparación con la serie anterior no atribuye la
+diferencia a la integración: cambió la configuración de build de Tessera.
+
+| Modo | Repetición 1 | Repetición 2 | Repetición 3 |
+| --- | ---: | ---: | ---: |
+| Tessera sin observación | 1048/1307/1768 | 993/1321/1634 | 1086/1275/1381 |
+| Tessera con observación | 2422/2865/3002 | 2105/2600/3165 | 2434/2869/3283 |
+| Engine mínimo | 893/1123/1478 | 914/1055/1141 | 809/1032/1156 |
+| Engine con observación | 2296/2808/3095 | 2245/2913/2983 | 2239/2527/2624 |
+| Engine con composición | 2252/2901/3489 | 2087/2679/2958 | 2520/3008/3220 |
+| Runtime con dispositivos | 2447/2805/2955 | 2560/3147/3377 | 2189/2577/2640 |
+
+Las demás etapas instrumentadas se resumen como mínimo–máximo entre los
+percentiles de las tres repeticiones, en µs. Cada etapa conserva sus 150
+muestras posteriores al calentamiento en los informes de evidencia locales.
+
+| Modo y etapa | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: |
+| Tessera mínima, hash canónico | 24.199–25.873 | 27.036–28.712 | 27.498–30.561 |
+| Tessera observada, hash canónico | 22.296–25.506 | 26.813–28.457 | 28.229–29.341 |
+| Tessera observada, capturas/eventos | 375–426 | 560–613 | 630–715 |
+| Engine mínimo, hash Runtime | 524–610 | 642–695 | 725–741 |
+| Engine observado, hash Runtime | 599–626 | 757–766 | 971–1.180 |
+| Engine compuesto, hash Runtime | 557–667 | 702–809 | 873–942 |
+| Engine compuesto, `engine_frame` | 73–89 | 139–160 | 164–278 |
+| Runtime, hash | 555–606 | 690–818 | 727–901 |
+| Runtime, `engine_frame` | 113–126 | 163–232 | 210–309 |
+| Runtime, `runtime_device` | 289–320 | 411–629 | 765–940 |
+| Runtime, `gpu_execute` | 86,112–97,152 | 636,480–952,896 | 642,464–956,928 |
+| Runtime, `gpu_image_wait` | 0,128 | 0,256–0,576 | 0,288–3,808 |
+
+La tabla expresa rangos de percentiles por repetición, no percentiles de
+muestras agregadas. Los hashes canónicos de Tessera y los hashes FNV de Runtime
+son trabajos diferentes; tampoco se suman etapas CPU/GPU solapadas. El benchmark comprobó que
+los 180 hashes de vídeo original y PCM de Engine coinciden entre los modos
+mínimo, observado, compuesto y Runtime; los 180 hashes presentados de la
+composición coinciden con Runtime en las tres repeticiones. Cada ejecución
+conservó 180 composiciones, 361 eventos emitidos/retenidos, cero pérdidas y
+cero episodios/muestras faltantes del stream SDL por repetición; FX-03 mantiene
+silencio previsto. La entrega al presentador, en ms y con 179 intervalos y
+cero errores Vulkan por repetición, fue:
+
+| Repetición | p50 | p95 | p99 | Máximo | Callbacks SDL |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 16,688 | 17,906 | 18,203 | 18,406 | 295 |
+| 2 | 16,725 | 17,730 | 18,205 | 18,448 | 295 |
+| 3 | 16,619 | 17,908 | 18,223 | 18,589 | 296 |
+
+Los timestamps efectivos de presentación continúan indisponibles.
+El pico de memoria por proceso fue 16,3–16,9 MiB en Tessera mínima,
+21,6–21,7 MiB con observación, 22,0–22,1 MiB en Engine mínimo,
+24,1–24,4 MiB con composición y 242,7–281,4 MiB en Runtime con dispositivos.
+Los contadores de `new` del ejecutable dieron 2 solicitudes/frame en Engine
+mínimo, 196 con observación, 205 con composición y ~210 con Runtime. El CLI
+Release de esta serie no incorporó el contador de asignaciones: sus campos
+vacíos no significan cero asignaciones y se usa para esa cobertura la serie
+instrumentada anterior. Tampoco se atribuye a `new` la memoria interna de SDL,
+Vulkan o bibliotecas con otro asignador.
+La traza nueva,
+SHA-256 `5743f98501e277590f703a33bbe2426aca3a1bcda463918ffec9f24cc7ee9c28`,
+permitió además pedir 181 frames al Runtime: emitió `AYTHER_NATIVE_EOF frame=180`
+y `AYTHER_NATIVE_DONE frames=180`. Con pack activo, un control de desactivación
+solicitado para el frame 181 no produjo frame ni respaldo adicional
+(`composed_frames=180`, `fallback_frames=0`). Ninguna traza o fixture generado
+se publica en Git ni en artifacts de CI.
