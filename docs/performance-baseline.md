@@ -364,6 +364,34 @@ cero errores Vulkan por repetición, fue:
 | 3 | 16,619 | 17,908 | 18,223 | 18,589 | 296 |
 
 Los timestamps efectivos de presentación continúan indisponibles.
+
+### Presupuestos locales derivados para la siguiente validación
+
+Los siguientes límites de aviso se derivan de la mayor observación entre las
+tres repeticiones del candidato `d074cb4` en este PC, con aproximadamente 25 %
+de margen y redondeo hacia arriba. Se aplican solo a una repetición del mismo
+perfil, hardware, toolchain, contenido y ventana de 150 frames estables; una
+medición en otro equipo requiere su propia línea base. No se suman etapas
+solapadas. El margen no convierte tres series en garantía estadística.
+
+| Serie | Mayor valor observado | Límite de aviso local |
+| --- | ---: | ---: |
+| Tessera observada, avance p99 | 3,283 ms | 4,2 ms |
+| Engine observado, avance p99 | 3,095 ms | 3,9 ms |
+| Engine compuesto, `engine_frame` p99 | 0,278 ms | 0,35 ms |
+| Runtime, avance p99 | 3,377 ms | 4,3 ms |
+| Runtime, `runtime_device` p99 | 0,940 ms | 1,2 ms |
+| Runtime, `gpu_execute` p99 | 0,957 ms | 1,2 ms |
+| Entrega al presentador p99 | 18,223 ms | 22,8 ms |
+| Intervalo máximo de entrega | 18,589 ms | 23,3 ms |
+| Memoria máxima de Runtime | 281,4 MiB | 352 MiB |
+
+La pérdida de eventos y las muestras faltantes del stream SDL tuvieron base
+cero; una observación positiva exige investigar el evento, sin tolerancia
+porcentual calculada a partir de cero. Los 180 respaldos fueron la consecuencia
+prevista del fixture, no un objetivo de reducción. La presentación efectiva y
+la salida acústica física no aportan una serie observable en este hardware;
+estos límites se refieren a entrega, comandos GPU y demanda del stream.
 El pico de memoria por proceso fue 16,3–16,9 MiB en Tessera mínima,
 21,6–21,7 MiB con observación, 22,0–22,1 MiB en Engine mínimo,
 24,1–24,4 MiB con composición y 242,7–281,4 MiB en Runtime con dispositivos.

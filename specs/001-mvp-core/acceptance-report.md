@@ -148,3 +148,8 @@ y `9e4f4c9`, respectivamente. Un
 runner temporal de organización se retiró sin ejecutar jobs porque no había
 un grupo autorizado para los tres repositorios públicos. Por tanto, el perfil
 GPU/audio en CI, los assets, el lock y la aceptación siguen pendientes.
+
+La línea base ya incluye presupuestos de aviso locales para la siguiente
+validación, calculados con el máximo de las tres repeticiones y 25 % de margen
+redondeado. Se limitan al hardware y perfil medidos; no sustituyen el perfil
+de dispositivo en CI que quedó pendiente por decisión del usuario.
