@@ -94,6 +94,10 @@ coinciden con las fuentes (4/4); las 10 licencias externas instaladas también
 son idénticas byte por byte a las fuentes. El metadato del paquete conserva
 `distribution_review: T034-pending` hasta cerrar la revisión conjunta de
 distribución, sin inferir derechos sobre los fixtures generados.
+La revisión siguiente agrega `SOURCE_AVAILABILITY.md` al prefijo instalado y
+registra SHA de commit y estado limpio en `package-metadata.json`. Configuración
+Release y consumidor C11/C++20 pasaron; el último candidato ZIP de SHA
+`42b8870a…` antecede a este cambio y debe regenerarse antes de publicarse.
 Runtime `a1fc482` configuró y enlazó con los dos paquetes extraídos y pasó
 230/230 CTest, incluidos los tres perfiles Tessera. Engine pasó 247/247 CTest
 en una pasada posterior a alinear CLI y biblioteca Tessera. En la primera, el
