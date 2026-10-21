@@ -1,0 +1,206 @@
+diff --git a/source/vdp.h b/source/vdp.h
+--- a/source/vdp.h
++++ b/source/vdp.h
+@@ -204,10 +204,28 @@
+ 	char kdebug_buffer[0x100];
+ } VDP_State;
+ 
++typedef struct VDP_ProvenancePixel
++{
++	cc_u16l tile_index;
++	cc_u16l tile_word;
++	cc_u8l source; /* 0 backdrop, 1 plane A, 2 plane B, 3 window, 4 sprite */
++	cc_u8l sat_slot;
++	cc_u8l source_x;
++	cc_u8l source_y;
++} VDP_ProvenancePixel;
++
++typedef void (*VDP_ProvenanceCallback)(void *user_data, cc_u16f scanline, const VDP_ProvenancePixel *pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f screen_width, cc_u16f screen_height);
++
+ typedef struct VDP
+ {
+ 	VDP_Configuration configuration;
+ 	VDP_State state;
++	VDP_ProvenanceCallback provenance_callback;
++	void *provenance_user_data;
++	VDP_ProvenancePixel *provenance_plane;
++	VDP_ProvenancePixel *provenance_sprite;
++	const cc_u8l *provenance_plane_origin;
++	const cc_u8l *provenance_sprite_origin;
+ } VDP;
+ 
+ typedef void (*VDP_ScanlineRenderedCallback)(void *user_data, cc_u16f scanline, const cc_u8l *pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f screen_width, cc_u16f screen_height);
+diff --git a/source/vdp.c b/source/vdp.c
+--- a/source/vdp.c
++++ b/source/vdp.c
+@@ -357,6 +357,12 @@
+ 
+ void VDP_Initialise(VDP* const vdp)
+ {
++	vdp->provenance_callback = NULL;
++	vdp->provenance_user_data = NULL;
++	vdp->provenance_plane = NULL;
++	vdp->provenance_sprite = NULL;
++	vdp->provenance_plane_origin = NULL;
++	vdp->provenance_sprite_origin = NULL;
+ 	vdp->state.access.write_pending = cc_false;
+ 	vdp->state.access.address_register = 0;
+ 	vdp->state.access.code_register = 0;
+@@ -446,7 +452,21 @@
+ 	}
+ }
+ 
+-static void RenderTilePair(const VDP* const vdp, const cc_u16f pixel_y_in_plane, const cc_u32f vram_address, const cc_u32f base_tile_vram_address, cc_u8l** const metapixels_pointer_pointer, const BlitLookup* const blit_lookup_list)
++static void RecordPlanePixel(const VDP* const vdp, const cc_u8l* const pixel, const cc_u8f colour, const cc_u16f word, const cc_u8f source, const cc_u8f source_x, const cc_u8f source_y)
++{
++	if (vdp->provenance_callback != NULL && colour != 0 && ((*pixel & 0xF) == 0 || (*pixel & 0x40) == 0 || (word & 0x8000) != 0))
++	{
++		VDP_ProvenancePixel* const entry = &vdp->provenance_plane[pixel - vdp->provenance_plane_origin];
++		entry->tile_index = VDP_GetTileIndex(word);
++		entry->tile_word = word;
++		entry->source = source;
++		entry->sat_slot = 0xFF;
++		entry->source_x = source_x;
++		entry->source_y = source_y;
++	}
++}
++
++static void RenderTilePair(const VDP* const vdp, const cc_u16f pixel_y_in_plane, const cc_u32f vram_address, const cc_u32f base_tile_vram_address, cc_u8l** const metapixels_pointer_pointer, const BlitLookup* const blit_lookup_list, const cc_u8f source)
+ {
+ 	const VDP_State* const state = &vdp->state;
+ 
+@@ -481,10 +501,14 @@
+ 		for (j = 0; j < TILE_WIDTH / 2; ++j)
+ 		{
+ 			const cc_u8f byte = ReadVRAM(state, (tile_row_vram_address + j) ^ byte_index_xor);
+-
+-			*metapixels_pointer = blit_lookup[(byte >> nybble_shift_1) & 0xF].pixels[*metapixels_pointer];
++			const cc_u8f first = (byte >> nybble_shift_1) & 0xF;
++			const cc_u8f second = (byte >> nybble_shift_2) & 0xF;
++			RecordPlanePixel(vdp, metapixels_pointer, first, word, source, x_flip ? TILE_WIDTH - j * 2 - 1 : j * 2, pixel_y_in_tile);
++
++			*metapixels_pointer = blit_lookup[first].pixels[*metapixels_pointer];
+ 			++metapixels_pointer;
+-			*metapixels_pointer = blit_lookup[(byte >> nybble_shift_2) & 0xF].pixels[*metapixels_pointer];
++			RecordPlanePixel(vdp, metapixels_pointer, second, word, source, x_flip ? TILE_WIDTH - j * 2 - 2 : j * 2 + 1, pixel_y_in_tile);
++			*metapixels_pointer = blit_lookup[second].pixels[*metapixels_pointer];
+ 			++metapixels_pointer;
+ 		}
+ 	}
+@@ -527,7 +551,7 @@
+ 		const cc_u16f tile_y = (pixel_y_in_plane >> tile_height_shift) & plane_height_bitmask;
+ 		const cc_u32f vram_address = plane_address + ((tile_y << plane_pitch_shift) + tile_x) * 2;
+ 
+-		RenderTilePair(vdp, pixel_y_in_plane, vram_address, base_tile_vram_address, &metapixels_pointer, blit_lookup_list);
++		RenderTilePair(vdp, pixel_y_in_plane, vram_address, base_tile_vram_address, &metapixels_pointer, blit_lookup_list, plane_index == 0 ? 1 : 2);
+ 	}
+ }
+ 
+@@ -549,7 +573,7 @@
+ 
+ 	/* Render tiles */
+ 	for (i = start; i < end && i < SCANLINE_WIDTH_IN_TILE_PAIRS; ++i)
+-		RenderTilePair(vdp, scanline, vram_address_base + ((tile_x_base + i * TILE_PAIR_COUNT) & plane_width_bitmask) * 2, base_tile_vram_address, &metapixels_pointer, blit_lookup_list);
++		RenderTilePair(vdp, scanline, vram_address_base + ((tile_x_base + i * TILE_PAIR_COUNT) & plane_width_bitmask) * 2, base_tile_vram_address, &metapixels_pointer, blit_lookup_list, 3);
+ }
+ 
+ static void UpdateSpriteCache(VDP* const vdp)
+@@ -707,6 +731,16 @@
+ 						{
+ 							const cc_u8f palette_line_index = (byte >> nybble_shift[l]) & 0xF;
+ 							*metapixels_pointer = metapixel_high_bits | palette_line_index;
++							if (vdp->provenance_callback != NULL && palette_line_index != 0)
++							{
++								VDP_ProvenancePixel* const entry = &vdp->provenance_sprite[metapixels_pointer - vdp->provenance_sprite_origin];
++								entry->tile_index = tile_index;
++								entry->tile_word = word;
++								entry->source = 4;
++								entry->sat_slot = sprite_row_cache_entry->table_index;
++								entry->source_x = x_flip ? TILE_WIDTH - k * 2 - l - 1 : k * 2 + l;
++								entry->source_y = pixel_y_in_tile;
++							}
+ 						}
+ 
+ 						++metapixels_pointer;
+@@ -760,7 +794,7 @@
+ 	}
+ }
+ 
+-static void RenderSpritePlane(cc_u8l* const plane_metapixels, cc_u8l* const sprite_metapixels, const BlitLookup* const blit_lookup_list, const unsigned int mask, const cc_u16f left_boundary_pixels, const cc_u16f right_boundary_pixels)
++static void RenderSpritePlane(const VDP* const vdp, cc_u8l* const plane_metapixels, cc_u8l* const sprite_metapixels, const BlitLookup* const blit_lookup_list, const unsigned int mask, const cc_u16f left_boundary_pixels, const cc_u16f right_boundary_pixels)
+ {
+ 	const cc_u8l *sprite_metapixels_pointer = &sprite_metapixels[left_boundary_pixels];
+ 	cc_u8l *plane_metapixels_pointer = &plane_metapixels[left_boundary_pixels];
+@@ -769,6 +803,8 @@
+ 
+ 	for (i = left_boundary_pixels; i < right_boundary_pixels; ++i)
+ 	{
++		if (vdp->provenance_callback != NULL && (*sprite_metapixels_pointer & 0xF) != 0 && ((*plane_metapixels_pointer & 0xF) == 0 || (*plane_metapixels_pointer & 0x40) == 0 || (*sprite_metapixels_pointer & 0x40) != 0))
++			vdp->provenance_plane[plane_metapixels_pointer - vdp->provenance_plane_origin] = vdp->provenance_sprite[sprite_metapixels_pointer - vdp->provenance_sprite_origin];
+ 		*plane_metapixels_pointer = blit_lookup_list->lower[*sprite_metapixels_pointer].pixels[*plane_metapixels_pointer] & mask;
+ 		++plane_metapixels_pointer;
+ 		++sprite_metapixels_pointer;
+@@ -799,15 +835,15 @@
+ 			RenderForegroundPlane(vdp, left_boundary, right_boundary, scanline, plane_metapixels, &blit_lookup.normal, window_plane);
+ 
+ 			if (state->shadow_highlight_enabled)
+-				RenderSpritePlane(plane_metapixels, sprite_metapixels, &blit_lookup.shadow_highlight, 0xFF, left_boundary_pixels, right_boundary_pixels);
++				RenderSpritePlane(vdp, plane_metapixels, sprite_metapixels, &blit_lookup.shadow_highlight, 0xFF, left_boundary_pixels, right_boundary_pixels);
+ 			else
+-				RenderSpritePlane(plane_metapixels, sprite_metapixels, &blit_lookup.normal, 0x3F, left_boundary_pixels, right_boundary_pixels);
++				RenderSpritePlane(vdp, plane_metapixels, sprite_metapixels, &blit_lookup.normal, 0x3F, left_boundary_pixels, right_boundary_pixels);
+ 		}
+ 
+ 		switch (state->debug.forced_layer)
+ 		{
+ 			case 1:
+-				RenderSpritePlane(plane_metapixels, sprite_metapixels, &blit_lookup.forced_layer, 0xFF, left_boundary_pixels, right_boundary_pixels);
++				RenderSpritePlane(vdp, plane_metapixels, sprite_metapixels, &blit_lookup.forced_layer, 0xFF, left_boundary_pixels, right_boundary_pixels);
+ 				break;
+ 
+ 			case 2:
+@@ -837,6 +873,8 @@
+ 		const cc_u16f clamped_left_boundary_pixels = CC_CLAMP(x_offset, x_offset + output_width, left_boundary_pixels) - x_offset;
+ 		const cc_u16f clamped_right_boundary_pixels = CC_CLAMP(x_offset, x_offset + output_width, right_boundary_pixels) - x_offset;
+ 
++		if (vdp->provenance_callback != NULL)
++			vdp->provenance_callback(vdp->provenance_user_data, scanline, vdp->provenance_plane + (plane_metapixels + x_offset - vdp->provenance_plane_origin), clamped_left_boundary_pixels, clamped_right_boundary_pixels, output_width, output_height);
+ 		scanline_rendered_callback((void*)scanline_rendered_callback_user_data, scanline, plane_metapixels + x_offset, clamped_left_boundary_pixels, clamped_right_boundary_pixels, output_width, output_height);
+ 	}
+ }
+@@ -860,13 +898,24 @@
+ 	   edges of the screen. */
+ 	cc_u8l plane_metapixels_buffer[(1 + SCANLINE_WIDTH_IN_TILE_PAIRS + 1) * TILE_PAIR_WIDTH];
+ 	cc_u8l* const plane_metapixels = &plane_metapixels_buffer[TILE_PAIR_WIDTH];
++	VDP_ProvenancePixel plane_provenance_buffer[CC_COUNT_OF(plane_metapixels_buffer)];
+ 
+ 	/* The padding bytes of the left and right are for allowing sprites to overdraw at the
+ 	   edges of the screen. */
+ 	cc_u8l sprite_metapixels_buffer[(MAX_SPRITE_WIDTH - 1) + VDP_MAX_SCANLINE_WIDTH + (MAX_SPRITE_WIDTH - 1)];
+ 	cc_u8l* const sprite_metapixels = &sprite_metapixels_buffer[MAX_SPRITE_WIDTH - 1];
++	VDP_ProvenancePixel sprite_provenance_buffer[CC_COUNT_OF(sprite_metapixels_buffer)];
+ 
+ 	assert(scanline < VDP_MAX_SCANLINES);
++	if (vdp->provenance_callback != NULL)
++	{
++		memset(plane_provenance_buffer, 0, sizeof(plane_provenance_buffer));
++		memset(sprite_provenance_buffer, 0, sizeof(sprite_provenance_buffer));
++		vdp->provenance_plane = plane_provenance_buffer;
++		vdp->provenance_sprite = sprite_provenance_buffer;
++		vdp->provenance_plane_origin = plane_metapixels_buffer;
++		vdp->provenance_sprite_origin = sprite_metapixels_buffer;
++	}
+ 
+ 	UpdateSpriteCache(vdp);
+ 
+@@ -892,6 +941,10 @@
+ 
+ 	/* Draw Plane A (and sprites). */
+ 	RenderForegroundAndSpritePlanes(vdp, scanline, plane_metapixels, sprite_metapixels, cc_false, scanline_rendered_callback, scanline_rendered_callback_user_data);
++	vdp->provenance_plane = NULL;
++	vdp->provenance_sprite = NULL;
++	vdp->provenance_plane_origin = NULL;
++	vdp->provenance_sprite_origin = NULL;
+ }
+ 
+ cc_u16f VDP_ReadData(VDP* const vdp)

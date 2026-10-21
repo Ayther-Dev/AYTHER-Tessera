@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.25)
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR "OUT_OF_SOURCE_BUILD_REQUIRED: use a preset or a separate build directory.")
+endif()
+
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "Use the shared release MSVC runtime (/MD)." FORCE)
+project(Tessera VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+include(cmake/ToolchainChecks.cmake)
+tessera_check_toolchain()
+
+option(TESSERA_ENABLE_DIAGNOSTICS "Enable AddressSanitizer on Tessera bootstrap targets." OFF)
+option(TESSERA_ENGINE_INTEGRATION "Link a minimal installed Engine SDK consumer." OFF)
+option(TESSERA_RUNTIME_INTEGRATION "Require the native Runtime integration acceptance target." OFF)
+option(TESSERA_BUILD_BACKEND_PROBES "Build the explicitly enabled Gate 0 backend probes." OFF)
+option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
+
+if(TESSERA_RUNTIME_INTEGRATION)
+    message(FATAL_ERROR "RUNTIME_INTEGRATION_UNAVAILABLE: the native Runtime product and acceptance tests are not implemented. This preset cannot pass as a bootstrap check.")
+endif()
+
+include(cmake/Dependencies.cmake)
+tessera_load_dependencies()
+
+add_library(tessera_build_options INTERFACE)
+add_library(Tessera::build_options ALIAS tessera_build_options)
+target_compile_options(tessera_build_options INTERFACE /W4)
+target_compile_options(tessera_build_options INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/permissive->" "$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
+include(cmake/Diagnostics.cmake)
+if(TESSERA_ENABLE_DIAGNOSTICS)
+    target_compile_options(tessera_build_options INTERFACE /fsanitize=address /Zi)
+    target_link_options(tessera_build_options INTERFACE /INCREMENTAL:NO)
+    tessera_configure_asan_runtime(tessera_build_options)
+endif()
+
+include(CTest)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/CMakeLists.txt")
+    add_subdirectory(src)
+endif()
+if(BUILD_TESTING)
+    add_subdirectory(tests/bootstrap)
+    # Later phases register their actual suites here; missing suites are not reported as passed.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        add_subdirectory(tests)
+    endif()
+endif()
+
+if(TESSERA_BUILD_BACKEND_PROBES)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/backend_probe/CMakeLists.txt")
+        message(FATAL_ERROR "BACKEND_PROBES_UNAVAILABLE: tests/backend_probe/CMakeLists.txt is not implemented.")
+    endif()
+    add_subdirectory(tests/backend_probe)
+endif()

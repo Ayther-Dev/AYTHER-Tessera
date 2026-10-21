@@ -1,0 +1,89 @@
+@PACKAGE_INIT@
+
+set(Tessera_VERSION "@PROJECT_VERSION@")
+set(Tessera_ABI_MAJOR 1)
+set(Tessera_ABI_MINOR 0)
+set(Tessera_POINTER_BYTES 8)
+set(Tessera_MSVC_RUNTIME MultiThreadedDLL)
+set(Tessera_DIAGNOSTICS @TESSERA_ENABLE_DIAGNOSTICS@)
+set(Tessera_BUILD_ID "@build_id@")
+set(Tessera_COMPILER_ID "@CMAKE_CXX_COMPILER_ID@")
+set(Tessera_COMPILER_VERSION "@CMAKE_CXX_COMPILER_VERSION@")
+
+if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(Tessera_FOUND FALSE)
+    set(Tessera_NOT_FOUND_MESSAGE "TESSERA_PLATFORM_INCOMPATIBLE: se requiere Windows x64 con ABI MSVC.")
+    return()
+endif()
+if(CMAKE_CXX_COMPILER_LOADED)
+    set(_Tessera_consumer_arch "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}")
+else()
+    set(_Tessera_consumer_arch "${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
+endif()
+if(NOT _Tessera_consumer_arch STREQUAL "x64" OR MSVC_VERSION LESS 1951)
+    set(Tessera_FOUND FALSE)
+    set(Tessera_NOT_FOUND_MESSAGE "TESSERA_TOOLCHAIN_INCOMPATIBLE: se requiere destino x64 y herramientas MSVC 14.51 o posteriores.")
+    return()
+endif()
+unset(_Tessera_consumer_arch)
+if(NOT CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")
+    set(Tessera_FOUND FALSE)
+    set(Tessera_NOT_FOUND_MESSAGE "TESSERA_RUNTIME_INCOMPATIBLE: configure CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL (/MD) antes de crear los targets.")
+    return()
+endif()
+if(Tessera_DIAGNOSTICS AND
+        (NOT CMAKE_CXX_COMPILER_ID STREQUAL Tessera_COMPILER_ID OR
+         NOT CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL Tessera_COMPILER_VERSION))
+    set(Tessera_FOUND FALSE)
+    set(Tessera_NOT_FOUND_MESSAGE "TESSERA_ASAN_TOOLCHAIN_INCOMPATIBLE: el paquete de diagnóstico local requiere el mismo compilador y versión.")
+    return()
+endif()
+
+set_and_check(Tessera_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set_and_check(Tessera_METADATA_FILE "@PACKAGE_TESSERA_INSTALL_DATADIR@/package-metadata.json")
+set(Tessera_ASAN_RUNTIME "")
+if(Tessera_DIAGNOSTICS)
+    set_and_check(Tessera_ASAN_RUNTIME "@PACKAGE_CMAKE_INSTALL_BINDIR@/@tessera_asan_dll_name@")
+endif()
+
+if(NOT TARGET Tessera::core)
+    include("${CMAKE_CURRENT_LIST_DIR}/TesseraTargets.cmake")
+    set(_Tessera_backend_libraries "")
+    foreach(_Tessera_library IN ITEMS clownmdemu-core clown68000-interpreter
+            clown68000-common clownz80-interpreter clownz80-common)
+        set_and_check(_Tessera_archive "@PACKAGE_TESSERA_INSTALL_BACKEND_LIBDIR@/${_Tessera_library}.lib")
+        list(APPEND _Tessera_backend_libraries "${_Tessera_archive}")
+    endforeach()
+    set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+        ${_Tessera_backend_libraries})
+    if(Tessera_DIAGNOSTICS)
+        set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_COMPILE_OPTIONS
+            /fsanitize=address /Zi)
+        set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_LINK_OPTIONS
+            /INCREMENTAL:NO)
+        if(Tessera_COMPILER_ID STREQUAL "Clang")
+            set_and_check(_Tessera_ASAN_IMPORT "@PACKAGE_TESSERA_INSTALL_ASANDIR@/@tessera_asan_import_name@")
+            set_and_check(_Tessera_ASAN_THUNK "@PACKAGE_TESSERA_INSTALL_ASANDIR@/@tessera_asan_thunk_name@")
+            set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_COMPILE_DEFINITIONS
+                "$<$<COMPILE_LANGUAGE:CXX>:_DISABLE_STL_ANNOTATION>")
+            set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+                "${_Tessera_ASAN_IMPORT}")
+            set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_LINK_OPTIONS
+                /include:__asan_seh_interceptor "/wholearchive:${_Tessera_ASAN_THUNK}")
+        endif()
+    endif()
+endif()
+
+# Explicitly copy the installed diagnostic runtime next to a consuming binary.
+function(tessera_copy_runtime_dependencies target)
+    if(NOT TARGET "${target}")
+        message(FATAL_ERROR "TESSERA_RUNTIME_TARGET_MISSING: el target consumidor no existe.")
+    endif()
+    if(Tessera_DIAGNOSTICS)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${Tessera_ASAN_RUNTIME}"
+                "$<TARGET_FILE_DIR:${target}>" VERBATIM)
+    endif()
+endfunction()
+
+check_required_components(Tessera)

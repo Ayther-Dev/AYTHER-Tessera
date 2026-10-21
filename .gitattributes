@@ -1,0 +1,3 @@
+third_party/licenses/** -text
+cmake/patches/** text eol=lf
+tests/backend_probe/main.cpp text eol=lf

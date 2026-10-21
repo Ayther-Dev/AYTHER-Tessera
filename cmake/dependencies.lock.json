@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-10-19",
+  "hash_algorithm": "SHA-256",
+  "scope": "Pinned auxiliary headers and original license copies; evidence and candidate archives are not a backend selection or a complete link-closure audit.",
+  "dependencies": [
+    {
+      "name": "nlohmann/json",
+      "version": "3.12.0",
+      "tag": "v3.12.0",
+      "tag_object": "65ee68451d8eb2b5f3a30b410476ab83deb3289b",
+      "commit": "55f93686c01528224f448c19128836e7df245f72",
+      "repository": "https://github.com/nlohmann/json",
+      "include_directory": "third_party/cache/nlohmann-json-3.12.0/include",
+      "purpose": "JSON formats",
+      "status": "pinned_auxiliary_header",
+      "files": [
+        {
+          "path": "third_party/cache/nlohmann-json-3.12.0/include/nlohmann/json.hpp",
+          "url": "https://raw.githubusercontent.com/nlohmann/json/55f93686c01528224f448c19128836e7df245f72/single_include/nlohmann/json.hpp",
+          "sha256": "aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63",
+          "bytes": 953436
+        },
+        {
+          "path": "third_party/licenses/nlohmann-json-3.12.0/LICENSE.MIT",
+          "url": "https://raw.githubusercontent.com/nlohmann/json/55f93686c01528224f448c19128836e7df245f72/LICENSE.MIT",
+          "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603",
+          "bytes": 1076
+        },
+        {
+          "path": "third_party/licenses/nlohmann-json-3.12.0/upstream-license.md",
+          "url": "https://raw.githubusercontent.com/nlohmann/json/55f93686c01528224f448c19128836e7df245f72/docs/mkdocs/docs/home/license.md",
+          "sha256": "d4b7ed0261c2c840e9ccc7d483b3b659bfddc8be797f3007da080f0c4a78d960",
+          "bytes": 1995
+        },
+        {
+          "path": "third_party/licenses/nlohmann-json-3.12.0/ABSEIL-APACHE-2.0.txt",
+          "url": "https://raw.githubusercontent.com/abseil/abseil-cpp/10cb35e459f5ecca5b2ff107635da0bfa41011b4/LICENSE",
+          "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+          "bytes": 11361
+        },
+        {
+          "path": "third_party/licenses/nlohmann-json-3.12.0/CC0-1.0.txt",
+          "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "bytes": 7048
+        }
+      ]
+    },
+    {
+      "name": "PicoSHA2",
+      "version": "1.0.1",
+      "tag": "v1.0.1",
+      "commit": "161cb3fc4170fa7a3eca9e582cebd27cc4d1fe29",
+      "repository": "https://github.com/okdshin/PicoSHA2",
+      "include_directory": "third_party/cache/picosha2-1.0.1/include",
+      "purpose": "SHA-256 hashes",
+      "status": "pinned_auxiliary_header",
+      "files": [
+        {
+          "path": "third_party/cache/picosha2-1.0.1/include/picosha2.h",
+          "url": "https://raw.githubusercontent.com/okdshin/PicoSHA2/161cb3fc4170fa7a3eca9e582cebd27cc4d1fe29/picosha2.h",
+          "sha256": "b13c180161ffac8d0adc81e033e493c409457c4d1258ab9781ac80579ba3bdd8",
+          "bytes": 13422
+        },
+        {
+          "path": "third_party/licenses/picosha2-1.0.1/LICENSE",
+          "url": "https://raw.githubusercontent.com/okdshin/PicoSHA2/161cb3fc4170fa7a3eca9e582cebd27cc4d1fe29/LICENSE",
+          "sha256": "6c30eb1f37554ec4199cb82a8c86d9e7a852da78a757832bebb03ac9ddc44ff1",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "name": "doctest",
+      "version": "2.5.3",
+      "tag": "v2.5.3",
+      "commit": "2d0a9359a60c51affe2a9bebb1be1dca47868151",
+      "repository": "https://github.com/doctest/doctest",
+      "include_directory": "third_party/cache/doctest-2.5.3/include",
+      "purpose": "Local tests only",
+      "status": "pinned_auxiliary_header",
+      "files": [
+        {
+          "path": "third_party/cache/doctest-2.5.3/include/doctest/doctest.h",
+          "url": "https://raw.githubusercontent.com/doctest/doctest/2d0a9359a60c51affe2a9bebb1be1dca47868151/doctest/doctest.h",
+          "sha256": "cfd518a3ef90f67e1f3ba514df23fb3627437de1a2feeba78cf5062a40021421",
+          "bytes": 362930
+        },
+        {
+          "path": "third_party/licenses/doctest-2.5.3/LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/doctest/doctest/2d0a9359a60c51affe2a9bebb1be1dca47868151/LICENSE.txt",
+          "sha256": "0fe0b331fa1513dcce8604ff1fa925f32d1cea17d8aeb1c2471fad40d291adc5",
+          "bytes": 1086
+        },
+        {
+          "path": "third_party/licenses/doctest-2.5.3/BSL-1.0.txt",
+          "url": "https://raw.githubusercontent.com/catchorg/Catch2/v2.13.10/LICENSE.txt",
+          "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+          "bytes": 1338
+        }
+      ]
+    }
+  ],
+  "backend_evidence": [
+    {
+      "path": "third_party/licenses/ares-v148/LICENSE",
+      "url": "https://raw.githubusercontent.com/ares-emulator/ares/0aafd85789215e84e1e43415c07d4c88461b7899/LICENSE",
+      "sha256": "a1053dec5f15ee7c851abf7716634344b9d5740b414bf5893802f9910fdc7a97",
+      "bytes": 41598
+    },
+    {
+      "path": "third_party/cache/backend-evidence/ares-v148/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/ares-emulator/ares/0aafd85789215e84e1e43415c07d4c88461b7899/CMakeLists.txt",
+      "sha256": "cbddb4beb27d44eed3a1df3f4a6f0350fec4e0f0c4997ce8543263228cb32c50",
+      "bytes": 1503
+    },
+    {
+      "path": "third_party/cache/backend-evidence/ares-v148/ares/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/ares-emulator/ares/0aafd85789215e84e1e43415c07d4c88461b7899/ares/CMakeLists.txt",
+      "sha256": "74db2de1617d14ca600ff1d594246c29d4aaefd003d7086b0c5e414991fea933",
+      "bytes": 8062
+    },
+    {
+      "path": "third_party/cache/backend-evidence/ares-v148/ares/md/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/ares-emulator/ares/0aafd85789215e84e1e43415c07d4c88461b7899/ares/md/CMakeLists.txt",
+      "sha256": "ef8a97ec81f1164bab273f6786fe6bd9c8997f5beb95ce27ddcf25613e81d97d",
+      "bytes": 3667
+    },
+    {
+      "path": "third_party/cache/backend-evidence/ares-v148/thirdparty/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/ares-emulator/ares/0aafd85789215e84e1e43415c07d4c88461b7899/thirdparty/CMakeLists.txt",
+      "sha256": "6a1e3242846694695457148fa5f5fb950ca30a165173cccab0387bde69a89324",
+      "bytes": 3778
+    },
+    {
+      "path": "third_party/licenses/clownmdemu-core-88ef45a/LICENCE.txt",
+      "url": "https://raw.githubusercontent.com/Clownacy/clownmdemu-core/88ef45a6585556e2247dd26b6c937d6b9fb4a12d/LICENCE.txt",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "bytes": 34523
+    },
+    {
+      "path": "third_party/cache/backend-evidence/clownmdemu-core-88ef45a/.gitmodules",
+      "url": "https://raw.githubusercontent.com/Clownacy/clownmdemu-core/88ef45a6585556e2247dd26b6c937d6b9fb4a12d/.gitmodules",
+      "sha256": "2af7dc0dbd5747f64199f1f036e1c0df36db61a0a8f8d4a90afea226cfdd7b2d",
+      "bytes": 297
+    },
+    {
+      "path": "third_party/cache/backend-evidence/clownmdemu-core-88ef45a/CMakeLists.txt",
+      "url": "https://raw.githubusercontent.com/Clownacy/clownmdemu-core/88ef45a6585556e2247dd26b6c937d6b9fb4a12d/CMakeLists.txt",
+      "sha256": "dad0e93d68ebd026566e0dec8cd7a7683538647cb1136546a8ec9fc4749d955f",
+      "bytes": 1677
+    },
+    {
+      "path": "third_party/licenses/clown68000-bb19838/LICENCE.txt",
+      "url": "https://raw.githubusercontent.com/Clownacy/clown68000/bb198386ae3ee0cd6d246ff917f9941b02b5be6a/LICENCE.txt",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "bytes": 34523
+    },
+    {
+      "path": "third_party/licenses/clownz80-aa4cae3/LICENCE.txt",
+      "url": "https://raw.githubusercontent.com/Clownacy/clownz80/aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b/LICENCE.txt",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "bytes": 34523
+    },
+    {
+      "path": "third_party/licenses/clowncommon-ecee31f/licence.txt",
+      "url": "https://raw.githubusercontent.com/Clownacy/clowncommon/ecee31fc78ee1eed901431d070239c9c6430607c/licence.txt",
+      "sha256": "86723cedb4955538ac3c01c705f1f5675f2824762744eafe3f5a68d0577cce56",
+      "bytes": 653
+    }
+  ],
+  "backend_archives": [
+    {
+      "name": "ares-0aafd85789215e84e1e43415c07d4c88461b7899",
+      "repository": "ares-emulator/ares",
+      "commit": "0aafd85789215e84e1e43415c07d4c88461b7899",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/ares-0aafd85789215e84e1e43415c07d4c88461b7899.zip",
+        "url": "https://codeload.github.com/ares-emulator/ares/zip/0aafd85789215e84e1e43415c07d4c88461b7899",
+        "sha256": "646213d43c738862066f39dae08c497e26a11b5ab9a6e7b00b18d017b4c4c7e0",
+        "bytes": 7301494
+      }
+    },
+    {
+      "name": "clownmdemu-core-88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+      "repository": "Clownacy/clownmdemu-core",
+      "commit": "88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/clownmdemu-core-88ef45a6585556e2247dd26b6c937d6b9fb4a12d.zip",
+        "url": "https://codeload.github.com/Clownacy/clownmdemu-core/zip/88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+        "sha256": "3d7ab6e27d28f295f55d6c34c399f3ffd31c45e678b96cd82a9a90cdfe7143da",
+        "bytes": 126797
+      }
+    },
+    {
+      "name": "clown68000-bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+      "repository": "Clownacy/clown68000",
+      "commit": "bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/clown68000-bb198386ae3ee0cd6d246ff917f9941b02b5be6a.zip",
+        "url": "https://codeload.github.com/Clownacy/clown68000/zip/bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+        "sha256": "a31e19c06f5703f5d1884b94e1ea16bba63223a672409b4e01ab4b794d570fcc",
+        "bytes": 60025
+      }
+    },
+    {
+      "name": "clownz80-aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+      "repository": "Clownacy/clownz80",
+      "commit": "aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/clownz80-aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b.zip",
+        "url": "https://codeload.github.com/Clownacy/clownz80/zip/aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+        "sha256": "d0a4f9a69049e9528f92a2006cfcc8f0c4f5f18afa2a5aca75105c6e994b68e9",
+        "bytes": 30352
+      }
+    },
+    {
+      "name": "clowncommon-ecee31fc78ee1eed901431d070239c9c6430607c",
+      "repository": "Clownacy/clowncommon",
+      "commit": "ecee31fc78ee1eed901431d070239c9c6430607c",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/clowncommon-ecee31fc78ee1eed901431d070239c9c6430607c.zip",
+        "url": "https://codeload.github.com/Clownacy/clowncommon/zip/ecee31fc78ee1eed901431d070239c9c6430607c",
+        "sha256": "bfb224babb6cc2545e14fd3c5a66ca38457b709f405b66d82a9f0aba8bc538b7",
+        "bytes": 3032
+      }
+    },
+    {
+      "name": "clowncommon-ddeff174c2121b40284883e0e1e3520f39d99227",
+      "repository": "Clownacy/clowncommon",
+      "commit": "ddeff174c2121b40284883e0e1e3520f39d99227",
+      "status": "evaluation_only_not_selected",
+      "archive": {
+        "path": "third_party/backends/clowncommon-ddeff174c2121b40284883e0e1e3520f39d99227.zip",
+        "url": "https://codeload.github.com/Clownacy/clowncommon/zip/ddeff174c2121b40284883e0e1e3520f39d99227",
+        "sha256": "f83cc61cecb535a709d79a43204816fd1228fea8e2984de3e108fdbc5f891c46",
+        "bytes": 3242
+      }
+    }
+  ],
+  "backend_source_lock": "third_party/backends/sources.lock.json",
+  "clown_top_level_gitlinks": {
+    "libraries_clown68000": "bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+    "libraries_clownz80": "aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+    "libraries_clowncommon": "ecee31fc78ee1eed901431d070239c9c6430607c"
+  },
+  "limitations": [
+    "The json.hpp hash matches its official release checksum; other hashes are local observations, not an assertion of signed releases.",
+    "Copied license texts and notices do not identify a final backend target or prove its complete transitive license closure.",
+    "The Catch2 v2.13.10 license copy supplies BSL-1.0 text; doctest does not identify exact source revisions of its embedded Catch/lest fragments.",
+    "Fixture generated artifacts require express publication rights or exclusion from public distributions; local authorized work can continue."
+  ],
+  "clown_nested_common_gitlink": "ddeff174c2121b40284883e0e1e3520f39d99227"
+}
