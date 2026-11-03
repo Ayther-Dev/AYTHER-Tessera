@@ -48,14 +48,6 @@ endif()
 
 if(NOT TARGET Tessera::core)
     include("${CMAKE_CURRENT_LIST_DIR}/TesseraTargets.cmake")
-    set(_Tessera_backend_libraries "")
-    foreach(_Tessera_library IN ITEMS clownmdemu-core clown68000-interpreter
-            clown68000-common clownz80-interpreter clownz80-common)
-        set_and_check(_Tessera_archive "@PACKAGE_TESSERA_INSTALL_BACKEND_LIBDIR@/${_Tessera_library}.lib")
-        list(APPEND _Tessera_backend_libraries "${_Tessera_archive}")
-    endforeach()
-    set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_LINK_LIBRARIES
-        ${_Tessera_backend_libraries})
     if(Tessera_DIAGNOSTICS)
         set_property(TARGET Tessera::core APPEND PROPERTY INTERFACE_COMPILE_OPTIONS
             /fsanitize=address /Zi)

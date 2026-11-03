@@ -35,19 +35,17 @@ int main() {
   std::uint32_t required = 0;
   if (tessera_backends_enumerate_v1(nullptr, 0, &required, &context) !=
           TESSERA_BUFFER_TOO_SMALL ||
-      required != 3)
+      required != 2)
     return 3;
-  std::array<tessera_backend_info_v1, 3> backends{};
+  std::array<tessera_backend_info_v1, 2> backends{};
   for (auto &backend : backends)
     backend = initialized<tessera_backend_info_v1>();
-  if (tessera_backends_enumerate_v1(backends.data(), 3, &required, &context) !=
+  if (tessera_backends_enumerate_v1(backends.data(), 2, &required, &context) !=
           TESSERA_OK ||
-      std::strcmp(backends[0].id, "clownmdemu") != 0 ||
-      std::strcmp(backends[1].id, "synthetic.minimal") != 0 ||
-      std::strcmp(backends[2].id, "synthetic.complete") != 0 ||
-      backends[0].kind != TESSERA_BACKEND_PRODUCT ||
-      backends[1].kind != TESSERA_BACKEND_TEST ||
-      backends[2].kind != TESSERA_BACKEND_TEST)
+      std::strcmp(backends[0].id, "synthetic.minimal") != 0 ||
+      std::strcmp(backends[1].id, "synthetic.complete") != 0 ||
+      backends[0].kind != TESSERA_BACKEND_TEST ||
+      backends[1].kind != TESSERA_BACKEND_TEST)
     return 4;
   if (tessera_api_query_v1(2, 0, &info, &context) != TESSERA_ABI_INCOMPATIBLE)
     return 5;

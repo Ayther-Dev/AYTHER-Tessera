@@ -22,6 +22,7 @@ option(TESSERA_ENABLE_DIAGNOSTICS "Enable AddressSanitizer on Tessera bootstrap 
 option(TESSERA_ENGINE_INTEGRATION "Link a minimal installed Engine SDK consumer." OFF)
 option(TESSERA_RUNTIME_INTEGRATION "Require the native Runtime integration acceptance target." OFF)
 option(TESSERA_BUILD_BACKEND_PROBES "Build the explicitly enabled Gate 0 backend probes." OFF)
+option(TESSERA_BUILD_CLOWN_REFERENCE "Build the ClownMDEmu reference backend (AGPL-3.0) for local differential testing only. Never installed or distributed." OFF)
 option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
 
 if(TESSERA_RUNTIME_INTEGRATION)

@@ -49,7 +49,6 @@ jobs:
       - name: Prepare exact pinned source inputs
         run: |
           ./tools/bootstrap-dependencies.ps1 -Download
-          ./tools/bootstrap-backends.ps1 -Download -SelectedOnly
 
       - name: Configure, build and test Release
         run: |
@@ -97,9 +96,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           @'
-          Candidato nativo de Tessera para Windows x64. El paquete incluye la API C,
-          CLI, referencia al código fuente correspondiente, inventario y licencias.
-          El backend Mega Drive incorpora componentes Clown bajo AGPL. El tag y el
+          Candidato nativo de Tessera para Windows x64 bajo MPL-2.0. El paquete
+          incluye la API C, CLI, referencia al código fuente correspondiente,
+          inventario y licencias. No incluye ClownMDEmu ni ningún componente AGPL,
+          GPL o LGPL, y no incluye un backend de producto de Mega Drive. El tag y el
           commit registrado en el paquete identifican las fuentes exactas.
           No incluye ROM, pack de contenido, registro de confianza ni generador
           compilado. El borrador permanece sin publicar hasta cerrar la revisión

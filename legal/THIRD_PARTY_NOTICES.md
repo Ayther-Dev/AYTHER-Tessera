@@ -1,5 +1,19 @@
 # Avisos de terceros y procedencia
 
+**Licencia de Tessera y alcance de la distribución (TP-009).** El código propio
+de Tessera se ofrece bajo [MPL-2.0](../LICENSE). Ningún artefacto distribuido
+(paquete instalado, ZIP de release ni biblioteca estática) contiene ClownMDEmu,
+clown68000, clownz80 ni otro componente AGPL, GPL o LGPL. El backend Mega Drive
+basado en ClownMDEmu se conserva en este repositorio como **referencia local**:
+solo se compila con la opción `TESSERA_BUILD_CLOWN_REFERENCE` (preset
+`windows-clown-reference`), en un árbol de compilación separado que no se puede
+instalar ni empaquetar, para el banco diferencial de la spec 008. El paquete
+distribuido no incluye un backend de producto de Mega Drive; lo aportará el
+núcleo propio de la spec 008. Los paquetes publicados antes de TP-009
+(`v0.1.0-mvp.1` y `v0.1.0-mvp.2`) sí incluyen ese backend y conservan sus
+avisos AGPL y MIT originales. Las menciones a la integración con ClownMDEmu en
+este documento describen esos paquetes y el árbol de referencia.
+
 Auditoría de Fase 0, 2026-10-19. Este registro distingue los headers auxiliares
 fijados, las copias de referencia del fixture y los backends descargados para
 evaluación. Descargar o registrar un candidato no lo selecciona ni acredita la
@@ -139,25 +153,36 @@ sección 2, permite crear y ejecutar obras cubiertas sin transmitirlas. No se
 identifica en esos términos un impedimento para la evaluación local autorizada.
 
 La evaluación Gate 0 dio paso a un backend Mega Drive compilado en Tessera con
-ClownMDEmu, clown68000/clownz80 y las revisiones fijadas de clowncommon. El
-paquete instalado de Tessera exporta ese núcleo y Engine lo consume en su
-sesión nativa; Runtime consume Engine. Los avisos y licencias de cada fuente
-se conservan. La ejecución local y la publicación de ramas de código fuente
-no acreditan por sí solas la clausura de una distribución binaria futura.
+ClownMDEmu, clown68000/clownz80 y las revisiones fijadas de clowncommon. Los
+paquetes `v0.1.0-mvp.1` y `v0.1.0-mvp.2` exportan ese núcleo y Engine lo
+consume en su sesión nativa; Runtime consume Engine. Desde TP-009 ese backend
+queda solo como referencia local (ver el aviso al inicio): no se instala, no
+se empaqueta y no se publica, y la AGPL no alcanza a ningún binario distribuido
+desde esta rama. Los avisos y licencias de cada fuente se conservan junto a las
+fuentes fijadas.
 
-El smoke aislado del SDK Engine no incorpora ClownMDEmu, pero la ruta nativa
-Engine→Tessera sí forma parte de la integración actual.
+Engine y Runtime que fijen un paquete anterior a TP-009 siguen combinando ese
+backend; deben retirarlo o sustituirlo antes de distribuir un binario sin
+obligaciones AGPL.
 Una API C, un wrapper o separar bibliotecas no elimina por sí mismo obligaciones
 AGPL. La ruta de obra mayor/licencia secundaria de MPL-2.0, sección 3.3, debe
 evaluarse sobre los archivos y avisos concretos de la futura combinación;
 no se da por resuelta para Engine, Runtime o Lab por este enlace mínimo.
 
-T034 debe comprobar antes de distribuir la clausura real, fuentes correspondientes
-y scripts necesarios, avisos y términos AGPL/MPL aplicables; si se ofrece
-interacción remota con una versión modificada, también la obligación AGPL de
-ofrecer las fuentes correspondientes a sus usuarios. Esta estrategia permite
-la selección técnica local sin declarar una excepción por API ni presentar
-AGPL como licencia no comercial. Los permisos pendientes del fixture original
+Los paquetes anteriores a TP-009 requirieron la revisión T034 (clausura real,
+fuentes correspondientes y scripts necesarios, avisos y términos AGPL/MPL
+aplicables y, si se ofrece interacción remota con una versión modificada, la
+obligación AGPL de ofrecer las fuentes a sus usuarios). Esa revisión no se
+extiende al paquete posterior a TP-009, que excluye los componentes AGPL.
+La estrategia no declara una excepción por API ni presenta AGPL como licencia
+no comercial.
+
+Los archivos que existen solo para el árbol de referencia —las fuentes del
+backend en `src/backends/megadrive`, el generador del codec de estado
+(`tools/generate-clown-codec.*`) y los probes de `tests/backend_probe`— enlazan
+o derivan de estructuras de ClownMDEmu. Mientras no haya una revisión que
+indique otra cosa, deben tratarse como código bajo condiciones AGPL-3.0 cuando
+se combinan con él, y no como código MPL-2.0 distribuible. Los permisos pendientes del fixture original
 permanecen sujetos al apartado anterior.
 
 Los archivos CMake y `.gitmodules` bajo `cache/backend-evidence` son copias de

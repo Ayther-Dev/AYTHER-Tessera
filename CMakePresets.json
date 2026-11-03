@@ -55,6 +55,14 @@
       "cacheVariables": {
         "TESSERA_RUNTIME_INTEGRATION": "ON"
       }
+    },
+    {
+      "name": "windows-clown-reference",
+      "displayName": "ClownMDEmu reference backend (AGPL-3.0, local only, never installed)",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "TESSERA_BUILD_CLOWN_REFERENCE": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -81,6 +89,11 @@
     {
       "name": "windows-runtime-integration",
       "configurePreset": "windows-runtime-integration",
+      "jobs": 2
+    },
+    {
+      "name": "windows-clown-reference",
+      "configurePreset": "windows-clown-reference",
       "jobs": 2
     }
   ],
@@ -136,6 +149,18 @@
     {
       "name": "windows-runtime-integration",
       "configurePreset": "windows-runtime-integration",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-clown-reference",
+      "configurePreset": "windows-clown-reference",
       "output": {
         "outputOnFailure": true
       },

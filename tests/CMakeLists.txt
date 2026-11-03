@@ -38,6 +38,8 @@ set_tests_properties(contract.snapshot PROPERTIES LABELS "contract;phase1" TIMEO
 
 add_executable(tessera_cli_test integration/cli_test.cpp)
 target_link_libraries(tessera_cli_test PRIVATE Tessera::build_options doctest::doctest nlohmann_json::nlohmann_json)
+target_compile_definitions(tessera_cli_test PRIVATE
+    TESSERA_CLOWN_REFERENCE=$<BOOL:${TESSERA_BUILD_CLOWN_REFERENCE}>)
 tessera_copy_diagnostic_runtime(tessera_cli_test)
 add_test(NAME integration.cli COMMAND tessera_cli_test "${PROJECT_BINARY_DIR}/src/tessera.exe")
 set_tests_properties(integration.cli PROPERTIES LABELS "integration;phase1" TIMEOUT 120)
@@ -49,6 +51,7 @@ tessera_copy_diagnostic_runtime(tessera_replay_test)
 add_test(NAME integration.replay COMMAND tessera_replay_test "${PROJECT_BINARY_DIR}/src/tessera.exe" "${PROJECT_BINARY_DIR}/../evidence/phase1-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
 set_tests_properties(integration.replay PROPERTIES LABELS "integration;replay;phase1;FX-01" TIMEOUT 240 RUN_SERIAL TRUE)
 
+if(NOT TESSERA_BUILD_CLOWN_REFERENCE)
 add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     "-DPRODUCER_BUILD=${PROJECT_BINARY_DIR}"
     "-DPROJECT_SOURCE=${PROJECT_SOURCE_DIR}"
@@ -60,7 +63,11 @@ add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/package_consumer/verify_package.cmake")
 set_tests_properties(package.installed_consumer PROPERTIES
     LABELS "package;integration;phase2" TIMEOUT 180 RUN_SERIAL TRUE)
+endif()
 
+# Mega Drive tests need the ClownMDEmu reference backend (AGPL-3.0), which is
+# built only in the local reference tree and never distributed.
+if(TESSERA_BUILD_CLOWN_REFERENCE)
 set(TESSERA_GENERATED_FIXTURES "${PROJECT_BINARY_DIR}/fixtures")
 add_executable(tessera_fixture_roms fixtures/graphics-replacement/generate_roms.cpp)
 target_include_directories(tessera_fixture_roms PRIVATE
@@ -96,6 +103,7 @@ target_link_libraries(tessera_megadrive_observation_test PRIVATE Tessera::core T
 tessera_copy_diagnostic_runtime(tessera_megadrive_observation_test)
 add_test(NAME integration.megadrive_observation COMMAND tessera_megadrive_observation_test)
 set_tests_properties(integration.megadrive_observation PROPERTIES LABELS "integration;phase4;MegaDrive" TIMEOUT 45)
+endif()
 
 add_executable(tessera_robustness_test integration/robustness_test.cpp)
 target_include_directories(tessera_robustness_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -106,12 +114,14 @@ add_test(NAME integration.robustness COMMAND tessera_robustness_test)
 set_tests_properties(integration.robustness PROPERTIES
     LABELS "integration;phase5;robustness" TIMEOUT 60)
 
+if(TESSERA_BUILD_CLOWN_REFERENCE)
 add_executable(tessera_audio_fixture_generator backend_probe/main.cpp)
 target_link_libraries(tessera_audio_fixture_generator PRIVATE Tessera::build_options
     nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
 tessera_copy_diagnostic_runtime(tessera_audio_fixture_generator)
+endif()
 
-if(WIN32)
+if(WIN32 AND TESSERA_BUILD_CLOWN_REFERENCE)
     add_executable(tessera_performance_benchmark performance/benchmark.cpp)
     target_include_directories(tessera_performance_benchmark PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(tessera_performance_benchmark PRIVATE Tessera::core
@@ -146,6 +156,7 @@ add_test(NAME integration.checkpoint COMMAND tessera_checkpoint_test)
 set_tests_properties(integration.checkpoint PROPERTIES
     LABELS "integration;phase3;checkpoint;FX-01" TIMEOUT 45)
 
+if(TESSERA_BUILD_CLOWN_REFERENCE)
 add_executable(tessera_megadrive_replay_test integration/megadrive_replay_test.cpp)
 target_include_directories(tessera_megadrive_replay_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_compile_definitions(tessera_megadrive_replay_test PRIVATE
@@ -159,3 +170,4 @@ add_test(NAME integration.megadrive_replay COMMAND tessera_megadrive_replay_test
     "$<TARGET_FILE:tessera_audio_fixture_generator>" "${PROJECT_BINARY_DIR}/../evidence/phase3-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
 set_tests_properties(integration.megadrive_replay PROPERTIES
     LABELS "integration;phase3;replay;FX-02;checkpoint" TIMEOUT 900 RUN_SERIAL TRUE)
+endif()

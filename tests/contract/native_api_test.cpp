@@ -655,13 +655,22 @@ TEST_CASE("Extended structures reject aliases in foreign tails before writing "
   CHECK(object_bytes(storage) == before);
 }
 
+#ifndef TESSERA_CLOWN_REFERENCE
+#define TESSERA_CLOWN_REFERENCE 0
+#endif
+// The distributed core registers only the two synthetic test backends. The
+// ClownMDEmu reference backend (AGPL-3.0) exists only in the local reference
+// build (TESSERA_BUILD_CLOWN_REFERENCE) and is listed first when present.
+constexpr std::uint32_t kBackendCount = TESSERA_CLOWN_REFERENCE ? 3 : 2;
+constexpr std::uint32_t kFirstSynthetic = kBackendCount - 2;
+
 TEST_CASE("Extended backend arrays honor each declared stride and preserve "
           "foreign tails") {
   struct ExtendedBackend {
     tessera_backend_info_v1 prefix;
     std::array<std::uint8_t, 8> tail;
   };
-  std::array<ExtendedBackend, 3> values{};
+  std::array<ExtendedBackend, kBackendCount> values{};
   for (auto &value : values) {
     value.prefix = initialized<tessera_backend_info_v1>();
     value.prefix.header.size = sizeof(value);
@@ -669,12 +678,13 @@ TEST_CASE("Extended backend arrays honor each declared stride and preserve "
   }
   auto context = initialized<tessera_context_v1>();
   std::uint32_t required{};
-  REQUIRE(tessera_backends_enumerate_v1(&values[0].prefix, 3, &required,
-                                        &context) == TESSERA_OK);
-  CHECK(required == 3);
-  CHECK(fixed_id(values[0].prefix.id) == "clownmdemu");
-  CHECK(fixed_id(values[1].prefix.id) == "synthetic.minimal");
-  CHECK(fixed_id(values[2].prefix.id) == "synthetic.complete");
+  REQUIRE(tessera_backends_enumerate_v1(&values[0].prefix, kBackendCount,
+                                        &required, &context) == TESSERA_OK);
+  CHECK(required == kBackendCount);
+  if constexpr (TESSERA_CLOWN_REFERENCE != 0)
+    CHECK(fixed_id(values[0].prefix.id) == "clownmdemu");
+  CHECK(fixed_id(values[kFirstSynthetic].prefix.id) == "synthetic.minimal");
+  CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) == "synthetic.complete");
   for (const auto &value : values)
     CHECK(std::all_of(value.tail.begin(), value.tail.end(),
                       [](auto b) { return b == 0xA5; }));
@@ -686,28 +696,28 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
   std::uint32_t required = 0;
   REQUIRE(tessera_backends_enumerate_v1(nullptr, 0, &required, &context) ==
           TESSERA_BUFFER_TOO_SMALL);
-  REQUIRE(required == 3);
-  std::array<tessera_backend_info_v1, 3> backends{
-      initialized<tessera_backend_info_v1>(),
-      initialized<tessera_backend_info_v1>(),
-      initialized<tessera_backend_info_v1>()};
+  REQUIRE(required == kBackendCount);
+  std::array<tessera_backend_info_v1, kBackendCount> backends{};
+  for (auto &backend : backends)
+    backend = initialized<tessera_backend_info_v1>();
   const auto before = object_bytes(backends);
   CHECK(tessera_backends_enumerate_v1(backends.data(), 1, &required,
                                       &context) == TESSERA_BUFFER_TOO_SMALL);
-  CHECK(required == 3);
+  CHECK(required == kBackendCount);
   CHECK(object_bytes(backends) == before);
-  CHECK(tessera_backends_enumerate_v1(nullptr, 3, &required, &context) ==
-        TESSERA_INVALID_ARGUMENT);
-  CHECK(tessera_backends_enumerate_v1(backends.data(), 3, nullptr, &context) ==
-        TESSERA_INVALID_ARGUMENT);
+  CHECK(tessera_backends_enumerate_v1(nullptr, kBackendCount, &required,
+                                      &context) == TESSERA_INVALID_ARGUMENT);
+  CHECK(tessera_backends_enumerate_v1(backends.data(), kBackendCount, nullptr,
+                                      &context) == TESSERA_INVALID_ARGUMENT);
   backends[1].header.size = 151;
   const auto badPrefix = object_bytes(backends);
-  CHECK(tessera_backends_enumerate_v1(backends.data(), 3, &required,
-                                      &context) == TESSERA_ABI_INCOMPATIBLE);
+  CHECK(tessera_backends_enumerate_v1(backends.data(), kBackendCount,
+                                      &required, &context) ==
+        TESSERA_ABI_INCOMPATIBLE);
   CHECK(object_bytes(backends) == badPrefix);
   backends[1] = initialized<tessera_backend_info_v1>();
-  REQUIRE(tessera_test_c_enumerate(backends.data(), 3, &required, &context) ==
-          TESSERA_OK);
+  REQUIRE(tessera_test_c_enumerate(backends.data(), kBackendCount, &required,
+                                   &context) == TESSERA_OK);
   std::set<std::string> ids;
   for (const auto &backend : backends) {
     CHECK(backend.kind == (fixed_id(backend.id) == "clownmdemu" ?
@@ -720,16 +730,17 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
     CHECK(std::any_of(std::begin(backend.build_id), std::end(backend.build_id),
                       [](auto v) { return v != 0; }));
   }
-  CHECK(ids ==
-        std::set<std::string>{"clownmdemu", "synthetic.minimal", "synthetic.complete"});
+  std::set<std::string> expected{"synthetic.minimal", "synthetic.complete"};
+  if constexpr (TESSERA_CLOWN_REFERENCE != 0)
+    expected.insert("clownmdemu");
+  CHECK(ids == expected);
   const std::string first = fixed_id(backends[0].id);
   backends[0].id[0] = '?'; // A caller copy cannot corrupt the registry.
-  std::array<tessera_backend_info_v1, 3> repeated{
-      initialized<tessera_backend_info_v1>(),
-      initialized<tessera_backend_info_v1>(),
-      initialized<tessera_backend_info_v1>()};
-  REQUIRE(tessera_backends_enumerate_v1(repeated.data(), 3, &required,
-                                        &context) == TESSERA_OK);
+  std::array<tessera_backend_info_v1, kBackendCount> repeated{};
+  for (auto &backend : repeated)
+    backend = initialized<tessera_backend_info_v1>();
+  REQUIRE(tessera_backends_enumerate_v1(repeated.data(), kBackendCount,
+                                        &required, &context) == TESSERA_OK);
   CHECK(fixed_id(repeated[0].id) == first);
   // Capability absence and live-session lifetime cases are added by T009/T012.
 }

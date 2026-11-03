@@ -33,13 +33,16 @@ https://github.com/Ayther-Dev/AYTHER-Tessera. El árbol de fuentes estaba limpio
 al configurarlo: `@tessera_source_clean_json@`. Para una entrega con tag,
 obtenga las fuentes de ese tag y compruebe que apunta al commit indicado.
 
-El repositorio contiene los scripts CMake de compilación e instalación, el lock
-de fuentes del backend Mega Drive en `third_party/backends/sources.lock.json`,
-la descarga y verificación de hashes en `tools/bootstrap-backends.ps1` y el
-parche exacto de ClownMDEmu en
-`cmake/patches/clownmdemu-provenance.patch`. El lock identifica por separado
-las revisiones de ClownMDEmu, clown68000, clownz80 y clowncommon. Sus textos de
-licencia originales acompañan al paquete bajo `licenses/`.
+Tessera se distribuye bajo MPL-2.0 (`licenses/LICENSE`). El repositorio contiene
+los scripts CMake de compilación e instalación y el lock de las dependencias
+auxiliares en `cmake/dependencies.lock.json`; sus textos de licencia originales
+acompañan al paquete bajo `licenses/`.
+
+Esta distribución no incluye ClownMDEmu, clown68000, clownz80 ni ningún otro
+componente AGPL, GPL o LGPL: el backend de referencia ClownMDEmu solo se compila
+en un árbol local separado para pruebas diferenciales (opción
+`TESSERA_BUILD_CLOWN_REFERENCE`) y no se instala ni se publica. El paquete no
+incluye backend de producto de Mega Drive.
 
 Engine es una dependencia separada y aporta sus propias fuentes y avisos.
 Esta distribución no incluye ROM, pack de contenido, registro de confianza
@@ -50,13 +53,6 @@ install(FILES "${tessera_package_directory}/SOURCE_AVAILABILITY.md"
 set_target_properties(tessera_core PROPERTIES EXPORT_NAME core)
 install(TARGETS tessera_core EXPORT TesseraTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-set(TESSERA_INSTALL_BACKEND_LIBDIR "${CMAKE_INSTALL_LIBDIR}/tessera-backend")
-set(tessera_backend_libraries clownmdemu-core clown68000-interpreter
-    clown68000-common clownz80-interpreter clownz80-common)
-foreach(backend_library IN LISTS tessera_backend_libraries)
-    install(FILES "$<TARGET_FILE:${backend_library}>"
-        DESTINATION "${TESSERA_INSTALL_BACKEND_LIBDIR}")
-endforeach()
 install(TARGETS tessera_cli RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${PROJECT_SOURCE_DIR}/include/tessera/tessera.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/tessera")
@@ -92,8 +88,7 @@ configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/TesseraConfig.cmake.i
     "${tessera_package_directory}/TesseraConfig.cmake"
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tessera"
     PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_BINDIR
-        TESSERA_INSTALL_DATADIR TESSERA_INSTALL_ASANDIR
-        TESSERA_INSTALL_BACKEND_LIBDIR)
+        TESSERA_INSTALL_DATADIR TESSERA_INSTALL_ASANDIR)
 write_basic_package_version_file("${tessera_package_directory}/TesseraConfigVersion.cmake"
     VERSION "${PROJECT_VERSION}" COMPATIBILITY SameMinorVersion)
 install(EXPORT TesseraTargets NAMESPACE Tessera::
@@ -109,11 +104,6 @@ install(FILES "${PROJECT_SOURCE_DIR}/legal/THIRD_PARTY_NOTICES.md"
     DESTINATION "${TESSERA_INSTALL_DATADIR}")
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/third_party/licenses/picosha2-1.0.1"
     "${PROJECT_SOURCE_DIR}/third_party/licenses/nlohmann-json-3.12.0"
-    "${PROJECT_SOURCE_DIR}/third_party/licenses/clownmdemu-core-88ef45a"
-    "${PROJECT_SOURCE_DIR}/third_party/licenses/clown68000-bb19838"
-    "${PROJECT_SOURCE_DIR}/third_party/licenses/clownz80-aa4cae3"
-    "${PROJECT_SOURCE_DIR}/third_party/licenses/clowncommon-ecee31f"
-    "${PROJECT_SOURCE_DIR}/third_party/licenses/clowncommon-ddeff17"
     DESTINATION "${TESSERA_INSTALL_DATADIR}/licenses")
 install(FILES "${PROJECT_SOURCE_DIR}/cmake/dependencies.lock.json"
     DESTINATION "${TESSERA_INSTALL_DATADIR}")
@@ -125,8 +115,8 @@ file(CONFIGURE OUTPUT "${tessera_package_directory}/package-metadata.json" CONTE
   "abi": {"major": 1, "minor": 0, "pointer_bytes": 8, "platform": "windows-x64-msvc", "runtime": "/MD"},
   "build": {"id": "@build_id@", "configuration": "@CMAKE_BUILD_TYPE@", "compiler_id": "@CMAKE_CXX_COMPILER_ID@", "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@", "diagnostics": @tessera_diagnostics_json@},
   "source": {"repository": "https://github.com/Ayther-Dev/AYTHER-Tessera", "revision": "@tessera_source_revision@", "clean_at_configure": @tessera_source_clean_json@},
-  "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": ["PicoSHA2 1.0.1", "ClownMDEmu 88ef45a", "clown68000 bb19838", "clownz80 aa4cae3", "clowncommon ecee31f/ddeff17"], "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
-  "scope": {"core": "synthetic-and-megadrive", "candidate_backends_included": true, "fixtures_included": false, "distribution_review": "T034-local-verified"},
+  "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": ["PicoSHA2 1.0.1"], "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
+  "scope": {"core": "synthetic", "candidate_backends_included": false, "reference_backends_included": false, "license": "MPL-2.0", "fixtures_included": false, "distribution_review": "T034-local-verified"},
   "asan_runtime": {"included": @tessera_diagnostics_json@, "file": "@tessera_asan_dll_name@", "sha256": "@tessera_asan_sha256@", "origin": "local-compiler-toolchain", "scope": "local-development-distribution-review-T034"}
 }
 ]=] @ONLY)

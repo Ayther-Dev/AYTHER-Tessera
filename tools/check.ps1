@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('windows-dev', 'windows-release', 'windows-diagnostics', 'windows-engine-integration', 'windows-runtime-integration')]
+    [ValidateSet('windows-dev', 'windows-release', 'windows-diagnostics', 'windows-engine-integration', 'windows-runtime-integration', 'windows-clown-reference')]
     [string]$Preset = 'windows-dev',
     [ValidateSet('All', 'Configure', 'Build', 'Test')]
     [string]$Stage = 'All',

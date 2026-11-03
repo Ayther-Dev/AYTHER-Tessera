@@ -38,8 +38,8 @@ tessera_limits_v1 limits() {
   v.snapshot_bytes = 8 * 1024 * 1024;
   return v;
 }
-std::array<tessera_backend_info_v1, 3> backends() {
-  std::array<tessera_backend_info_v1, 3> values{};
+std::array<tessera_backend_info_v1, kRegistrationCount> backends() {
+  std::array<tessera_backend_info_v1, kRegistrationCount> values{};
   const auto registrations = SystemRegistry::registrations();
   const auto hash = build_identity();
   for (std::size_t i = 0; i < values.size(); ++i) {
@@ -155,17 +155,18 @@ tessera_status TESSERA_CALL tessera_backends_enumerate_v1(
     std::uint32_t *required, tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
     c.object(required);
-    std::array<tessera_backend_info_v1 *, 3> slots{};
+    constexpr auto count = static_cast<std::uint32_t>(kRegistrationCount);
+    std::array<tessera_backend_info_v1 *, kRegistrationCount> slots{};
     auto cursor = reinterpret_cast<std::uintptr_t>(out);
-    for (std::uint32_t i = 0; i < std::min(capacity, 3U); ++i) {
+    for (std::uint32_t i = 0; i < std::min(capacity, count); ++i) {
       auto *slot = reinterpret_cast<tessera_backend_info_v1 *>(cursor);
       c.object(slot);
       slots[i] = slot;
       cursor += slot->header.size;
     }
-    if (capacity < 3) {
+    if (capacity < count) {
       c.start();
-      *required = 3;
+      *required = count;
       return TESSERA_BUFFER_TOO_SMALL;
     }
     // Validate every prefix before publishing the first array element.
@@ -173,7 +174,7 @@ tessera_status TESSERA_CALL tessera_backends_enumerate_v1(
     const auto values = backends();
     for (std::size_t i = 0; i < values.size(); ++i)
       publish(slots[i], values[i]);
-    *required = 3;
+    *required = count;
     return TESSERA_OK;
   });
 }
