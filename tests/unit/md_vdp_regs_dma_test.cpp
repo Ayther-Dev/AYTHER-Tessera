@@ -157,3 +157,96 @@ TEST_CASE("horizontal interrupt counts lines") {
   v.acknowledge(4);
   CHECK(v.irq_level() == 0);
 }
+
+// ---- TP-104.1: ports
+// ------------------------------------------------------------
+
+TEST_CASE("CRAM and VSRAM read back through the data port") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2);
+  set_write(v, 0x0010, 3);
+  v.write_data(0x0E0E);
+  v.write_data(0x00AA);
+  set_read(v, 0x0010, 8);
+  CHECK(v.read_data() == 0x0E0E);
+  CHECK(v.read_data() == 0x00AA);
+  set_write(v, 0x0004, 5);
+  v.write_data(0x03FF);
+  set_read(v, 0x0004, 4);
+  CHECK(v.read_data() == 0x03FF);
+}
+
+TEST_CASE("the auto-increment register steps by 1, 2 and 4") {
+  for (const int step : {1, 2, 4}) {
+    Vdp v(Standard::ntsc);
+    reg(v, 15, step);
+    set_write(v, 0x0100);
+    v.write_data(0xAAAA);
+    v.write_data(0xBBBB);
+    // the second word lands `step` bytes after the first one
+    const unsigned second = 0x100 + step;
+    if (step == 2 || step == 4) {
+      CHECK(v.vram()[second] == 0xBB);
+      CHECK(v.vram()[second + 1] == 0xBB);
+    }
+    if (step == 1) { // odd address: the bytes are swapped inside the word
+      CHECK(v.vram()[0x101] == 0xBB);
+      CHECK(v.vram()[0x100] == 0xBB);
+    }
+  }
+}
+
+TEST_CASE("the access address uses 16 bits: second word carries bits 14-15") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2);
+  set_write(v, 0x8000);
+  v.write_data(0x1122);
+  CHECK(v.vram()[0x8000] == 0x11);
+  CHECK(v.vram()[0x8001] == 0x22);
+  set_write(v, 0xFFFE);
+  v.write_data(0x3344);
+  v.write_data(0x5566); // wraps to address 0
+  CHECK(v.vram()[0xFFFE] == 0x33);
+  CHECK(v.vram()[0xFFFF] == 0x44);
+  CHECK(v.vram()[0x0000] == 0x55);
+  CHECK(v.vram()[0x0001] == 0x66);
+}
+
+TEST_CASE("an odd VRAM address stores the word with its bytes swapped") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2);
+  set_write(v, 0x0201);
+  v.write_data(0xA1B2);
+  CHECK(v.vram()[0x200] == 0xB2);
+  CHECK(v.vram()[0x201] == 0xA1);
+}
+
+TEST_CASE("CRAM keeps 9 bit colours and VSRAM 11 bit scroll values") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2);
+  set_write(v, 0x0000, 3);
+  v.write_data(0xFFFF);
+  CHECK(v.cram()[0] == 0x0EEE);
+  set_write(v, 0x0000, 5);
+  v.write_data(0xFFFF);
+  CHECK(v.vsram()[0] == 0x07FF);
+}
+
+TEST_CASE("a register write does not disturb the pending access address") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2);
+  set_write(v, 0x0040);
+  reg(v, 0, 0x04); // set a register between the command and the data
+  v.write_data(0x7777);
+  CHECK(v.reg(0) == 0x04);
+  // the register write resets the access code, so the data goes nowhere
+  CHECK(v.vram()[0x40] == 0x00);
+}
+
+TEST_CASE("the status register is stable across reads and has the fixed bits") {
+  Vdp v(Standard::ntsc);
+  const auto first = v.read_status();
+  CHECK(first == v.read_status());
+  CHECK((first & 0xFC00) == 0x3400);
+  CHECK((first & 0x0200) != 0); // FIFO empty
+}
