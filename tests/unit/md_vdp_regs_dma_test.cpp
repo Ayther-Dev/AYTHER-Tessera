@@ -406,65 +406,77 @@ TEST_CASE("the H counter values per line and its jump in H32 and H40") {
 }
 
 // TP-104.6 (RF-2.2): VRAM access through the data port while the VDP is in
-// Mode 4 (register 1 bit 2 clear). Values measured on gpgx with byte probes
-// (bench: mode4_pbc): the address steps by one whatever register 15 says, a
-// write puts the high byte at the address and the low byte at the next one
-// (odd addresses are not swapped), a read returns the word of the even address
-// (the byte access of the 68000 picks its low byte) and steps by one, and a
-// read command starts at the even address below.
+// Mode 4 (register 1 bit 2 clear), after gpgx vdp_68k_data_w_m4/_r_m4 (checked
+// with the mode4_pbc bench): the word goes to the even address, byte swapped
+// when the address is odd, a read returns the word of the even address (the
+// byte access of the 68000 picks its low byte), and the address steps by
+// register 15 + 1. Every control word is a whole
+// command (gpgx vdp_68k_ctrl_w: pending is only set in Mode 5).
 namespace {
 std::uint16_t read_byte_low(Vdp &v) { return v.read_data() & 0xFF; }
+void m4_set_write(Vdp &v, std::uint16_t address) {
+  v.write_control(static_cast<std::uint16_t>(0x4000 | address));
+}
+void m4_set_read(Vdp &v, std::uint16_t address) { v.write_control(address); }
 } // namespace
 
 TEST_CASE("Mode 4 writes: one step per access, high byte then low byte") {
   Vdp v(Standard::ntsc);
-  set_write(v, 0x0000, 1);
+  m4_set_write(v, 0x0000);
   v.write_data(0x1111); // a byte write is the byte in both halves
   v.write_data(0x2222);
   v.write_data(0x3333);
-  CHECK(v.vram()[0] == 0x11);
-  CHECK(v.vram()[1] == 0x22); // the second write overwrote the low byte
+  CHECK(v.vram()[0] == 0x22); // the second write replaced the whole word
+  CHECK(v.vram()[1] == 0x22);
   CHECK(v.vram()[2] == 0x33);
   CHECK(v.vram()[3] == 0x33);
-  set_write(v, 0x0010, 1);
+  m4_set_write(v, 0x0010);
   v.write_data(0x4455);
-  v.write_data(0x6677); // at the odd address $11: no byte swap
-  CHECK(v.vram()[0x10] == 0x44);
+  v.write_data(0x6677);
+  // the second write is at the odd address $11: its word is byte swapped and
+  // lands on the even word $10
+  CHECK(v.vram()[0x10] == 0x77);
   CHECK(v.vram()[0x11] == 0x66);
-  CHECK(v.vram()[0x12] == 0x77);
+  CHECK(v.vram()[0x12] == 0x00);
 }
 
 TEST_CASE("Mode 4 reads: even word, low byte, one step per read") {
   Vdp v(Standard::ntsc);
-  set_write(v, 0x0000, 1);
+  m4_set_write(v, 0x0000);
   v.write_data(0x1111);
   v.write_data(0x2222);
   v.write_data(0x3333);
-  set_read(v, 0x0000, 0);
+  m4_set_read(v, 0x0000);
   CHECK(read_byte_low(v) == 0x22);
   CHECK(read_byte_low(v) == 0x22);
   CHECK(read_byte_low(v) == 0x33);
   CHECK(read_byte_low(v) == 0x33);
-  // a read command at an odd address starts at the even one below
-  set_write(v, 0x0030, 1);
+  // a read at an odd address returns the word of the even one below
+  m4_set_write(v, 0x0030);
   v.write_data(0xAAAA);
   v.write_data(0xBBBB);
-  set_read(v, 0x0031, 0);
-  CHECK(read_byte_low(v) == 0xBB);
+  m4_set_read(v, 0x0031);
   CHECK(read_byte_low(v) == 0xBB);
   CHECK(read_byte_low(v) == 0x00);
+  CHECK(read_byte_low(v) == 0x00);
   // a word read gives both bytes of the even word
-  set_write(v, 0x0020, 1);
+  m4_set_write(v, 0x0020);
   v.write_data(0x8888);
-  set_read(v, 0x0020, 0);
+  m4_set_read(v, 0x0020);
   CHECK(v.read_data() == 0x8888);
   CHECK(v.read_data() == 0x8888);
 }
 
-TEST_CASE("Mode 4 ignores the high address bits of the command") {
+TEST_CASE("Mode 4: every control word is a whole command") {
   Vdp v(Standard::ntsc);
   v.write_control(0x4005);
-  v.write_control(0x0001); // would be address bit 14 in Mode 5
   v.write_data(0x7777);
   CHECK(v.vram()[5] == 0x77);
+  // the zero second word of a long write is a read command at address 0 and
+  // the writes that follow land at address 0 (gpgx), not at 5
+  v.write_control(0x4005);
+  v.write_control(0x0000);
+  v.write_data(0x9999);
+  CHECK(v.vram()[0] == 0x99);
+  CHECK(v.vram()[2] == 0x00);
 }
