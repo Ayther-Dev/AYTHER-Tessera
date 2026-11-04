@@ -44,3 +44,9 @@ if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
     set_tests_properties(tool.diffbench_trace_neutral PROPERTIES
         PASS_REGULAR_EXPRESSION "audio_peak=768 " LABELS "tool;phase0;local" TIMEOUT 120)
 endif()
+
+add_executable(tessera_diffbench_selftest selftest.cpp)
+target_link_libraries(tessera_diffbench_selftest PRIVATE Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_diffbench_selftest)
+add_test(NAME integration.diffbench_selftest COMMAND tessera_diffbench_selftest)
+set_tests_properties(integration.diffbench_selftest PROPERTIES LABELS "tool;phase0" TIMEOUT 30)
