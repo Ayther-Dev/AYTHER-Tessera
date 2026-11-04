@@ -31,3 +31,16 @@ SIG(tessera_observation_frame_delta_since_v1, uint64_t, tessera_obs_frame_delta_
 static_assert(TESSERA_ABI_MINOR == 1, "la API 1.1 sube el menor");
 
 TEST_CASE("la API 1.1 declara las 13 funciones de observación") { CHECK(TESSERA_ABI_MINOR == 1); }
+
+TEST_CASE("limites de observación publicados (TP-006.6, RNF-5)") {
+    tessera_observation_limits_v1 out{};
+    out.header = {static_cast<uint32_t>(sizeof(out)), TESSERA_ABI_MAJOR, TESSERA_ABI_MINOR};
+    tessera_context_v1 ctx{};
+    ctx.header = {static_cast<uint32_t>(sizeof(ctx)), TESSERA_ABI_MAJOR, 0};
+    REQUIRE(tessera_observation_limits_query_v1(0, &out, &ctx) == TESSERA_OK);
+    CHECK(out.max_rom_bytes == 16u * 1024 * 1024);
+    CHECK(out.max_journal_events == 256);
+    CHECK(out.max_audio_writes == 8192);
+    CHECK(out.max_parsed_sprites == 128);
+    CHECK(out.max_state_bytes == 2u * 1024 * 1024);
+}

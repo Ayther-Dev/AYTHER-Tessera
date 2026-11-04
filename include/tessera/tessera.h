@@ -475,6 +475,21 @@ tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
     tessera_session session, uint64_t generation_from,
     tessera_obs_frame_delta_v1 *out, uint32_t out_size, tessera_context_v1 *ctx);
 
+/* API 1.1: límites de la observación y de la ROM (RNF-5). Estructura nueva
+   porque tessera_limits_v1 es de tamaño fijo en ABI 1.0. */
+typedef struct tessera_observation_limits_v1 {
+  tessera_header_v1 header;
+  uint64_t max_rom_bytes;
+  uint64_t max_state_bytes;
+  uint32_t max_journal_events;
+  uint32_t max_audio_writes;
+  uint32_t max_parsed_sprites;
+  uint32_t reserved;
+} tessera_observation_limits_v1;
+tessera_status TESSERA_CALL tessera_observation_limits_query_v1(
+    tessera_session session, tessera_observation_limits_v1 *out,
+    tessera_context_v1 *ctx);
+
 #ifdef __cplusplus
 }
 #endif

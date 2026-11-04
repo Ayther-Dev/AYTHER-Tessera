@@ -138,6 +138,25 @@ tessera_status TESSERA_CALL tessera_api_query_v1(std::uint16_t major,
     return TESSERA_OK;
   });
 }
+tessera_status TESSERA_CALL tessera_observation_limits_query_v1(
+    tessera_session session, tessera_observation_limits_v1 *out,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    c.object(out);
+    c.start();
+    if (session)
+      (void)sessions.get(session);
+    auto v = initialized<tessera_observation_limits_v1>();
+    v.header.minor = 1;
+    v.max_rom_bytes = UINT64_C(16) * 1024 * 1024;
+    v.max_state_bytes = UINT64_C(2) * 1024 * 1024;
+    v.max_journal_events = TESSERA_OBS_JOURNAL_MAX_EVENTS;
+    v.max_audio_writes = 8192;
+    v.max_parsed_sprites = 128;
+    publish(out, v);
+    return TESSERA_OK;
+  });
+}
 tessera_status TESSERA_CALL tessera_limits_query_v1(tessera_session session,
                                                     tessera_limits_v1 *out,
                                                     tessera_context_v1 *ctx) {
