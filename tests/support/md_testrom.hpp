@@ -1,8 +1,10 @@
 // Synthetic Mega Drive test ROMs (spec 008, TP-101.10). They contain no
 // commercial content: a SEGA header and a few hand-assembled 68000 words.
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace tessera::testrom {
@@ -491,6 +493,290 @@ inline std::vector<std::uint8_t> mode4_pbc_rom() {
     at += 2;
   }
   return rom;
+}
+
+} // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// A VDP scene ROM (spec 008, TP-105): a header, then unrolled 68000 code that
+// loads registers, VRAM, CRAM, VSRAM and finally turns the display on, then
+// idles. The bench compares the frame with gpgx, so what matters is that both
+// machines see exactly the same writes.
+struct Scene {
+  std::vector<std::pair<std::uint8_t, std::uint8_t>> regs; // before the data
+  std::vector<std::pair<std::uint16_t, std::vector<std::uint16_t>>> vram;
+  std::vector<std::uint16_t> cram;  // from index 0
+  std::vector<std::uint16_t> vsram; // from index 0
+  std::uint8_t reg1 = 0x44;         // final value of register 1
+};
+
+inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
+                                           const char (&title)[17]) {
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0 (data port)
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1 (control port)
+  };
+  const auto reg = [&](std::uint8_t r, std::uint8_t v) {
+    c.insert(c.end(),
+             {0x32BC, static_cast<std::uint16_t>(0x8000 | (r << 8) | v)});
+  };
+  const auto command = [&](std::uint32_t cmd) {
+    c.insert(c.end(), {0x22BC, static_cast<std::uint16_t>(cmd >> 16),
+                       static_cast<std::uint16_t>(cmd)});
+  };
+  const auto data = [&](std::uint16_t w) { c.insert(c.end(), {0x30BC, w}); };
+  reg(0, 0x04); // full palette
+  reg(1, 0x04); // display off, Mode 5
+  reg(15, 2);
+  for (const auto &[r, v] : scene.regs)
+    reg(r, v);
+  for (const auto &[addr, words] : scene.vram) {
+    command((0x40000000U | ((addr & 0x3FFFU) << 16)) | ((addr >> 14) & 3U));
+    for (const auto w : words)
+      data(w);
+  }
+  if (!scene.cram.empty()) {
+    command(0xC0000000U);
+    for (const auto w : scene.cram)
+      data(w);
+  }
+  if (!scene.vsram.empty()) {
+    command(0x40000010U);
+    for (const auto w : scene.vsram)
+      data(w);
+  }
+  reg(1, scene.reg1);
+  c.push_back(0x60FE); // bra.s .
+  std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], title, 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+/// Deterministic pseudo random numbers for scene contents.
+struct Lcg {
+  std::uint32_t state;
+  std::uint32_t next() {
+    state = state * 1664525U + 1013904223U;
+    return state >> 8;
+  }
+};
+
+/// `palette_sweep` block `block` (0..8): 60 CRAM colours (colour indices
+/// 1..15 of the four palette lines), shown as solid cells of plane B: rows 0-1
+/// with the priority bit (normal) and rows 2-3 without (shadow, as register
+/// 12 enables shadow/highlight). Nine blocks cover the 512 colours.
+inline std::vector<std::uint8_t> palette_sweep_rom(unsigned block) {
+  Scene scene;
+  scene.regs = {{2, 0x08}, {4, 0x06}, {12, 0x08}, {16, 0x00}, {7, 0x00}};
+  std::vector<std::uint16_t> tiles;
+  for (unsigned t = 1; t <= 15; ++t)
+    for (unsigned i = 0; i < 16; ++i)
+      tiles.push_back(static_cast<std::uint16_t>(t * 0x1111U));
+  scene.vram.emplace_back(0x0020, tiles);
+  scene.cram.assign(64, 0);
+  for (unsigned line = 0; line < 4; ++line)
+    for (unsigned colour = 1; colour < 16; ++colour) {
+      const unsigned v = (block * 60U + line * 15U + colour - 1U) % 512U;
+      scene.cram[line * 16 + colour] = static_cast<std::uint16_t>(
+          ((v >> 6) & 7U) << 9 | ((v >> 3) & 7U) << 5 | (v & 7U) << 1);
+    }
+  std::vector<std::uint16_t> table(32 * 4, 0);
+  for (unsigned shadow = 0; shadow < 2; ++shadow)
+    for (unsigned n = 0; n < 60; ++n) {
+      const unsigned line = n / 15U, colour = n % 15U + 1U;
+      const unsigned cell = (shadow * 2U + n / 30U) * 32U + n % 30U;
+      table[cell] = static_cast<std::uint16_t>((shadow == 0 ? 0x8000U : 0U) |
+                                               (line << 13) | colour);
+    }
+  scene.vram.emplace_back(0xC000, table);
+  return scene_rom(scene, "AYTHER PALSWEEP ");
+}
+
+} // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `modes_sweep` variant: random but deterministic planes. Both planes use the
+// same 64 patterned tiles, random attributes and a random CRAM, VSRAM and
+// horizontal scroll table, so that any scroll mode, size, flip, priority or
+// window rule that differs from gpgx moves pixels.
+struct ModesVariant {
+  std::uint8_t reg11 = 0x00;      // scroll modes
+  std::uint8_t reg16 = 0x00;      // plane size
+  std::uint8_t reg12 = 0x00;      // H32/H40, shadow/highlight, interlace
+  std::uint8_t reg1_extra = 0x00; // V30
+  std::uint8_t reg3 = 0x34;       // window name table
+  std::uint8_t reg17 = 0x00;      // window horizontal
+  std::uint8_t reg18 = 0x00;      // window vertical
+  std::uint8_t reg0_extra = 0x00; // left column blank
+  std::uint8_t reg7 = 0x05;
+  int hscroll_a = -1; // first horizontal scroll entry of plane A
+};
+
+inline std::vector<std::uint8_t> modes_sweep_rom(const ModesVariant &v) {
+  Scene scene;
+  scene.regs = {{2, 0x10},   // plane A at $4000
+                {4, 0x06},   // plane B at $C000
+                {3, v.reg3}, // window
+                {13, 0x38},  // horizontal scroll table at $E000
+                {5, 0x7F},   // sprite table far away, empty
+                {11, v.reg11}, {16, v.reg16}, {12, v.reg12},
+                {17, v.reg17}, {18, v.reg18}, {7, v.reg7}};
+  if (v.reg0_extra != 0)
+    scene.regs.insert(scene.regs.begin(),
+                      {0, static_cast<std::uint8_t>(0x04 | v.reg0_extra)});
+  scene.reg1 = static_cast<std::uint8_t>(0x44 | v.reg1_extra);
+  Lcg rng{0x5EED0001U};
+  // 64 tiles with a pattern that is not symmetric: flips are visible.
+  std::vector<std::uint16_t> tiles;
+  for (unsigned t = 0; t < 64; ++t)
+    for (unsigned row = 0; row < 8; ++row) {
+      std::uint32_t word = 0;
+      for (unsigned col = 0; col < 8; ++col) {
+        const unsigned colour =
+            (t == 0) ? 0U : (((t * 7U + row * 3U + col * 5U) % 15U) + 1U);
+        const unsigned c = (rng.next() % 5U == 0U) ? 0U : colour; // holes
+        word = (word << 4) | c;
+      }
+      tiles.push_back(static_cast<std::uint16_t>(word >> 16));
+      tiles.push_back(static_cast<std::uint16_t>(word));
+    }
+  scene.vram.emplace_back(0x0000, tiles);
+  const unsigned cells_x = ((v.reg16 & 3U) == 0)   ? 32U
+                           : ((v.reg16 & 3U) == 1) ? 64U
+                                                   : 128U;
+  const unsigned cells_y = (((v.reg16 >> 4) & 3U) == 0)   ? 32U
+                           : (((v.reg16 >> 4) & 3U) == 1) ? 64U
+                                                          : 128U;
+  const unsigned entries = std::min(cells_x * cells_y, 4096U);
+  const auto table = [&](bool priorities) {
+    std::vector<std::uint16_t> t(entries);
+    for (auto &e : t) {
+      const std::uint32_t r = rng.next();
+      e = static_cast<std::uint16_t>(
+          (priorities && (r & 0x100U) ? 0x8000U : 0U) |
+          (((r >> 9) & 3U) << 13) | ((r & 0x200U) ? 0x1000U : 0U) |
+          ((r & 0x400U) ? 0x0800U : 0U) | ((r >> 12) % 64U));
+    }
+    return t;
+  };
+  scene.vram.emplace_back(0x4000, table(true));
+  scene.vram.emplace_back(0xC000, table(true));
+  std::vector<std::uint16_t> window(64 * 32);
+  for (auto &e : window) {
+    const std::uint32_t r = rng.next();
+    e = static_cast<std::uint16_t>(((r & 0x100U) ? 0x8000U : 0U) |
+                                   (((r >> 9) & 3U) << 13) | ((r >> 12) % 64U));
+  }
+  scene.vram.emplace_back(0xD000, window);
+  std::vector<std::uint16_t> hscroll(240 * 2);
+  for (auto &e : hscroll)
+    e = static_cast<std::uint16_t>(rng.next() % 1024U);
+  if (v.hscroll_a >= 0)
+    hscroll[0] = static_cast<std::uint16_t>(v.hscroll_a);
+  scene.vram.emplace_back(0xE000, hscroll);
+  scene.cram.resize(64);
+  for (auto &c : scene.cram)
+    c = static_cast<std::uint16_t>(rng.next() & 0x0EEEU);
+  scene.vsram.resize(40);
+  for (auto &e : scene.vsram)
+    e = static_cast<std::uint16_t>(rng.next() % 1024U);
+  return scene_rom(scene, "AYTHER MODESWEEP");
+}
+
+/// Variant `id` of `modes_sweep`; the list is mirrored in
+/// tools/diffbench/CMakeLists.txt (one test per variant).
+inline ModesVariant modes_variant(unsigned id) {
+  ModesVariant v;
+  switch (id) {
+  case 0: // plain 32x32, full scroll
+    break;
+  case 1: // 64x32, cell horizontal scroll
+    v.reg11 = 0x02;
+    v.reg16 = 0x01;
+    break;
+  case 2: // 32x64, line horizontal scroll
+    v.reg11 = 0x03;
+    v.reg16 = 0x10;
+    break;
+  case 3: // 64x64, 2 cell vertical scroll
+    v.reg11 = 0x04;
+    v.reg16 = 0x11;
+    break;
+  case 4: // H40, 128x32, line scroll and 2 cell vertical scroll
+    v.reg11 = 0x07;
+    v.reg12 = 0x81;
+    v.reg16 = 0x03;
+    break;
+  case 5: // invalid horizontal scroll mode
+    v.reg11 = 0x01;
+    break;
+  case 6: // V30, H40
+    v.reg1_extra = 0x08;
+    v.reg11 = 0x03;
+    v.reg12 = 0x81;
+    break;
+  case 7: // left column blank
+    v.reg0_extra = 0x20;
+    v.reg11 = 0x03;
+    break;
+  case 8: // window above and left
+    v.reg17 = 0x05;
+    v.reg18 = 0x03;
+    break;
+  case 9: // window right and below, H40
+    v.reg17 = 0x8A;
+    v.reg18 = 0x83;
+    v.reg12 = 0x81;
+    break;
+  case 10: // window left, H40
+    v.reg17 = 0x0C;
+    v.reg12 = 0x81;
+    break;
+  case 11: // window right
+    v.reg17 = 0x85;
+    break;
+  case 12: // window below, line scroll
+    v.reg18 = 0x8E;
+    v.reg11 = 0x03;
+    break;
+  case 13: // shadow/highlight mode, line scroll
+    v.reg12 = 0x08;
+    v.reg11 = 0x03;
+    break;
+  case 14: // 64x64 only
+    v.reg16 = 0x11;
+    break;
+  case 15: // 2 cell vertical scroll only
+    v.reg11 = 0x04;
+    break;
+  case 16: // 2 cell vertical scroll, H40
+    v.reg11 = 0x04;
+    v.reg12 = 0x81;
+    break;
+  case 17: // left window, plane A fine scroll 1 (even column)
+  case 18: // fine scroll 1, odd column
+  case 19: // fine scroll 4
+  case 20: // fine scroll 7
+    v.reg17 = 0x05;
+    v.hscroll_a = id == 17 ? 49 : id == 18 ? 41 : id == 19 ? 52 : 55;
+    break;
+  default:
+    break;
+  }
+  return v;
 }
 
 } // namespace tessera::testrom

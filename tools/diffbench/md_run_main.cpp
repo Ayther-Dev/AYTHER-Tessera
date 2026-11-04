@@ -14,7 +14,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path;
+  std::string rom_path, out_path, srm_path, frame_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -26,6 +26,8 @@ int main(int argc, char **argv) {
       out_path = argv[++i];
     } else if (arg == "--save-ram-out" && has_value) {
       srm_path = argv[++i];
+    } else if (arg == "--frame-out" && has_value) {
+      frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
@@ -61,6 +63,17 @@ int main(int argc, char **argv) {
   out.write(reinterpret_cast<const char *>(ram.data()),
             static_cast<std::streamsize>(ram.size()));
   out.close();
+  if (!frame_path.empty()) {
+    // Same layout as the bench's oracle dump: width, height, pitch (u32 LE)
+    // and the rows; here RGBA8, one u32 per pixel (R in the low byte).
+    const auto size = system.renderer().size();
+    const std::uint32_t head[3] = {size.width, size.height, size.width * 4U};
+    std::ofstream fo(frame_path, std::ios::binary | std::ios::trunc);
+    fo.write(reinterpret_cast<const char *>(head), sizeof head);
+    const auto &frame = system.renderer().frame();
+    fo.write(reinterpret_cast<const char *>(frame.data()),
+             static_cast<std::streamsize>(frame.size() * 4U));
+  }
   if (!srm_path.empty()) {
     const auto srm = system.sram().to_srm();
     std::ofstream srm_out(srm_path, std::ios::binary | std::ios::trunc);

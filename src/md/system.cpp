@@ -82,6 +82,8 @@ void System::run_frame() {
       vdp_.power_on_hint_counter();
     }
     update_irq();
+    if (line == 0)
+      renderer_.begin_frame(vdp_);
     if (index == 0 && frame_ != 0) {
       // The vertical interrupt comes vint_cycle cycles after the frame start
       // (gpgx), so a horizontal interrupt of that same line is served first.
@@ -92,6 +94,7 @@ void System::run_frame() {
     }
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     cpu_.executeUntil(static_cast<moira::i64>(end_master / kDivider68k));
+    renderer_.render_line(vdp_, line);
   }
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();

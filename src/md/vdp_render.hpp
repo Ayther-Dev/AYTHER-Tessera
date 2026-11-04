@@ -21,9 +21,11 @@ struct FrameSize {
 /// Visible size for the current mode: H32 256 / H40 320, V28 224 / V30 240.
 FrameSize frame_size(const Vdp &vdp) noexcept;
 
-/// CRAM colour (0000BBB0GGG0RRR0) as RGBA8. The 3 to 8 bit conversion is
-/// provisional until TP-105.2 takes the table from gpgx.
-std::uint32_t colour_to_rgba(std::uint16_t cram) noexcept;
+/// CRAM colour (0000BBB0GGG0RRR0) as RGBA8, the way a host sees the 565 frame
+/// of gpgx (TP-105.2); `highlight` is the same rule, not yet checked on gpgx.
+enum class Shade : std::uint8_t { normal, shadow, highlight };
+std::uint32_t colour_to_rgba(std::uint16_t cram,
+                             Shade shade = Shade::normal) noexcept;
 
 class Renderer {
 public:
@@ -40,6 +42,19 @@ public:
   FrameSize size() const noexcept { return size_; }
 
 private:
+  struct Pixel {
+    std::uint8_t index = 0; ///< 0..63 CRAM entry; colour 0 of a line is clear
+    bool high = false;      ///< priority bit of the tile
+    bool opaque = false;    ///< colour index of the tile pixel is not 0
+  };
+  unsigned hscroll_value(const Vdp &vdp, unsigned plane,
+                         std::uint32_t line) const;
+  /// Overwrites plane A with the window where it covers the line.
+  void window_line(const Vdp &vdp, std::uint32_t line,
+                   std::span<Pixel> a) const;
+  /// Fills `out` (one entry per visible column) with plane A (0) or B (1).
+  void plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
+                  std::span<Pixel> out) const;
   std::vector<std::uint32_t> frame_;
   FrameSize size_;
   LineHook hook_;

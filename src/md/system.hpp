@@ -8,6 +8,7 @@
 #include "md/machine.hpp"
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
+#include "md/vdp_render.hpp"
 
 #include <array>
 #include <cstdint>
@@ -39,6 +40,8 @@ public:
     return bus_.work_ram();
   }
   const Vdp &vdp() const noexcept { return vdp_; }
+  /// Frame drawn by the last run_frame (RGBA8, `renderer().size()`).
+  const Renderer &renderer() const noexcept { return renderer_; }
   const Sram &sram() const noexcept { return sram_; }
   const M68k &cpu() const noexcept { return cpu_; }
 
@@ -70,6 +73,7 @@ private:
   M68k cpu_;
   Vdp vdp_;
   Tmss tmss_;
+  Renderer renderer_;
   std::uint64_t frame_ = 0;
   std::uint32_t current_line_ = 0;
   std::uint32_t frame_start_line_ = 192; // gpgx starts in Mode 4

@@ -157,4 +157,31 @@ if(TESSERA_BUILD_MEGADRIVE)
                 PASS_REGULAR_EXPRESSION "match=1" LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-105.2 to TP-105.4: the last frame against gpgx, pixel by pixel.
+        # palette_sweep: 9 blocks of 60 colours, normal and shadow (all 512).
+        # modes_sweep: scroll modes, plane sizes, window, shadow; the list of
+        # variants is modes_variant() in tests/support/md_testrom.hpp.
+        set(frame_roms)
+        foreach(block RANGE 0 8)
+            list(APPEND frame_roms palette-sweep-${block})
+        endforeach()
+        foreach(variant RANGE 0 20)
+            list(APPEND frame_roms modes-sweep-${variant})
+        endforeach()
+        foreach(mode IN LISTS frame_roms)
+            add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
+                "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
+            set_tests_properties(integration.md_${mode}_rom PROPERTIES
+                FIXTURES_SETUP md_${mode}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+            add_test(NAME integration.md_${mode} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_frame.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}")
+            set_tests_properties(integration.md_${mode} PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+    endif()
 endif()

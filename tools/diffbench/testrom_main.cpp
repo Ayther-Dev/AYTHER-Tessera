@@ -3,6 +3,7 @@
 #include "support/md_testrom.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 
@@ -40,6 +41,12 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_h_probe_rom(0x81);
   else if (std::strcmp(argv[1], "mode4-pbc") == 0)
     rom = tessera::testrom::mode4_pbc_rom();
+  else if (std::strncmp(argv[1], "palette-sweep-", 14) == 0)
+    rom = tessera::testrom::palette_sweep_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10)));
+  else if (std::strncmp(argv[1], "modes-sweep-", 12) == 0)
+    rom = tessera::testrom::modes_sweep_rom(tessera::testrom::modes_variant(
+        static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
   else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else

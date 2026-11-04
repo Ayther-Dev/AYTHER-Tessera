@@ -50,7 +50,7 @@ TEST_CASE("an empty frame is the backdrop colour in RGBA8") {
   const std::uint32_t pixel = r.frame()[0];
   CHECK((pixel & 0xFF) == 0x00);         // red
   CHECK(((pixel >> 8) & 0xFF) == 0x00);  // green
-  CHECK(((pixel >> 16) & 0xFF) == 0xFF); // blue, scaled to 8 bits
+  CHECK(((pixel >> 16) & 0xFF) == 0xEF); // blue 7 -> 565 level 29 -> 8 bits
   CHECK((pixel >> 24) == 0xFF);          // alpha
   for (const auto p : r.frame())
     CHECK(p == pixel);
@@ -65,10 +65,10 @@ TEST_CASE("register 0 bit 2 clear limits each channel to its lowest bit") {
   r.begin_frame(v);
   r.render_line(v, 0);
   const std::uint32_t limited = r.frame()[0];
-  CHECK((limited & 0xFF) == 0x24); // level 1 of 7 -> 36
+  CHECK((limited & 0xFF) == 0x21); // level 1 -> 565 level 4 -> 8 bits
   reg(v, 0, 0x04);
   r.render_line(v, 0);
-  CHECK((r.frame()[0] & 0xFF) == 0xFF); // full palette
+  CHECK((r.frame()[0] & 0xFF) == 0xEF); // full palette
 }
 
 TEST_CASE("the backdrop can change between lines and the hook sees each line") {
@@ -93,8 +93,8 @@ TEST_CASE("the backdrop can change between lines and the hook sees each line") {
   REQUIRE(hooked_lines.size() == 2);
   CHECK(hooked_lines[0] == 0);
   CHECK(hooked_lines[1] == 1);
-  CHECK((first_pixels[0] & 0xFF) == 0xFF);
-  CHECK(((first_pixels[1] >> 8) & 0xFF) == 0xFF);
+  CHECK((first_pixels[0] & 0xFF) == 0xEF);
+  CHECK(((first_pixels[1] >> 8) & 0xFF) == 0xEF);
   // no pass after the lines: the frame already holds what the hook saw
   CHECK(r.frame()[0] == first_pixels[0]);
   CHECK(r.frame()[256] == first_pixels[1]);
@@ -111,4 +111,72 @@ TEST_CASE("lines outside the active display are not drawn") {
   r.render_line(v, 224);
   r.render_line(v, 300);
   CHECK(calls == 0);
+}
+
+namespace {
+// Plane B at $C000 (reg 4 = 6), 32x32, tiles from $0000.
+void plane_b_scene(Vdp &v) {
+  reg(v, 0, 0x04);
+  reg(v, 1, 0x44);
+  reg(v, 2, 0x10);
+  reg(v, 4, 0x06);
+  reg(v, 15, 2);
+  set_colour(v, 1, 0x000E); // palette 0, colour 1: red
+  set_colour(v, 2, 0x00E0); // palette 0, colour 2: green
+  // tile 1: first pixel colour 1, the rest colour 2 (row 0 only)
+  v.write_control(0x4020);
+  v.write_control(0x0000);
+  v.write_data(0x1222);
+  v.write_data(0x2222);
+  // name table entry (0,0) = tile 1
+  v.write_control(0x4000);
+  v.write_control(0x0003);
+  v.write_data(0x0001);
+}
+} // namespace
+
+TEST_CASE("plane B draws a tile pixel with its palette colour") {
+  Vdp v(Standard::ntsc);
+  plane_b_scene(v);
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((r.frame()[0] & 0xFF) == 0xEF);        // red
+  CHECK(((r.frame()[1] >> 8) & 0xFF) == 0xEF); // green
+}
+
+TEST_CASE("a horizontal flip mirrors the tile pixels") {
+  Vdp v(Standard::ntsc);
+  plane_b_scene(v);
+  v.write_control(0x4000);
+  v.write_control(0x0003);
+  v.write_data(0x0801); // tile 1 with horizontal flip
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((r.frame()[7] & 0xFF) == 0xEF); // red now on the right
+}
+
+TEST_CASE("full horizontal scroll moves the plane to the right") {
+  Vdp v(Standard::ntsc);
+  plane_b_scene(v);
+  reg(v, 13, 0x38);
+  v.write_control(0x6000); // VRAM write at $E000
+  v.write_control(0x0003);
+  v.write_data(0x0000); // plane A scroll
+  v.write_data(0x0003); // plane B scroll 3
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((r.frame()[3] & 0xFF) == 0xEF); // red pixel moved from x 0 to x 3
+}
+
+TEST_CASE("shadow mode darkens a pixel without the priority bit") {
+  Vdp v(Standard::ntsc);
+  plane_b_scene(v);
+  reg(v, 12, 0x08);
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((r.frame()[0] & 0xFF) == 0x73); // level 7 as shadow: 14 -> 8 bits
 }
