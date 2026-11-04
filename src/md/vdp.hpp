@@ -24,6 +24,10 @@ public:
   std::uint16_t read_status();
   /// HV counter word; `line_cycle` is the master cycle inside the current line.
   std::uint16_t read_hv(std::uint32_t line_cycle) const noexcept;
+  /// Freezes the HV counter at `line_cycle` of the current line. Ignored
+  /// unless register 0 bit 1 (latch enable) is set; the frozen value is what
+  /// read_hv returns until the bit is cleared.
+  void latch_hv(std::uint32_t line_cycle) noexcept;
 
   /// Called at the start of every line, 0-based within the frame.
   void begin_line(std::uint32_t line);
@@ -48,6 +52,7 @@ private:
   std::uint32_t active_lines() const noexcept;
   void put(std::uint16_t value);
   void run_dma(std::uint16_t first_data);
+  std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
 
   Standard standard_;
   std::array<std::uint8_t, 32> regs_{};
@@ -62,6 +67,8 @@ private:
   std::uint32_t line_ = 0;
   bool vint_flag_ = false;
   bool hint_flag_ = false;
+  bool hv_latched_ = false;
+  std::uint16_t hv_latch_value_ = 0;
   std::int32_t hint_counter_ = 0;
   std::function<std::uint16_t(std::uint32_t)> dma_reader_;
 };

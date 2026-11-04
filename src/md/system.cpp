@@ -108,7 +108,21 @@ std::uint8_t System::io_read(std::uint32_t offset) const noexcept {
   }
 }
 
+// Level of the TH pin of port 2 as the VDP sees it: the data bit when the pin
+// is an output, high (pulled up) when it is an input.
+bool System::th2() const noexcept {
+  return (io_ctrl_[1] & 0x40U) == 0 || (io_data_[1] & 0x40U) != 0;
+}
+
+std::uint32_t System::line_cycle() const noexcept {
+  const std::uint64_t master = cpu_.getClock() * kDivider68k;
+  return master > line_start_master_
+             ? static_cast<std::uint32_t>(master - line_start_master_)
+             : 0U;
+}
+
 void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
+  const bool th_before = th2();
   switch (offset) {
   case 0x03:
   case 0x05:
@@ -123,6 +137,8 @@ void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
   default:
     break;
   }
+  if (th_before && !th2()) // TH falling on port 2 latches the HV counter
+    vdp_.latch_hv(line_cycle());
 }
 
 std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
@@ -159,8 +175,7 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     if (offset < 0x10) {
-      const std::uint16_t v = vdp_.read_hv(static_cast<std::uint32_t>(
-          (cpu_.getClock() * kDivider68k) - line_start_master_));
+      const std::uint16_t v = vdp_.read_hv(line_cycle());
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     return word ? 0xFFFFU : 0xFFU;

@@ -81,6 +81,13 @@ tessera_copy_diagnostic_runtime(tessera_md_testrom_bus_sweep)
 add_test(NAME integration.md_testrom_bus_sweep COMMAND tessera_md_testrom_bus_sweep)
 set_tests_properties(integration.md_testrom_bus_sweep PROPERTIES LABELS "integration;phase1;md" TIMEOUT 60)
 
+add_executable(tessera_md_vdp_reads_test unit/md_vdp_reads_test.cpp)
+target_include_directories(tessera_md_vdp_reads_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_md_vdp_reads_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_vdp_reads_test)
+add_test(NAME unit.md_vdp_reads COMMAND tessera_md_vdp_reads_test)
+set_tests_properties(unit.md_vdp_reads PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+
 add_test(NAME unit.md_bus COMMAND tessera_md_bus_test)
 set_tests_properties(unit.md_bus PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 

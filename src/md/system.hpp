@@ -60,6 +60,8 @@ private:
              bool word) override;
   std::uint8_t io_read(std::uint32_t offset) const noexcept;
   void io_write(std::uint32_t offset, std::uint8_t value) noexcept;
+  bool th2() const noexcept;
+  std::uint32_t line_cycle() const noexcept;
   void update_irq() noexcept;
 
   MachineConfig config_;

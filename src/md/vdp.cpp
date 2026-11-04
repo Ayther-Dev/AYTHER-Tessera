@@ -24,6 +24,8 @@ void Vdp::write_control(std::uint16_t value) {
   }
   if ((value & 0xC000U) == 0x8000U) {
     regs_[(value >> 8) & 0x1FU] = static_cast<std::uint8_t>(value);
+    if ((regs_[0] & 0x02U) == 0)
+      hv_latched_ = false; // clearing the latch enable releases the counter
     code_ = 0;
     return;
   }
@@ -133,6 +135,19 @@ std::uint16_t Vdp::read_status() {
 }
 
 std::uint16_t Vdp::read_hv(std::uint32_t line_cycle) const noexcept {
+  if (hv_latched_ && (regs_[0] & 0x02U) != 0)
+    return hv_latch_value_;
+  return live_hv(line_cycle);
+}
+
+void Vdp::latch_hv(std::uint32_t line_cycle) noexcept {
+  if ((regs_[0] & 0x02U) == 0)
+    return;
+  hv_latch_value_ = live_hv(line_cycle);
+  hv_latched_ = true;
+}
+
+std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
   // NTSC counts 0x00-0xEA, then continues at 0xE5 up to 0xFF; PAL has its own
   // jump. Both are provisional until compared with gpgx.
   std::uint32_t v = line_;
