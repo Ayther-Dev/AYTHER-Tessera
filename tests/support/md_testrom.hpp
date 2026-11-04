@@ -822,6 +822,7 @@ struct SpriteVariant {
   bool x_zero = false;      // some sprites with raw X = 0 (mask)
   bool dense = false;       // pack the sprites into a few lines (limits)
   bool custom_tile = false; // tile 127: left half opaque, right half clear
+  unsigned shade_probe = 0; // 1: sprite x plane priority/colour matrix
   bool col7_tile = false;   // tile 127: only column 7 opaque
   bool col0_tile = false;   // tile 127: only column 0 opaque
   bool row0_tile = false;   // tile 127: only the right half of row 0 opaque
@@ -899,19 +900,63 @@ inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
                  : 0;
   }
   scene.vram.emplace_back(0xC000, plane);
+  SpriteVariant pv = v;
+  if (v.shade_probe != 0) {
+    // tiles 124 to 127: solid colours 5, 14, 15 and 3
+    std::vector<std::uint16_t> solid;
+    for (const unsigned colour : {5U, 14U, 15U, 3U})
+      for (unsigned i = 0; i < 16; ++i)
+        solid.push_back(static_cast<std::uint16_t>(colour * 0x1111U));
+    scene.vram.emplace_back(124U * 32U, solid);
+    std::vector<std::uint16_t> cells(32 * 32, 0);
+    unsigned i = 0;
+    for (const unsigned sprite_attr_kind : {0U, 1U, 2U, 3U}) // see below
+      for (const unsigned sprite_prio : {0U, 1U})
+        for (const unsigned plane_prio : {0U, 1U}) {
+          const unsigned tile = sprite_attr_kind == 0   ? 124U // pal 0 col 5
+                                : sprite_attr_kind == 1 ? 124U // pal 3 col 5
+                                : sprite_attr_kind == 2 ? 125U // pal 3 col 14
+                                                        : 126U; // col 15
+          const unsigned pal = sprite_attr_kind == 0 ? 0U : 3U;
+          cells[5 * 32 + 2 * i] =
+              static_cast<std::uint16_t>((plane_prio ? 0x8000U : 0U) | 127U);
+          pv.sprites.push_back(
+              {static_cast<int>(16 * i), 40, 1, 1,
+               static_cast<std::uint16_t>((sprite_prio ? 0x8000U : 0U) |
+                                          (pal << 13) | tile)});
+          ++i;
+        }
+    if (v.shade_probe == 2) {
+      // no plane tiles: palette 0-3 x colour 5/14/15 x priority over the
+      // backdrop (tile 124 colour 5, 125 colour 14, 126 colour 15)
+      pv.sprites.clear();
+      std::fill(cells.begin(), cells.end(), 0);
+      unsigned k = 0;
+      for (unsigned pal = 0; pal < 4; ++pal)
+        for (unsigned tile = 124; tile <= 126; ++tile)
+          for (unsigned prio = 0; prio < 2; ++prio, ++k)
+            pv.sprites.push_back(
+                {static_cast<int>(16 * (k % 12)), static_cast<int>(40 + 40 * (k / 12)),
+                 1, 1,
+                 static_cast<std::uint16_t>((prio ? 0x8000U : 0U) | (pal << 13) |
+                                            tile)});
+    }
+    scene.vram.emplace_back(0xC000, cells);
+  }
+  const SpriteVariant &v2 = pv;
   const bool h40 = (v.reg12 & 0x81U) != 0;
   const unsigned width = h40 ? 320U : 256U;
   std::vector<std::uint16_t> sat;
-  for (unsigned n = 0; n < v.sprites.size(); ++n) {
-    const auto &e = v.sprites[n];
-    const unsigned link = n + 1U < v.sprites.size() ? n + 1U : 0U;
+  for (unsigned n = 0; n < v2.sprites.size(); ++n) {
+    const auto &e = v2.sprites[n];
+    const unsigned link = n + 1U < v2.sprites.size() ? n + 1U : 0U;
     sat.push_back(static_cast<std::uint16_t>(e.y + 128));
     sat.push_back(static_cast<std::uint16_t>(((e.w - 1U) << 10) |
                                              ((e.h - 1U) << 8) | link));
     sat.push_back(e.attr);
     sat.push_back(static_cast<std::uint16_t>(e.x + 128));
   }
-  for (unsigned n = 0; n < v.count && v.sprites.empty(); ++n) {
+  for (unsigned n = 0; n < v.count && v2.sprites.empty(); ++n) {
     unsigned w = rng.next() % v.max_cells + 1U;
     unsigned h = rng.next() % v.max_cells + 1U;
     if (v.fixed_w != 0)
@@ -1377,6 +1422,47 @@ inline SpriteVariant sprite_variant(unsigned id) {
         {20, 40, 1, 1, 0x18}, {20, 40, 1, 1, 0x19}, {20, 40, 1, 1, 0x1A},
         {20, 40, 1, 1, 0x1B}, {20, 40, 1, 1, 0x1C}, {20, 40, 1, 1, 0x1D},
         {60, 40, 1, 1, 0x1F}, {70, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 200: // shadow/highlight with random sprites over random planes
+  case 201:
+  case 202:
+  case 203:
+    v.count = 12;
+    v.max_cells = 2;
+    v.reg12 = 0x08;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 205:
+  case 206:
+  case 207:
+  case 208:
+  case 209: // more seeds, dense sprites so that they overlap
+    v.count = 14;
+    v.max_cells = 2;
+    v.reg12 = 0x08;
+    v.dense = (id & 1U) != 0;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 204: // same in H40
+    v.count = 16;
+    v.max_cells = 3;
+    v.reg12 = 0x89;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 210: // shadow/highlight matrix: sprite kind x priorities
+    v.shade_probe = 1;
+    v.reg12 = 0x08;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 211: // shadow/highlight: sprite palette x colour over the backdrop
+    v.shade_probe = 2;
+    v.reg12 = 0x08;
     v.planes = false;
     v.poll_status = true;
     break;

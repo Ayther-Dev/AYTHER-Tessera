@@ -177,7 +177,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # sprite_variant() in tests/support/md_testrom.hpp.
         set(sprite_variants)
         foreach(range IN ITEMS "0;25" "100;120" "130;135" "140;145" "150;167"
-                               "170;176" "180;188")
+                               "170;176" "180;188" "200;211")
             list(GET range 0 first)
             list(GET range 1 last)
             foreach(variant RANGE ${first} ${last})

@@ -311,11 +311,11 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   // of each 3-bit channel (color_update_m5, data &= 0x49).
   const bool limited = (vdp.reg(0) & 0x04U) == 0;
   const auto &cram = vdp.cram();
-  const auto cram_colour = [&](unsigned index, bool shadow) {
+  const auto cram_colour = [&](unsigned index, Shade shade) {
     std::uint16_t value = cram[index & 0x3FU];
     if (limited)
       value &= 0x0222U;
-    return colour_to_rgba(value, shadow ? Shade::shadow : Shade::normal);
+    return colour_to_rgba(value, shade);
   };
   const bool shadow_mode = (vdp.reg(12) & 0x08U) != 0;
   const unsigned width = size_.width;
@@ -324,7 +324,8 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   const std::uint32_t backdrop_index = vdp.reg(7) & 0x3FU;
   const bool display_on = (vdp.reg(1) & 0x40U) != 0;
   if (!display_on) {
-    std::fill(row.begin(), row.end(), cram_colour(backdrop_index, false));
+    std::fill(row.begin(), row.end(),
+              cram_colour(backdrop_index, Shade::normal));
   } else {
     std::vector<Pixel> a(width), b(width), sp(width);
     sprite_line(vdp, line, sp);
@@ -338,7 +339,28 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       // Shadow when neither plane has the priority bit set in its tile, even
       // where the pixel is transparent (measured on gpgx, modes_sweep 13).
       const bool high = pa.high || pb.high;
-      const Pixel &ps = sp[x];
+      Pixel ps = sp[x];
+      Shade shade = shadow_mode && !high ? Shade::shadow : Shade::normal;
+      // Shadow/highlight operators: palette 3 colours 14 and 15 of a sprite
+      // are not drawn, they change the brightness of what lies below.
+      if (shadow_mode && ps.opaque && (ps.index == 0x3EU || ps.index == 0x3FU)) {
+        // An operator under a high priority plane pixel has no effect
+        // (measured on gpgx, sprite_limits 210).
+        const bool covered =
+            !ps.high && ((pa.opaque && pa.high) || (pb.opaque && pb.high));
+        if (!covered) {
+          if (ps.index == 0x3FU)
+            shade = Shade::shadow;
+          else
+            shade = shade == Shade::shadow ? Shade::normal : Shade::highlight;
+        }
+        ps = Pixel{};
+      } else if (shadow_mode && ps.opaque) {
+        // gpgx quirk (sprite_limits 211): colour 14 of a low priority sprite
+        // is not shadowed, in any palette.
+        shade = high || ps.high || (ps.index & 15U) == 14U ? Shade::normal
+                                                            : Shade::shadow;
+      }
       if (ps.opaque && ps.high) {
         index = ps.index;
       } else if (pa.opaque && pa.high) {
@@ -352,11 +374,12 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       } else if (pb.opaque) {
         index = pb.index;
       }
-      row[x] = cram_colour(index, shadow_mode && !high);
+      row[x] = cram_colour(index, shade);
     }
     if ((vdp.reg(0) & 0x20U) != 0) // left column blank: backdrop
       for (unsigned x = 0; x < 8U && x < width; ++x)
-        row[x] = cram_colour(backdrop_index, shadow_mode);
+        row[x] = cram_colour(backdrop_index,
+                               shadow_mode ? Shade::shadow : Shade::normal);
   }
   if (hook_)
     hook_(line, row);
