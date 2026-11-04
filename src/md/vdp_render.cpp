@@ -11,25 +11,56 @@ FrameSize frame_size(const Vdp &vdp) noexcept {
   return size;
 }
 
-std::uint32_t colour_to_rgba(std::uint16_t cram, Shade shade) noexcept {
-  // Measured on gpgx (palette_sweep, all 512 colours): the 3 bit level is
-  // widened to a 4 bit level L (normal 2*level, shadow level, highlight
-  // level + 7), then to the 565 output by bit replication (5 bits
-  // (L<<1)|(L>>3), 6 bits (L<<2)|(L>>2)), and a host expands that back to 8
-  // bits.
+std::uint16_t colour_to_565(std::uint16_t cram, Shade shade) noexcept {
+  // Measured on gpgx (palette_sweep, all 512 colours, and its PALETTE region
+  // for the highlight): the 3 bit level is widened to a 4 bit level L (normal
+  // 2*level, shadow level, highlight level + 7), then to the 565 output by
+  // bit replication (5 bits (L<<1)|(L>>3), 6 bits (L<<2)|(L>>2)).
   const auto expand = [shade](unsigned level, unsigned bits) {
     const unsigned l4 = shade == Shade::normal   ? level * 2U
                         : shade == Shade::shadow ? level
                                                  : level + 7U;
     return bits == 5 ? ((l4 << 1) | (l4 >> 3)) : ((l4 << 2) | (l4 >> 2));
   };
-  const std::uint32_t r5 = expand((cram >> 1) & 7U, 5);
-  const std::uint32_t g6 = expand((cram >> 5) & 7U, 6);
-  const std::uint32_t b5 = expand((cram >> 9) & 7U, 5);
+  const unsigned r5 = expand((cram >> 1) & 7U, 5);
+  const unsigned g6 = expand((cram >> 5) & 7U, 6);
+  const unsigned b5 = expand((cram >> 9) & 7U, 5);
+  return static_cast<std::uint16_t>((r5 << 11) | (g6 << 5) | b5);
+}
+
+std::uint32_t colour_to_rgba(std::uint16_t cram, Shade shade) noexcept {
+  const std::uint32_t c = colour_to_565(cram, shade);
+  const std::uint32_t r5 = c >> 11, g6 = (c >> 5) & 63U, b5 = c & 31U;
+  // a host expands the 565 back to 8 bits
   const std::uint32_t red = (r5 << 3) | (r5 >> 2);
   const std::uint32_t green = (g6 << 2) | (g6 >> 4);
   const std::uint32_t blue = (b5 << 3) | (b5 >> 2);
   return red | (green << 8) | (blue << 16) | 0xFF000000U;
+}
+
+std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept {
+  // PALETTE region: shadow, normal and highlight tables of the 64 CRAM
+  // entries, then 64 zero entries (layout read from gpgx r4).
+  std::array<std::uint16_t, 256> table{};
+  const bool limited = (vdp.reg(0) & 0x04U) == 0;
+  // Measured on gpgx: entry 0 holds the backdrop colour (register 7), the
+  // transparent entry of palettes 1 to 3 is black, and without shadow and
+  // highlight (register 12 bit 3) all three tables hold the normal colour.
+  const bool shade = (vdp.reg(12) & 0x08U) != 0;
+  for (unsigned i = 0; i < 64U; ++i) {
+    std::uint16_t value = vdp.cram()[i];
+    if (i == 0)
+      value = vdp.cram()[vdp.reg(7) & 0x3FU];
+    else if ((i & 15U) == 0)
+      value = 0;
+    if (limited)
+      value &= 0x0222U;
+    table[64U + i] = colour_to_565(value, Shade::normal);
+    table[i] = shade ? colour_to_565(value, Shade::shadow) : table[64U + i];
+    table[128U + i] =
+        shade ? colour_to_565(value, Shade::highlight) : table[64U + i];
+  }
+  return table;
 }
 
 void Renderer::begin_frame(const Vdp &vdp) {

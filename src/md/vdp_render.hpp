@@ -6,6 +6,7 @@
 #pragma once
 #include "md/vdp.hpp"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <span>
@@ -24,6 +25,9 @@ FrameSize frame_size(const Vdp &vdp) noexcept;
 /// CRAM colour (0000BBB0GGG0RRR0) as RGBA8, the way a host sees the 565 frame
 /// of gpgx (TP-105.2); `highlight` is the same rule, not yet checked on gpgx.
 enum class Shade : std::uint8_t { normal, shadow, highlight };
+std::uint16_t colour_to_565(std::uint16_t cram, Shade shade) noexcept;
+/// PALETTE region (RF-3.3): 256 RGB565 entries as gpgx serves them.
+std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept;
 std::uint32_t colour_to_rgba(std::uint16_t cram,
                              Shade shade = Shade::normal) noexcept;
 

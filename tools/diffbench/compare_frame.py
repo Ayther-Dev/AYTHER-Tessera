@@ -37,6 +37,25 @@ def main(argv):
         if subprocess.run(command, capture_output=True).returncode != 0:
             print("tool failed:", command[0])
             return 2
+    # PALETTE region (id 24): 256 RGB565 entries, shadow/normal/highlight.
+    pal_native = os.path.join(out_dir, "native.palette")
+    pal_gpgx = os.path.join(out_dir, "gpgx.palette")
+    for command in (
+        [md_run, "--rom", rom, "--frames", frames, "--palette-out", pal_native,
+         "--work-ram-out", os.path.join(out_dir, "native.wram")],
+        [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
+         "--dump-regions", "--region-out", "24:" + pal_gpgx],
+    ):
+        subprocess.run(command, capture_output=True)  # dump-regions exits 1
+    with open(pal_native, "rb") as f:
+        pn = f.read()
+    with open(pal_gpgx, "rb") as f:
+        pg = f.read()
+    palette_diff = [i for i in range(0, min(len(pn), len(pg)), 2)
+                    if pn[i:i + 2] != pg[i:i + 2]]
+    print("palette entries=%d differing=%d" % (len(pg) // 2, len(palette_diff)))
+    if len(pn) != len(pg) or palette_diff:
+        return 1
     nw, nh, npitch, nd = load(mine)
     gw, gh, gpitch, gd = load(gpgx)
     if (nw, nh) != (gw, gh):

@@ -63,9 +63,10 @@ uint64_t fnv1a(const uint8_t *p, size_t n, uint64_t h) {
 
 bool __cdecl environment(unsigned cmd, void *data) {
   switch (cmd) {
-  case 10:                                             // SET_PIXEL_FORMAT
+  case 10: // SET_PIXEL_FORMAT
     if (std::getenv("TESSERA_DEBUG_VIDEO") && data)
-      std::fprintf(stderr, "set_pixel_format %d%c", *static_cast<int32_t *>(data), 10);
+      std::fprintf(stderr, "set_pixel_format %d%c",
+                   *static_cast<int32_t *>(data), 10);
     if (data && std::getenv("TESSERA_ACCEPT_565"))
       return *static_cast<int32_t *>(data) == 2;
     return data && *static_cast<int32_t *>(data) == 1; // XRGB8888
@@ -229,6 +230,7 @@ RunResult run_libretro(const std::string &core_path,
           if (d.read_status == 0) {
             d.bytes_read = info.byte_size;
             d.hash = fnv1a(buf.data(), buf.size(), 1469598103934665603ull);
+            d.bytes = std::move(buf);
           }
         }
         result.regions.push_back(d);

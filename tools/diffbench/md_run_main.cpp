@@ -14,7 +14,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path, frame_path;
+  std::string rom_path, out_path, srm_path, frame_path, palette_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -26,6 +26,8 @@ int main(int argc, char **argv) {
       out_path = argv[++i];
     } else if (arg == "--save-ram-out" && has_value) {
       srm_path = argv[++i];
+    } else if (arg == "--palette-out" && has_value) {
+      palette_path = argv[++i];
     } else if (arg == "--frame-out" && has_value) {
       frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
@@ -63,6 +65,12 @@ int main(int argc, char **argv) {
   out.write(reinterpret_cast<const char *>(ram.data()),
             static_cast<std::streamsize>(ram.size()));
   out.close();
+  if (!palette_path.empty()) {
+    const auto table = tessera::md::palette_565(system.vdp());
+    std::ofstream po(palette_path, std::ios::binary | std::ios::trunc);
+    po.write(reinterpret_cast<const char *>(table.data()),
+             static_cast<std::streamsize>(table.size() * 2U));
+  }
   if (!frame_path.empty()) {
     // Same layout as the bench's oracle dump: width, height, pitch (u32 LE)
     // and the rows; here RGBA8, one u32 per pixel (R in the low byte).

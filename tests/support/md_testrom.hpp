@@ -622,7 +622,8 @@ struct ModesVariant {
   std::uint8_t reg18 = 0x00;      // window vertical
   std::uint8_t reg0_extra = 0x00; // left column blank
   std::uint8_t reg7 = 0x05;
-  int hscroll_a = -1; // first horizontal scroll entry of plane A
+  bool limited_palette = false; // register 0 bit 2 clear
+  int hscroll_a = -1;           // first horizontal scroll entry of plane A
 };
 
 inline std::vector<std::uint8_t> modes_sweep_rom(const ModesVariant &v) {
@@ -634,7 +635,9 @@ inline std::vector<std::uint8_t> modes_sweep_rom(const ModesVariant &v) {
                 {5, 0x7F},   // sprite table far away, empty
                 {11, v.reg11}, {16, v.reg16}, {12, v.reg12},
                 {17, v.reg17}, {18, v.reg18}, {7, v.reg7}};
-  if (v.reg0_extra != 0)
+  if (v.limited_palette)
+    scene.regs.insert(scene.regs.begin(), {0, 0x00});
+  else if (v.reg0_extra != 0)
     scene.regs.insert(scene.regs.begin(),
                       {0, static_cast<std::uint8_t>(0x04 | v.reg0_extra)});
   scene.reg1 = static_cast<std::uint8_t>(0x44 | v.reg1_extra);
@@ -772,6 +775,10 @@ inline ModesVariant modes_variant(unsigned id) {
   case 20: // fine scroll 7
     v.reg17 = 0x05;
     v.hscroll_a = id == 17 ? 49 : id == 18 ? 41 : id == 19 ? 52 : 55;
+    break;
+  case 21: // limited palette with shadow/highlight
+    v.limited_palette = true;
+    v.reg12 = 0x08;
     break;
   default:
     break;

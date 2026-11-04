@@ -105,7 +105,8 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
     std::cerr << "error: " << r.error << "\n";
     return 1;
   }
-  const auto write_blob = [&](const char *flag, const std::vector<uint8_t> &data) {
+  const auto write_blob = [&](const char *flag,
+                              const std::vector<uint8_t> &data) {
     if (!args.count(flag))
       return;
     std::ofstream blob(args[flag], std::ios::binary | std::ios::trunc);
@@ -119,6 +120,20 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
     std::ofstream out(args["--hashes-out"]);
     for (const auto h : r.frame_hashes)
       out << std::hex << h << "\n";
+  }
+  if (args.count("--region-out")) {
+    // --region-out <id>:<file>
+    const auto spec = args["--region-out"];
+    const auto colon = spec.find(':');
+    const auto id =
+        static_cast<uint32_t>(std::strtoul(spec.c_str(), nullptr, 10));
+    for (const auto &d : r.regions)
+      if (d.id == id && colon != std::string::npos) {
+        std::ofstream blob(spec.substr(colon + 1),
+                           std::ios::binary | std::ios::trunc);
+        blob.write(reinterpret_cast<const char *>(d.bytes.data()),
+                   static_cast<std::streamsize>(d.bytes.size()));
+      }
   }
   if (args.count("--dump-regions")) {
     unsigned readable = 0, read_ok = 0, size_ok = 0;
