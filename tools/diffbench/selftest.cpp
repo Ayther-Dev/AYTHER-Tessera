@@ -80,3 +80,45 @@ TEST_CASE("regiones: la máscara oculta bits fuera de comparación") {
   CHECK_FALSE(
       compare_region(a, b, std::vector<uint8_t>{0b1111'0000}).has_value());
 }
+
+#include "exceptions.hpp"
+
+static const char *kTable =
+    "| Id | Plano | Alcance | Descripción | Afecta a identidad | Aprobación |\n"
+    "|---|---|---|---|---|---|\n"
+    "| EXC-003 | framebuffer | frames de arranque 0–2 | borde distinto | No | "
+    "responsable, 2026-11-03 |\n";
+
+TEST_CASE("excepciones: una divergencia cubierta no falla y se registra") {
+  std::string err;
+  const auto list = parse_exceptions(kTable, err);
+  REQUIRE(err.empty());
+  REQUIRE(list.size() == 1);
+  CHECK(find_exception(list, "framebuffer", 1) == "EXC-003");
+  CHECK(find_exception(list, "framebuffer", 2) == "EXC-003");
+}
+
+TEST_CASE("excepciones: una divergencia no cubierta falla") {
+  std::string err;
+  const auto list = parse_exceptions(kTable, err);
+  CHECK(find_exception(list, "framebuffer", 3).empty());
+  CHECK(find_exception(list, "audio_writes", 1).empty());
+}
+
+TEST_CASE(
+    "excepciones: afectar a la identidad es un defecto, no una excepción") {
+  std::string err;
+  std::string t = kTable;
+  t.replace(t.find("| No |"), 6, "| Sí |");
+  const auto list = parse_exceptions(t, err);
+  CHECK_FALSE(err.empty());
+  CHECK(list.empty());
+}
+
+TEST_CASE("excepciones: sin aprobación se rechaza") {
+  std::string err;
+  std::string t = kTable;
+  t.replace(t.find("responsable, 2026-11-03"), 23, "");
+  const auto list = parse_exceptions(t, err);
+  CHECK_FALSE(err.empty());
+}
