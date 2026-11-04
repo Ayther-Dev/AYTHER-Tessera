@@ -60,3 +60,25 @@ inline std::vector<std::uint8_t> bus_sweep_rom() {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `bus_sweep` (SSF2 part): an 8 MiB image of 16 banks of 512 KiB. Every bank
+// carries its own number at its first, middle and last byte, so a read through
+// the mapper tells which bank answered.
+inline std::vector<std::uint8_t> ssf2_sweep_rom() {
+  std::vector<std::uint8_t> rom(8U * 1024U * 1024U, 0);
+  for (std::size_t bank = 0; bank < 16; ++bank) {
+    const std::size_t base = bank * 0x80000;
+    rom[base + 0x40000] = static_cast<std::uint8_t>(0xB0 + bank);
+    rom[base + 0x7FFFF] = static_cast<std::uint8_t>(0xC0 + bank);
+    rom[base + 0x2000] = static_cast<std::uint8_t>(0xD0 + bank);
+  }
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA SSF        ", 16);
+  put32(rom, 0x1A4, 0x7FFFFF);
+  return rom;
+}
+
+} // namespace tessera::testrom

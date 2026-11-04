@@ -134,3 +134,68 @@ TEST_CASE("unmapped regions read open bus and ignore writes") {
   CHECK(bus.read8(0xA12000) == kUnmappedByte);
   CHECK(spy.log.empty());
 }
+
+// ---- TP-101.7: SSF2 mapper
+// ---------------------------------------------------
+#include "support/md_testrom.hpp"
+
+TEST_CASE("SSF2: the mapper registers are classified") {
+  CHECK(classify(0xA130F1) == Target::mapper);
+  CHECK(classify(0xA130F3) == Target::mapper);
+  CHECK(classify(0xA130FF) == Target::mapper);
+  CHECK(classify(0xA13100) == Target::unmapped);
+}
+
+TEST_CASE("SSF2: power-on layout maps every bank to itself") {
+  Spy spy;
+  Bus bus(tessera::testrom::ssf2_sweep_rom(), spy, Mapper::ssf2);
+  // 4 MiB window: banks 0..7
+  for (std::uint32_t bank = 0; bank < 8; ++bank) {
+    CHECK(bus.read8(bank * 0x80000 + 0x40000) == 0xB0 + bank);
+    CHECK(bus.read8(bank * 0x80000 + 0x7FFFF) == 0xC0 + bank);
+  }
+}
+
+TEST_CASE("SSF2: each of the 16 banks is readable through every slot") {
+  Spy spy;
+  Bus bus(tessera::testrom::ssf2_sweep_rom(), spy, Mapper::ssf2);
+  for (std::uint32_t slot = 1; slot < 8; ++slot) {
+    for (std::uint32_t bank = 0; bank < 16; ++bank) {
+      bus.write8(0xA130F1 + 2 * slot, static_cast<std::uint8_t>(bank));
+      const std::uint32_t at = slot * 0x80000;
+      CHECK(bus.read8(at + 0x40000) == 0xB0 + bank);
+      CHECK(bus.read8(at + 0x7FFFF) == 0xC0 + bank);
+      CHECK(bus.read16(at + 0x2000) == (((0xD0 + bank) << 8) & 0xFF00));
+    }
+  }
+}
+
+TEST_CASE(
+    "SSF2: slot 0 is fixed and a register change leaves other slots alone") {
+  Spy spy;
+  Bus bus(tessera::testrom::ssf2_sweep_rom(), spy, Mapper::ssf2);
+  bus.write8(0xA130F3, 9);                      // slot 1 -> bank 9
+  CHECK(bus.read8(0x40000) == 0xB0);            // slot 0 still bank 0
+  CHECK(bus.read8(0x80000 + 0x40000) == 0xB9);  // slot 1 -> bank 9
+  CHECK(bus.read8(0x100000 + 0x40000) == 0xB2); // slot 2 untouched
+  bus.write8(0xA130F1, 0);                      // not a bank register
+  CHECK(bus.read8(0x40000) == 0xB0);
+}
+
+TEST_CASE("SSF2: word writes use the low byte, banks wrap over the ROM size") {
+  Spy spy;
+  Bus bus(tessera::testrom::ssf2_sweep_rom(), spy, Mapper::ssf2);
+  bus.write16(0xA130F4,
+              0x0003); // word at the even address, low byte lands on F5
+  CHECK(bus.read8(0x100000 + 0x40000) == 0xB3);
+  bus.write8(0xA130F5, 16 + 4); // beyond 8 MiB: wraps modulo 16 banks
+  CHECK(bus.read8(0x100000 + 0x40000) == 0xB4);
+}
+
+TEST_CASE("without the mapper the registers are ignored") {
+  Spy spy;
+  Bus bus(rom_image(0x200), spy);
+  bus.write8(0xA130F3, 5);
+  CHECK(bus.read8(0x10) == static_cast<std::uint8_t>(0x10 * 7 + 3));
+  CHECK(spy.log.empty());
+}
