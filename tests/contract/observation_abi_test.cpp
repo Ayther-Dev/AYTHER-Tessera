@@ -1,6 +1,7 @@
 // Contrato de observación (spec 008, RF-3.0, TP-006.2): cada constante de Tessera
 // coincide con la del header de referencia de gpgx (ayther-abi-1.10-r4).
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <cstddef>
 #include <cstdint>
 #include <doctest/doctest.h>
 
@@ -28,4 +29,14 @@ TEST_CASE("límites del contrato") {
     CHECK(TESSERA_OBS_JOURNAL_MAX_EVENTS == 256);
     CHECK(TESSERA_OBS_PALETTE_ENTRIES == 256);
     CHECK(TESSERA_OBS_SUB_ALL == 0xFFFu);
+}
+
+TEST_CASE("layouts del contrato (TP-006.3)") {
+    CHECK(sizeof(tessera_obs_audio_write_v1) == 8);
+    CHECK(offsetof(tessera_obs_audio_write_v1, chip) == 7);
+    CHECK(sizeof(tessera_obs_sprite_v1) == 10);
+    CHECK(sizeof(tessera_obs_journal_event_v1) == 8);
+    CHECK(sizeof(tessera_obs_journal_v1) == 16 + 256 * 8);
+    CHECK(sizeof(tessera_obs_frame_hash_v1) == 56);
+    CHECK(sizeof(tessera_obs_region_info_v1) == 32);
 }
