@@ -25,6 +25,7 @@ void command(System &s, std::uint16_t first, std::uint16_t second) {
 TEST_CASE(
     "VRAM written by the 68000 is read back word by word and byte by byte") {
   System s = make_system();
+  s.write16(0xC00004, 0x8104); // mode 5, so that register 15 exists
   s.write16(0xC00004, 0x8F02); // increment 2
   command(s, 0x4020, 0x0000);  // VRAM write at $0020
   s.write16(0xC00000, 0x1234);
@@ -40,6 +41,7 @@ TEST_CASE(
 
 TEST_CASE("byte writes to the data port repeat the byte in both halves") {
   System s = make_system();
+  s.write16(0xC00004, 0x8104); // mode 5, so that register 15 exists
   s.write16(0xC00004, 0x8F02);
   command(s, 0x4040, 0x0000);
   s.write8(0xC00000, 0xAB);
@@ -49,6 +51,7 @@ TEST_CASE("byte writes to the data port repeat the byte in both halves") {
 
 TEST_CASE("CRAM and VSRAM read commands through the bus") {
   System s = make_system();
+  s.write16(0xC00004, 0x8104); // mode 5, so that register 15 exists
   s.write16(0xC00004, 0x8F02);
   command(s, 0xC006, 0x0000); // CRAM write at 6
   s.write16(0xC00000, 0x0ACE);
@@ -63,7 +66,7 @@ TEST_CASE("CRAM and VSRAM read commands through the bus") {
 TEST_CASE("status read through the bus: word and the two bytes") {
   System s = make_system();
   const std::uint16_t word = s.read16(0xC00004);
-  CHECK(word == 0x3600); // fixed bits + FIFO empty, display active
+  CHECK(word == 0x3608); // fixed bits, FIFO empty, display off = blanking
   CHECK(s.read8(0xC00004) == (word >> 8));
   CHECK(s.read8(0xC00005) == (word & 0xFF));
   // the mirror of the status port answers the same

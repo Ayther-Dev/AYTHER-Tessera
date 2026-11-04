@@ -35,6 +35,7 @@ TEST_CASE("register writes through the control port") {
 
 TEST_CASE("VRAM write with auto-increment and read back") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0100);
   v.write_data(0x1234);
@@ -50,6 +51,7 @@ TEST_CASE("VRAM write with auto-increment and read back") {
 
 TEST_CASE("CRAM and VSRAM writes") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0004, 3); // CRAM write
   v.write_data(0x0EEE);
@@ -63,13 +65,14 @@ TEST_CASE("a control word read of the status clears a half-written command") {
   Vdp v(Standard::ntsc);
   v.write_control(0x4000); // first half
   (void)v.read_status();
-  reg(v, 15, 1); // must be taken as a register write, not as a second half
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
+  reg(v, 15, 1);   // must be taken as a register write, not as a second half
   CHECK(v.reg(15) == 1);
 }
 
 TEST_CASE("fill DMA") {
   Vdp v(Standard::ntsc);
-  reg(v, 1, 0x10); // DMA enabled
+  reg(v, 1, 0x14); // DMA enabled
   reg(v, 15, 1);
   reg(v, 19, 4); // length low
   reg(v, 20, 0);
@@ -85,7 +88,7 @@ TEST_CASE("68000 to VRAM DMA reads words from the bus") {
   v.set_dma_reader([](std::uint32_t address) -> std::uint16_t {
     return static_cast<std::uint16_t>(0x1000 + (address >> 1));
   });
-  reg(v, 1, 0x10);
+  reg(v, 1, 0x14);
   reg(v, 15, 2);
   reg(v, 19, 2); // 2 words
   reg(v, 20, 0);
@@ -123,6 +126,7 @@ TEST_CASE("VINT enable bit gates the interrupt, not the status flag") {
 
 TEST_CASE("vblank flag and PAL bit in the status") {
   Vdp ntsc(Standard::ntsc);
+  reg(ntsc, 1, 0x40); // display on
   ntsc.begin_line(10);
   CHECK((ntsc.read_status() & 0x08) == 0);
   ntsc.begin_line(230);
@@ -163,6 +167,7 @@ TEST_CASE("horizontal interrupt counts lines") {
 
 TEST_CASE("CRAM and VSRAM read back through the data port") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0010, 3);
   v.write_data(0x0E0E);
@@ -179,6 +184,7 @@ TEST_CASE("CRAM and VSRAM read back through the data port") {
 TEST_CASE("the auto-increment register steps by 1, 2 and 4") {
   for (const int step : {1, 2, 4}) {
     Vdp v(Standard::ntsc);
+    reg(v, 1, 0x04); // mode 5: registers above 10 exist
     reg(v, 15, step);
     set_write(v, 0x0100);
     v.write_data(0xAAAA);
@@ -198,6 +204,7 @@ TEST_CASE("the auto-increment register steps by 1, 2 and 4") {
 
 TEST_CASE("the access address uses 16 bits: second word carries bits 14-15") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x8000);
   v.write_data(0x1122);
@@ -214,6 +221,7 @@ TEST_CASE("the access address uses 16 bits: second word carries bits 14-15") {
 
 TEST_CASE("an odd VRAM address stores the word with its bytes swapped") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0201);
   v.write_data(0xA1B2);
@@ -223,6 +231,7 @@ TEST_CASE("an odd VRAM address stores the word with its bytes swapped") {
 
 TEST_CASE("CRAM keeps 9 bit colours and VSRAM 11 bit scroll values") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0000, 3);
   v.write_data(0xFFFF);
@@ -234,6 +243,7 @@ TEST_CASE("CRAM keeps 9 bit colours and VSRAM 11 bit scroll values") {
 
 TEST_CASE("a register write does not disturb the pending access address") {
   Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // mode 5: registers above 10 exist
   reg(v, 15, 2);
   set_write(v, 0x0040);
   reg(v, 0, 0x04); // set a register between the command and the data
@@ -249,4 +259,90 @@ TEST_CASE("the status register is stable across reads and has the fixed bits") {
   CHECK(first == v.read_status());
   CHECK((first & 0xFC00) == 0x3400);
   CHECK((first & 0x0200) != 0); // FIFO empty
+}
+
+// TP-104.4 (RF-2.2): DMA duration, busy bit and blank bit.
+namespace {
+void dma_regs(Vdp &v, std::uint16_t length, std::uint32_t source,
+              std::uint8_t mode_bits) {
+  reg(v, 19, length & 0xFF);
+  reg(v, 20, length >> 8);
+  reg(v, 21, (source >> 1) & 0xFF);
+  reg(v, 22, (source >> 9) & 0xFF);
+  reg(v, 23, static_cast<int>(((source >> 17) & 0x3F) | mode_bits));
+}
+void dma_command(Vdp &v, std::uint16_t addr, std::uint8_t code) {
+  v.write_control(
+      static_cast<std::uint16_t>(((code & 3) << 14) | (addr & 0x3FFF)));
+  v.write_control(static_cast<std::uint16_t>(0x0080 | ((code & 0x3C) << 2)));
+}
+} // namespace
+
+TEST_CASE("the blank bit follows the display enable and the active area") {
+  Vdp v(Standard::ntsc);
+  CHECK((v.read_status() & 0x0008) != 0); // display off after reset
+  reg(v, 1, 0x74);
+  v.begin_line(10);
+  CHECK((v.read_status() & 0x0008) == 0);
+  v.begin_line(224);
+  CHECK((v.read_status() & 0x0008) != 0);
+}
+
+TEST_CASE("registers above 10 are ignored while the VDP is in mode 4") {
+  Vdp v(Standard::ntsc);
+  reg(v, 15, 2); // register 1 bit 2 still clear
+  CHECK(v.reg(15) == 0);
+  reg(v, 1, 0x14);
+  reg(v, 15, 2);
+  CHECK(v.reg(15) == 2);
+}
+
+TEST_CASE("a VRAM fill keeps the busy bit set for one slot per byte") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14); // mode 5, DMA enabled, display off (blanking: 167 slots)
+  reg(v, 15, 1);
+  v.set_time(1000);
+  dma_regs(v, 0x20, 0, 0x80);
+  dma_command(v, 0x0100, 1);
+  v.write_data(0xAB00);
+  CHECK((v.read_status() & 0x0002) != 0);
+  const std::uint64_t duration = 0x20ULL * 3420 / 167;
+  v.set_time(1000 + duration - 1);
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(1000 + duration);
+  CHECK((v.read_status() & 0x0002) == 0);
+}
+
+TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14);
+  reg(v, 15, 2);
+  set_write(v, 0x0000, 1);
+  v.write_data(0x0123);
+  v.write_data(0x1234);
+  v.set_time(0);
+  dma_regs(v, 4, 0, 0xC0);
+  reg(v, 21, 0); // copy source is a VRAM byte address
+  reg(v, 22, 0);
+
+  v.write_control(0x0200);
+  v.write_control(0x00C0);
+  // every byte lands at (dest ^ 1) from (source ^ 1)
+  CHECK(v.vram()[0x201] == 0x23);
+  CHECK(v.vram()[0x203] == 0x01);
+  const std::uint64_t duration = 4ULL * 2 * 3420 / 167;
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(duration);
+  CHECK((v.read_status() & 0x0002) == 0);
+}
+
+TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14);
+  reg(v, 15, 2);
+  v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
+  dma_regs(v, 16, 0x400, 0x00);
+  dma_command(v, 0x0000, 1);
+  CHECK(v.take_cpu_stall() == 16ULL * 3420 / 167);
+  CHECK(v.take_cpu_stall() == 0);
 }

@@ -166,6 +166,7 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
     return word ? 0xFFFFU : 0xFFU;
   }
   case Target::vdp: {
+    vdp_.set_time(cpu_.getClock() * kDivider68k);
     if (offset < 4) {
       const std::uint16_t v = vdp_.read_data();
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
@@ -205,12 +206,15 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
   case Target::vdp: {
     const std::uint16_t v =
         word ? value : dup(static_cast<std::uint8_t>(value));
+    vdp_.set_time(cpu_.getClock() * kDivider68k);
     if (offset < 4)
       vdp_.write_data(v);
     else if (offset < 8) {
       vdp_.write_control(v);
       update_irq(); // a register write can enable a pending interrupt
     }
+    if (const auto stall = vdp_.take_cpu_stall(); stall != 0)
+      cpu_.stall(static_cast<int>(stall / kDivider68k)); // DMA owns the bus
     break;
   }
   case Target::tmss:

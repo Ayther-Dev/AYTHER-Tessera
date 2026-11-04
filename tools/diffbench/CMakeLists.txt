@@ -93,4 +93,20 @@ if(TESSERA_BUILD_MEGADRIVE)
         set_tests_properties(integration.md_boot_fx02 PROPERTIES
             PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 300)
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-104.4: synthetic dma_fifo ROM; VRAM, CRAM and VSRAM are read back
+        # into work RAM by the ROM itself, so the work RAM plane covers them.
+        add_test(NAME integration.md_dma_fifo_rom COMMAND tessera_md_testrom dma-fifo
+            "${CMAKE_CURRENT_BINARY_DIR}/dma_fifo.bin")
+        set_tests_properties(integration.md_dma_fifo_rom PROPERTIES
+            FIXTURES_SETUP md_dma_fifo_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+        add_test(NAME integration.md_dma_fifo COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/dma_fifo.bin" 60
+            "${CMAKE_CURRENT_BINARY_DIR}/md-dma-fifo")
+        set_tests_properties(integration.md_dma_fifo PROPERTIES
+            FIXTURES_REQUIRED md_dma_fifo_rom
+            PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
+    endif()
 endif()

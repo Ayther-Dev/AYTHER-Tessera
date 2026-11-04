@@ -139,3 +139,81 @@ inline std::vector<std::uint8_t> vint_counter_rom() {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `dma_fifo`: runs the three DMA classes (68000 bus to VRAM, CRAM and VSRAM, a
+// VRAM fill and a VRAM copy), records the status word right after the fill
+// and reads VRAM, CRAM and VSRAM back into work RAM from $FF0000: 4 status
+// words, then 512 + 64 + 40 words. The bench compares that RAM with gpgx.
+inline std::vector<std::uint8_t> dma_fifo_rom() {
+  std::vector<std::uint8_t> rom(0x480, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER DMA FIFO ", 16);
+  put32(rom, 0x1A4, 0x47F);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  for (unsigned i = 0; i < 32; ++i) // DMA source at $400
+    put16(rom, 0x400 + 2 * i,
+          static_cast<std::uint16_t>(0x0123 + i * 0x0111 + (i << 12)));
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x32BC, 0x8114,         // mode 5 + DMA enabled (before registers >= 11)
+      0x32BC, 0x8F02,         // autoincrement 2
+  };
+  const auto regs = [&](std::uint16_t length, std::uint16_t reg23,
+                        std::uint16_t reg22 = 0x9602) {
+    for (const std::uint16_t w :
+         {static_cast<std::uint16_t>(0x9300 | (length & 0xFF)),
+          static_cast<std::uint16_t>(0x9400 | (length >> 8)),
+          std::uint16_t{0x9500}, reg22, reg23}) {
+      c.push_back(0x32BC);
+      c.push_back(w);
+    }
+  };
+  const auto command = [&](std::uint16_t first, std::uint16_t second) {
+    c.insert(c.end(), {0x22BC, first, second});
+  };
+  const auto poll = [&] { // wait until the busy bit (status bit 1) clears
+    c.insert(c.end(), {0x3011, 0x0240, 0x0002, 0x66F8});
+  };
+  regs(16, 0x9700);
+  command(0x4000, 0x0080); // 68000 -> VRAM at 0
+  regs(8, 0x9700);
+  command(0xC000, 0x0080); // 68000 -> CRAM at 0
+  regs(8, 0x9700);
+  command(0x4000, 0x0090); // 68000 -> VSRAM at 0
+  regs(0x20, 0x9780);
+  command(0x4100, 0x0080);             // VRAM fill at $100
+  c.insert(c.end(), {0x30BC, 0xABCD}); // fill data
+  for (int i = 0; i < 4; ++i) // 4 status reads, bits 1 (busy) and 3 (blank)
+    c.insert(c.end(), {0x3011, 0x0240, 0x000A, 0x34C0});
+  poll();
+  regs(0x10, 0x97C0, 0x9600);
+  command(0x0200, 0x00C0); // VRAM copy to $200
+  poll();
+  // The bits the VDP does not drive come from the bus (prefetch), so every
+  // read is masked to the bits the memory really holds.
+  const auto readback = [&](std::uint16_t second, std::uint16_t words,
+                            std::uint16_t mask) {
+    command(0x0000, second);
+    c.insert(c.end(), {0x303C, static_cast<std::uint16_t>(words - 1), 0x3010,
+                       0x0240, mask, 0x34C0, 0x51C8, 0xFFF6});
+  };
+  readback(0x0000, 512, 0xFFFF); // VRAM
+  readback(0x0020, 64, 0x0EEE);  // CRAM
+  readback(0x0010, 40, 0x07FF);  // VSRAM
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom

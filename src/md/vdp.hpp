@@ -35,6 +35,17 @@ public:
   std::uint8_t irq_level() const noexcept;
   void acknowledge(std::uint8_t level) noexcept;
 
+  /// Master cycle of the access being made; the owner sets it before every
+  /// port access so that DMA durations and the busy bit have a time base.
+  void set_time(std::uint64_t master) noexcept { now_ = master; }
+  /// Master cycles the 68000 stalled in a DMA that read its bus; returns the
+  /// amount once and clears it.
+  std::uint64_t take_cpu_stall() noexcept {
+    const auto stall = cpu_stall_;
+    cpu_stall_ = 0;
+    return stall;
+  }
+
   /// DMA source: reads a word from the 68000 bus.
   void set_dma_reader(std::function<std::uint16_t(std::uint32_t)> reader) {
     dma_reader_ = std::move(reader);
@@ -53,6 +64,10 @@ private:
   void put(std::uint16_t value);
   void run_dma(std::uint16_t first_data);
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
+  bool display_blank() const noexcept;
+  /// Master cycles that `slots` external-bus slots last in the current mode.
+  std::uint64_t dma_cycles(std::uint64_t slots) const noexcept;
+  std::uint32_t slots_per_line() const noexcept;
 
   Standard standard_;
   std::array<std::uint8_t, 32> regs_{};
@@ -70,6 +85,9 @@ private:
   bool hv_latched_ = false;
   std::uint16_t hv_latch_value_ = 0;
   std::int32_t hint_counter_ = 0;
+  std::uint64_t now_ = 0;
+  std::uint64_t busy_until_ = 0;
+  std::uint64_t cpu_stall_ = 0;
   std::function<std::uint16_t(std::uint32_t)> dma_reader_;
 };
 

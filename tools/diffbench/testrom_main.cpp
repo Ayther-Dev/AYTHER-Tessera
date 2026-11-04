@@ -20,6 +20,8 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::ssf2_sweep_rom();
   else if (std::strcmp(argv[1], "vint-counter") == 0)
     rom = tessera::testrom::vint_counter_rom();
+  else if (std::strcmp(argv[1], "dma-fifo") == 0)
+    rom = tessera::testrom::dma_fifo_rom();
   else
     return 2;
   std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);

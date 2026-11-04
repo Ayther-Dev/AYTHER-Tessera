@@ -21,6 +21,9 @@ public:
     interrupt_hook_ = std::move(hook);
   }
 
+  /// Holds the CPU for `cycles` 68000 cycles (a DMA owns the bus).
+  void stall(int cycles) { sync(cycles); }
+
 protected:
   void willInterrupt(moira::u8 level) override;
   moira::u8 read8(moira::u32 addr) const override;
