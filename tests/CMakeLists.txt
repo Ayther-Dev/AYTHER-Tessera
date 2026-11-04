@@ -171,3 +171,14 @@ add_test(NAME integration.megadrive_replay COMMAND tessera_megadrive_replay_test
 set_tests_properties(integration.megadrive_replay PROPERTIES
     LABELS "integration;phase3;replay;FX-02;checkpoint" TIMEOUT 900 RUN_SERIAL TRUE)
 endif()
+
+add_executable(tessera_observation_abi_test contract/observation_abi_test.cpp)
+target_include_directories(tessera_observation_abi_test PRIVATE "${PROJECT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/contract")
+target_link_libraries(tessera_observation_abi_test PRIVATE Tessera::build_options doctest::doctest)
+set(TESSERA_ABI_REFERENCE_HEADER "" CACHE FILEPATH "Header ayther_api.h de referencia (gpgx ayther-abi-1.10-r4) para contract.observation_abi.")
+if(TESSERA_ABI_REFERENCE_HEADER)
+    target_compile_definitions(tessera_observation_abi_test PRIVATE TESSERA_ABI_REFERENCE_HEADER="${TESSERA_ABI_REFERENCE_HEADER}")
+endif()
+tessera_copy_diagnostic_runtime(tessera_observation_abi_test)
+add_test(NAME contract.observation_abi COMMAND tessera_observation_abi_test)
+set_tests_properties(contract.observation_abi PROPERTIES LABELS "contract;phase1;observation" TIMEOUT 30)
