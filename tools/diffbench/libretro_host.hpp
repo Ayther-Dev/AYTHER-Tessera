@@ -26,6 +26,24 @@ struct RunResult {
   std::string error;
 };
 
+// Hash FNV-1a 64 canónico de un frame: tripletas R,G,B por píxel, fila a fila,
+// sin relleno. Ambos lados lo usan para que los hashes sean comparables.
+inline uint64_t fnv_rgb(uint64_t h, uint8_t r, uint8_t g, uint8_t b) {
+  for (const uint8_t v : {r, g, b}) {
+    h ^= v;
+    h *= 1099511628211ull;
+  }
+  return h;
+}
+inline constexpr uint64_t fnv_seed = 1469598103934665603ull;
+
+#ifdef TESSERA_DIFFBENCH_WITH_TESSERA
+// Ejecuta el backend de referencia Clown por la API pública de Tessera.
+RunResult run_tessera(const std::string &backend_id,
+                      const std::string &rom_path, unsigned frames,
+                      const std::vector<TraceFrame> *trace = nullptr);
+#endif
+
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,

@@ -98,6 +98,58 @@ bool validate(const Manifest &oracles, const Manifest &corpus,
   return errs.empty();
 }
 
+int report_run(const diffbench::RunResult &r, unsigned frames,
+               std::map<std::string, std::string> &args) {
+  if (!r.error.empty()) {
+    std::cerr << "error: " << r.error << "\n";
+    return 1;
+  }
+  if (args.count("--hashes-out")) {
+    std::ofstream out(args["--hashes-out"]);
+    for (const auto h : r.frame_hashes)
+      out << std::hex << h << "\n";
+  }
+  if (args.count("--dump-regions")) {
+    unsigned readable = 0, read_ok = 0, size_ok = 0;
+    for (const auto &d : r.regions) {
+      std::cout << "region=" << d.id << " bytes=" << d.byte_size
+                << " access=" << d.access << " query=" << d.query_status
+                << " elem=" << d.element_size << " cap=" << d.capacity
+                << " ver=" << d.data_version << " legacy=" << d.legacy_id
+                << " read=" << d.read_status << "\n";
+      if (d.access & TESSERA_OBS_REGION_ACCESS_READ) {
+        ++readable;
+        read_ok += d.read_status == 0;
+        size_ok += d.bytes_read == d.byte_size && d.byte_size > 0;
+      }
+    }
+    std::cout << "regions=" << r.regions.size() << " readable=" << readable
+              << " read_ok=" << read_ok << " size_ok=" << size_ok << "\n";
+    return read_ok == readable && size_ok == readable ? 0 : 1;
+  }
+  if (args.count("--report-out")) {
+    // Informe del plan §3.3. Esta ejecución solo corre el oráculo, así que no
+    // hay candidato ni divergencia; nunca incluye framebuffers ni PCM.
+    nlohmann::json report = {
+        {"tool", "tessera_diffbench"},
+        {"contract", 1},
+        {"entry", args.count("--entry") ? args["--entry"] : "unnamed"},
+        {"segment", {0, frames}},
+        {"reference", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
+        {"candidate", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
+        {"frames_compared", r.frame_hashes.size()},
+        {"first_divergence", nullptr},
+        {"exceptions_applied", nlohmann::json::array()},
+        {"audio_writes", {{"frames_equal", r.frame_hashes.size()}}}};
+    std::ofstream out(args["--report-out"]);
+    out << report.dump(2) << "\n";
+  }
+  std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
+            << " size=" << r.width << "x" << r.height
+            << " audio_peak=" << r.peak << " \n";
+  return r.frame_hashes.size() == frames ? 0 : 1;
+}
+
 void help() {
   std::cout << "tessera_diffbench - banco diferencial (spec 008, RF-7.2)\n"
                "  --oracles <oracles.toml>   rutas y hashes de los oráculos\n"
@@ -155,54 +207,36 @@ int main(int argc, char **argv) {
         diffbench::run_libretro(args["--libretro"], args["--rom"], frames,
                                 args.count("--dump-regions") > 0,
                                 args.count("--trace") ? &trace : nullptr);
-    if (!r.error.empty()) {
-      std::cerr << "error: " << r.error << "\n";
-      return 1;
+    return report_run(r, frames, args);
+  }
+  if (args.count("--tessera")) {
+#ifdef TESSERA_DIFFBENCH_WITH_TESSERA
+    if (!args.count("--rom")) {
+      std::cerr << "falta --rom\n";
+      return 2;
     }
-    if (args.count("--hashes-out")) {
-      std::ofstream out(args["--hashes-out"]);
-      for (const auto h : r.frame_hashes)
-        out << std::hex << h << "\n";
-    }
-    if (args.count("--dump-regions")) {
-      unsigned readable = 0, read_ok = 0, size_ok = 0;
-      for (const auto &d : r.regions) {
-        std::cout << "region=" << d.id << " bytes=" << d.byte_size
-                  << " access=" << d.access << " query=" << d.query_status
-                  << " elem=" << d.element_size << " cap=" << d.capacity
-                  << " ver=" << d.data_version << " legacy=" << d.legacy_id
-                  << " read=" << d.read_status << "\n";
-        if (d.access & TESSERA_OBS_REGION_ACCESS_READ) {
-          ++readable;
-          read_ok += d.read_status == 0;
-          size_ok += d.bytes_read == d.byte_size && d.byte_size > 0;
-        }
+    const unsigned frames = args.count("--frames")
+                                ? static_cast<unsigned>(std::strtoul(
+                                      args["--frames"].c_str(), nullptr, 10))
+                                : 600u;
+    std::vector<diffbench::TraceFrame> trace;
+    if (args.count("--trace")) {
+      std::string terr;
+      trace = diffbench::load_trace(args["--trace"], terr);
+      if (!terr.empty()) {
+        std::cerr << "error: " << terr << "\n";
+        return 1;
       }
-      std::cout << "regions=" << r.regions.size() << " readable=" << readable
-                << " read_ok=" << read_ok << " size_ok=" << size_ok << "\n";
-      return read_ok == readable && size_ok == readable ? 0 : 1;
     }
-    if (args.count("--report-out")) {
-      // Informe del plan §3.3. Esta ejecución solo corre el oráculo, así que no
-      // hay candidato ni divergencia; nunca incluye framebuffers ni PCM.
-      nlohmann::json report = {
-          {"tool", "tessera_diffbench"},
-          {"contract", 1},
-          {"entry", args.count("--entry") ? args["--entry"] : "unnamed"},
-          {"segment", {0, frames}},
-          {"reference", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
-          {"candidate", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
-          {"frames_compared", r.frame_hashes.size()},
-          {"first_divergence", nullptr},
-          {"exceptions_applied", nlohmann::json::array()},
-          {"audio_writes", {{"frames_equal", r.frame_hashes.size()}}}};
-      std::ofstream out(args["--report-out"]);
-      out << report.dump(2) << "\n";
-    }
-    std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
-              << " size=" << r.width << "x" << r.height
-              << " audio_peak=" << r.peak << " \n";
-    return r.frame_hashes.size() == frames ? 0 : 1;
+    const auto r =
+        diffbench::run_tessera(args["--tessera"], args["--rom"], frames,
+                               args.count("--trace") ? &trace : nullptr);
+    return report_run(r, frames, args);
+#else
+    std::cerr << "este binario no incluye el backend de referencia "
+                 "(TESSERA_BUILD_CLOWN_REFERENCE=OFF)\n";
+    return 2;
+#endif
   }
   if (!args.count("--oracles") || !args.count("--corpus")) {
     std::cerr << "faltan --oracles y --corpus\n";

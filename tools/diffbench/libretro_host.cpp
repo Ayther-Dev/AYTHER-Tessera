@@ -80,11 +80,15 @@ bool __cdecl environment(unsigned cmd, void *data) {
 void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
   if (!g_result)
     return;
-  uint64_t hash = 1469598103934665603ull;
+  uint64_t hash = fnv_seed;
   if (data) {
     const auto *rows = static_cast<const uint8_t *>(data);
+    // XRGB8888 little-endian en memoria: B, G, R, X.
     for (unsigned y = 0; y < h; ++y)
-      hash = fnv1a(rows + y * pitch, size_t{w} * 4, hash);
+      for (unsigned x = 0; x < w; ++x) {
+        const uint8_t *px = rows + y * pitch + size_t{x} * 4;
+        hash = fnv_rgb(hash, px[2], px[1], px[0]);
+      }
   }
   g_result->width = w;
   g_result->height = h;

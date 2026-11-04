@@ -1,4 +1,8 @@
 add_executable(tessera_diffbench main.cpp libretro_host.cpp)
+if(TESSERA_BUILD_CLOWN_REFERENCE)
+    target_sources(tessera_diffbench PRIVATE tessera_side.cpp)
+    target_compile_definitions(tessera_diffbench PRIVATE TESSERA_DIFFBENCH_WITH_TESSERA=1)
+endif()
 target_include_directories(tessera_diffbench PRIVATE "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(tessera_diffbench PRIVATE Tessera::core Tessera::build_options nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
 
@@ -43,6 +47,14 @@ if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
         --trace "${fx}/fx02-neutral.json" --frames 120)
     set_tests_properties(tool.diffbench_trace_neutral PROPERTIES
         PASS_REGULAR_EXPRESSION "audio_peak=768 " LABELS "tool;phase0;local" TIMEOUT 120)
+endif()
+
+if(TESSERA_BUILD_CLOWN_REFERENCE AND TESSERA_DIFFBENCH_FX02_ROM)
+    add_test(NAME tool.diffbench_clown_fx02 COMMAND tessera_diffbench
+        --tessera clownmdemu --rom "${TESSERA_DIFFBENCH_FX02_ROM}"
+        --frames 600 --hashes-out "${CMAKE_CURRENT_BINARY_DIR}/clown-fx02.hashes")
+    set_tests_properties(tool.diffbench_clown_fx02 PROPERTIES
+        PASS_REGULAR_EXPRESSION "frames=600 hashed=600" LABELS "tool;phase0;local" TIMEOUT 300)
 endif()
 
 add_executable(tessera_diffbench_selftest selftest.cpp)

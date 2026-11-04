@@ -305,28 +305,28 @@ std::vector<RegionData> MegaDriveBackend::regions(std::uint64_t mask) const {
       append_u16(bytes, word);
     bytes.insert(bytes.end(), std::begin(machine_->vdp.state.vram),
                  std::end(machine_->vdp.state.vram));
-    result.push_back(region(1, 1, static_cast<std::uint32_t>(bytes.size()),
-                            std::move(bytes)));
+    const auto count = static_cast<std::uint32_t>(bytes.size());
+    result.push_back(region(1, 1, count, std::move(bytes)));
   }
   if (mask & TESSERA_REGION_PALETTE) {
     Bytes bytes;
     for (auto word : machine_->vdp.state.cram)
       append_u16(bytes, word);
-    result.push_back(region(2, 2, static_cast<std::uint32_t>(bytes.size() / 2),
-                            std::move(bytes)));
+    const auto count = static_cast<std::uint32_t>(bytes.size() / 2);
+    result.push_back(region(2, 2, count, std::move(bytes)));
   }
   if (mask & TESSERA_REGION_SPRITES) {
     Bytes bytes(std::begin(machine_->vdp.state.vram),
                 std::end(machine_->vdp.state.vram));
-    result.push_back(region(3, 1, static_cast<std::uint32_t>(bytes.size()),
-                            std::move(bytes)));
+    const auto count = static_cast<std::uint32_t>(bytes.size());
+    result.push_back(region(3, 1, count, std::move(bytes)));
   }
   if (mask & TESSERA_REGION_GEOMETRY) {
     Bytes bytes;
     wire::scalar(bytes, 1, TESSERA_ENCODING_U32, width_);
     wire::scalar(bytes, 2, TESSERA_ENCODING_U32, height_);
-    result.push_back(region(4, 1, static_cast<std::uint32_t>(bytes.size()),
-                            std::move(bytes)));
+    const auto count = static_cast<std::uint32_t>(bytes.size());
+    result.push_back(region(4, 1, count, std::move(bytes)));
   }
   if (mask & TESSERA_REGION_TEMPORAL) {
     result.push_back(temporal_region());
