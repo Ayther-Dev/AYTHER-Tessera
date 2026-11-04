@@ -20,6 +20,10 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::ssf2_sweep_rom();
   else if (std::strcmp(argv[1], "vint-counter") == 0)
     rom = tessera::testrom::vint_counter_rom();
+  else if (std::strcmp(argv[1], "hint-counter") == 0)
+    rom = tessera::testrom::hint_counter_rom(9);
+  else if (std::strcmp(argv[1], "hint-every-line") == 0)
+    rom = tessera::testrom::hint_counter_rom(0);
   else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else

@@ -217,3 +217,52 @@ inline std::vector<std::uint8_t> dma_fifo_rom() {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `hv_probe` (interrupt part, TP-106.2): enables the horizontal interrupt with
+// a line counter of `hint_reg` (register 10) and the vertical one; the level
+// 4 handler adds one to the long at $FF0000 and the level 6 handler to the
+// long at $FF0004. After N frames both hold how many interrupts were taken.
+inline std::vector<std::uint8_t> hint_counter_rom(std::uint8_t hint_reg) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  put32(rom, 0x70, 0x300); // level 4 autovector
+  put32(rom, 0x78, 0x310); // level 6 autovector
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER HINT CNT ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  const std::uint16_t main_code[] = {
+      0x33FC, 0x8164,
+      0x00C0, 0x0004, // reg1: mode 5, display, VINT
+      0x33FC, 0x8014,
+      0x00C0, 0x0004, // reg0: HINT enabled
+      0x33FC, static_cast<std::uint16_t>(0x8A00 | hint_reg),
+      0x00C0, 0x0004,
+      0x46FC, 0x2000, // move #$2000,sr
+      0x60FE,         // bra.s .
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t hint[] = {0x52B9, 0x00FF, 0x0000, 0x4E73};
+  const std::uint16_t vint[] = {0x52B9, 0x00FF, 0x0004, 0x4E73};
+  at = 0x300;
+  for (const auto word : hint) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  at = 0x310;
+  for (const auto word : vint) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom

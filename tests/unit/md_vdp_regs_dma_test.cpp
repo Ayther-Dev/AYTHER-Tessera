@@ -346,3 +346,21 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   CHECK(v.take_cpu_stall() == 16ULL * 3420 / 167);
   CHECK(v.take_cpu_stall() == 0);
 }
+
+// TP-106.2 (RF-2.2): gpgx raises the horizontal interrupt on lines 0..224
+// (the line after the active display included) with register 10 = 0, and
+// only the vertical blank counter reload stops it after that.
+TEST_CASE("the horizontal interrupt also fires on the line after the display") {
+  Vdp v(Standard::ntsc);
+  reg(v, 0, 0x14);
+  reg(v, 10, 0);
+  unsigned fired = 0;
+  for (std::uint32_t line = 0; line < 262; ++line) {
+    v.begin_line(line);
+    if (v.irq_level() == 4) {
+      ++fired;
+      v.acknowledge(4);
+    }
+  }
+  CHECK(fired == 225);
+}

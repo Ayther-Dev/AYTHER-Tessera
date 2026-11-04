@@ -193,16 +193,20 @@ void Vdp::begin_line(std::uint32_t line) {
   line_ = line;
   if (line == 0)
     hint_counter_ = regs_[10];
-  if (line < active_lines()) {
+  // The counter runs on the lines 0..active inclusive (gpgx); in the rest of
+  // the blanking it is reloaded on every line.
+  if (line <= active_lines()) {
     if (hint_counter_ == 0) {
       hint_flag_ = true;
       hint_counter_ = regs_[10];
     } else {
       --hint_counter_;
     }
-  } else if (line == active_lines()) {
-    vint_flag_ = true;
+  } else {
+    hint_counter_ = regs_[10];
   }
+  if (line == active_lines())
+    vint_flag_ = true;
 }
 
 std::uint8_t Vdp::irq_level() const noexcept {
