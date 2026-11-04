@@ -37,6 +37,8 @@ public:
     return (regs_[12] & 0x81U) != 0 ? 788U : 770U;
   }
   void raise_vint() noexcept { vint_flag_ = true; }
+  /// Status bit 4: odd field of an interlaced frame.
+  void set_odd_field(bool odd) noexcept { odd_field_ = odd; }
   /// Sprite overflow (status bit 6) and collision (bit 5), set by the
   /// renderer and cleared by a status read.
   void raise_sprite_flags(bool overflow, bool collision) noexcept {
@@ -107,6 +109,7 @@ private:
   bool dma_pending_ = false;
   std::uint32_t line_ = 0;
   bool vint_flag_ = false;
+  bool odd_field_ = false;
   bool sprite_overflow_ = false;
   bool sprite_collision_ = false;
   bool hint_flag_ = false;

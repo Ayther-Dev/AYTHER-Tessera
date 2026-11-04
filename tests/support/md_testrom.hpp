@@ -553,7 +553,7 @@ inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
     // flags are cleared by every read, so the loop accumulates them).
     c.insert(c.end(), {0x7200,                 // moveq #0,d1
                        0x3011,                 // move.w (a1),d0
-                       0x0240, 0x0060,         // andi.w #$60,d0
+                       0x0240, 0x0070,         // andi.w #$70,d0
                        0x8240,                 // or.w d0,d1
                        0x33C1, 0x00FF, 0x0000, // move.w d1,$FF0000
                        0x60F0});               // bra loop

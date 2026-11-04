@@ -84,6 +84,8 @@ void System::run_frame() {
     update_irq();
     if (line == 0)
       renderer_.begin_frame(vdp_);
+    if (line == 0)
+      vdp_.set_odd_field(renderer_.field() == 1);
     if (index == 0 && frame_ != 0) {
       // The vertical interrupt comes vint_cycle cycles after the frame start
       // (gpgx), so a horizontal interrupt of that same line is served first.
