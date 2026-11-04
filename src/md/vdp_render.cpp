@@ -27,7 +27,12 @@ void Renderer::begin_frame(const Vdp &vdp) {
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (line >= size_.height)
     return;
-  const std::uint32_t backdrop = colour_to_rgba(vdp.cram()[vdp.reg(7) & 0x3FU]);
+  // Register 0 bit 2 clear (limited palette): gpgx keeps only the lowest bit
+  // of each 3-bit channel (color_update_m5, data &= 0x49).
+  std::uint16_t backdrop_cram = vdp.cram()[vdp.reg(7) & 0x3FU];
+  if ((vdp.reg(0) & 0x04U) == 0)
+    backdrop_cram &= 0x0222U;
+  const std::uint32_t backdrop = colour_to_rgba(backdrop_cram);
   const auto row = std::span<std::uint32_t>(frame_).subspan(
       std::size_t{line} * size_.width, size_.width);
   std::fill(row.begin(), row.end(), backdrop);

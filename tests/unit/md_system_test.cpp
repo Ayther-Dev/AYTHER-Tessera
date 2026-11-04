@@ -20,11 +20,14 @@ TEST_CASE("one vertical interrupt per frame reaches the handler") {
                 MachineConfig::for_region(Region::usa));
   system.reset();
   CHECK(counter(system) == 0);
+  // gpgx raises no vertical interrupt on the first frame after a reset
+  system.run_frame();
+  CHECK(counter(system) == 0);
   system.run_frame();
   CHECK(counter(system) == 1);
-  for (int i = 1; i < 100; ++i)
+  for (int i = 2; i < 100; ++i)
     system.run_frame();
-  CHECK(counter(system) == 100);
+  CHECK(counter(system) == 99);
   CHECK(system.frame() == 100);
 }
 
@@ -34,13 +37,14 @@ TEST_CASE("PAL frames are longer but still one interrupt each") {
   system.reset();
   for (int i = 0; i < 25; ++i)
     system.run_frame();
-  CHECK(counter(system) == 25);
+  CHECK(counter(system) == 24); // none on the first frame
 }
 
 TEST_CASE("work RAM is cleared by a hard reset only through reset()") {
   System system(tessera::testrom::vint_counter_rom(),
                 MachineConfig::for_region(Region::usa));
   system.reset();
+  system.run_frame();
   system.run_frame();
   CHECK(counter(system) == 1);
   system.reset();

@@ -38,6 +38,7 @@ TEST_CASE("the frame size follows H32/H40 and V28/V30") {
 
 TEST_CASE("an empty frame is the backdrop colour in RGBA8") {
   Vdp v(Standard::ntsc);
+  reg(v, 0, 0x04); // full palette
   reg(v, 1, 0x04);
   set_colour(v, 3, 0x0E00); // blue = 7, green = 0, red = 0
   reg(v, 7, 0x03);          // backdrop = palette 0, colour 3
@@ -55,8 +56,24 @@ TEST_CASE("an empty frame is the backdrop colour in RGBA8") {
     CHECK(p == pixel);
 }
 
+TEST_CASE("register 0 bit 2 clear limits each channel to its lowest bit") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  set_colour(v, 1, 0x0EEE);
+  reg(v, 7, 0x01);
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  const std::uint32_t limited = r.frame()[0];
+  CHECK((limited & 0xFF) == 0x24); // level 1 of 7 -> 36
+  reg(v, 0, 0x04);
+  r.render_line(v, 0);
+  CHECK((r.frame()[0] & 0xFF) == 0xFF); // full palette
+}
+
 TEST_CASE("the backdrop can change between lines and the hook sees each line") {
   Vdp v(Standard::ntsc);
+  reg(v, 0, 0x04); // full palette
   reg(v, 1, 0x04);
   set_colour(v, 1, 0x000E); // red
   set_colour(v, 2, 0x00E0); // green

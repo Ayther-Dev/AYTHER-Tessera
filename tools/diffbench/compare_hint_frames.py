@@ -2,8 +2,10 @@
 
 The hint_counter ROM stores, at $FF0100 + n, how many horizontal interrupts
 happened between vertical interrupt n and n + 1. The first frames depend on
-how the CPU boots, so only the steady state is compared: the entries from the
-fourth to the fourth from last. Both cores must give one value, the same one.
+how the CPU boots (gpgx starts the 68000 at line 159 of a frame that begins at
+line 192, with no interrupt on that first frame), so the whole list has to be
+equal as well as the steady state: every entry but the last one, which the
+benchmark may or may not have reached.
 
 usage: compare_hint_frames.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
 exit:  0 same steady value, 1 different, 2 a tool failed
@@ -29,6 +31,7 @@ def main(argv):
             print("tool failed:", command[0])
             return 2
     steady = []
+    whole = []
     for path in (mine, gpgx):
         with open(path, "rb") as f:
             data = f.read()
@@ -38,9 +41,11 @@ def main(argv):
             swapped[0::2], swapped[1::2] = data[1::2], data[0::2]
             data = bytes(swapped)
         steady.append(sorted(set(data[0x100 + 3:0x100 + count - 3])))
-    print("steady native=%s gpgx=%s match=%d" % (steady[0], steady[1],
-                                                 int(steady[0] == steady[1] and len(steady[0]) == 1)))
-    return 0 if steady[0] == steady[1] and len(steady[0]) == 1 else 1
+        whole.append(list(data[0x100:0x100 + count - 1]))
+    ok = steady[0] == steady[1] and len(steady[0]) == 1 and whole[0] == whole[1]
+    print("steady native=%s gpgx=%s whole native=%s gpgx=%s match=%d" %
+          (steady[0], steady[1], whole[0][:4], whole[1][:4], int(ok)))
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

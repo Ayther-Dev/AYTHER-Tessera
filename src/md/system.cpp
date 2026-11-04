@@ -44,8 +44,23 @@ void System::reset() {
   io_ctrl_ = {0x00, 0x00, 0x00};
   frame_ = 0;
   current_line_ = 0;
+  frame_start_line_ = 192;
   line_start_master_ = 0;
   cpu_.reset();
+  // On a hard reset the 68000 starts at a fixed point of the frame, not at its
+  // beginning: gpgx (genesis.c, gen_reset) measured on hardware that the first
+  // HV counter read is $9F21 (NTSC) or $8421 (PAL), i.e. line 159 (132) and
+  // 1004 master cycles. The CPU clock starts there and the lines before it run
+  // without the CPU.
+  // (the frame starts at line 192, so that is 229 lines into it, 253 in PAL)
+  const std::uint64_t boot_lines =
+      config_.standard == Standard::pal ? 253U : 229U;
+  const std::uint64_t boot_master = boot_lines * kCyclesPerLine + 1004U;
+  // 68000 cycles of the reset sequence that gpgx counts before the first
+  // instruction: 31 reproduces the $9F21 read (30 to 32 all do).
+  constexpr moira::i64 kBootCpuCycles = 31;
+  cpu_.setClock(
+      static_cast<moira::i64>(boot_master / kDivider68k + kBootCpuCycles));
 }
 
 void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
@@ -54,15 +69,32 @@ void System::run_frame() {
   const std::uint32_t lines = lines_per_frame(config_.standard);
   const std::uint64_t frame_master =
       frame_ * cycles_per_frame(config_.standard);
-  for (std::uint32_t line = 0; line < lines; ++line) {
+  // A frame starts at the first line of the vertical blanking (gpgx); the
+  // first one at line 192, the height of Mode 4 in which the VDP wakes up.
+  const std::uint32_t first_line = frame_start_line_ % lines;
+  for (std::uint32_t index = 0; index < lines; ++index) {
+    const std::uint32_t line = (first_line + index) % lines;
     current_line_ = line;
-    line_start_master_ = frame_master + std::uint64_t{line} * kCyclesPerLine;
-    vdp_.begin_line(line);
+    line_start_master_ = frame_master + std::uint64_t{index} * kCyclesPerLine;
+    vdp_.begin_line(line, false);
+    if (frame_ == 0) {
+      vdp_.cancel_hint();
+      vdp_.power_on_hint_counter();
+    }
     update_irq();
+    if (index == 0 && frame_ != 0) {
+      // The vertical interrupt comes vint_cycle cycles after the frame start
+      // (gpgx), so a horizontal interrupt of that same line is served first.
+      cpu_.executeUntil(static_cast<moira::i64>(
+          (line_start_master_ + vdp_.vint_cycle()) / kDivider68k));
+      vdp_.raise_vint();
+      update_irq();
+    }
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     cpu_.executeUntil(static_cast<moira::i64>(end_master / kDivider68k));
   }
   ++frame_;
+  frame_start_line_ = vdp_.frame_start_line();
 }
 
 void System::set_pad(unsigned port, std::uint8_t pressed) noexcept {

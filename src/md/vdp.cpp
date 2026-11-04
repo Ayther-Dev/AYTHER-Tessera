@@ -238,13 +238,19 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
   const std::uint32_t steps = h40 ? 211U : 171U;
   const std::uint32_t last_low = h40 ? 0xB6U : 0x93U;
   const std::uint32_t first_high = h40 ? 0xE4U : 0xE9U;
-  const std::uint32_t n = line_cycle * steps / kCyclesPerLine;
+  // The line starts at the end of the active display, not at H = 0: gpgx
+  // (hvc.h) has H $85 (H32) or $A5 (H40) on the first master cycle of the line
+  // and H = 0 on cycle 760 (H32) or 780 (H40).
+  const std::uint32_t zero = h40 ? 780U : 760U;
+  const std::uint32_t n =
+      ((line_cycle + kCyclesPerLine - zero) % kCyclesPerLine) * steps /
+      kCyclesPerLine;
   const std::uint32_t h =
       (n <= last_low ? n : n - last_low - 1 + first_high) & 0xFFU;
   return static_cast<std::uint16_t>(((v & 0xFFU) << 8) | h);
 }
 
-void Vdp::begin_line(std::uint32_t line) {
+void Vdp::begin_line(std::uint32_t line, bool raise_vint) {
   line_ = line;
   if (line == 0)
     hint_counter_ = regs_[10];
@@ -260,7 +266,7 @@ void Vdp::begin_line(std::uint32_t line) {
   } else {
     hint_counter_ = regs_[10];
   }
-  if (line == active_lines())
+  if (raise_vint && line == active_lines())
     vint_flag_ = true;
 }
 

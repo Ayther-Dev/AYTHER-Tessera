@@ -30,7 +30,13 @@ public:
   void latch_hv(std::uint32_t line_cycle) noexcept;
 
   /// Called at the start of every line, 0-based within the frame.
-  void begin_line(std::uint32_t line);
+  // `raise_vint` false leaves the vertical interrupt to the caller, which
+  // raises it `vint_cycle()` master cycles into the line (gpgx).
+  void begin_line(std::uint32_t line, bool raise_vint = true);
+  std::uint32_t vint_cycle() const noexcept {
+    return (regs_[12] & 0x81U) != 0 ? 788U : 770U;
+  }
+  void raise_vint() noexcept { vint_flag_ = true; }
   /// Highest pending interrupt level that is enabled (6 VINT, 4 HINT), or 0.
   std::uint8_t irq_level() const noexcept;
   void acknowledge(std::uint8_t level) noexcept;
@@ -58,6 +64,18 @@ public:
   const std::array<std::uint16_t, 64> &cram() const noexcept { return cram_; }
   const std::array<std::uint16_t, 40> &vsram() const noexcept { return vsram_; }
   std::uint32_t line() const noexcept { return line_; }
+
+  // Line a frame starts at in gpgx: the first line of the vertical blanking,
+  // i.e. the active height (192 in Mode 4, 224 or 240 in Mode 5).
+  std::uint32_t frame_start_line() const noexcept {
+    return mode4() ? 192U : active_lines();
+  }
+  // gpgx has no vertical interrupt on the first frame after a VDP reset.
+  // Measured on gpgx: no horizontal interrupt reaches the CPU on that frame.
+  void cancel_hint() noexcept { hint_flag_ = false; }
+  // gpgx wakes up with its line counter at $FF and only reloads it from
+  // register 10 once the first frame is over.
+  void power_on_hint_counter() noexcept { hint_counter_ = 0xFFU; }
 
 private:
   std::uint32_t active_lines() const noexcept;

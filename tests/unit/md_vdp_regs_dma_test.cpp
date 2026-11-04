@@ -146,7 +146,10 @@ TEST_CASE("V counter follows the line, H counter the position in it") {
   CHECK((v.read_hv(0) >> 8) == 0xE5);
   v.begin_line(261);
   CHECK((v.read_hv(0) >> 8) == 0xFF);
-  CHECK((v.read_hv(0) & 0xFF) < (v.read_hv(3000) & 0xFF));
+  // the line starts at H = $85 (gpgx hvc.h) and passes H = 0 on cycle 760
+  CHECK((v.read_hv(0) & 0xFF) == 0x85);
+  CHECK((v.read_hv(760) & 0xFF) == 0x00);
+  CHECK((v.read_hv(800) & 0xFF) < (v.read_hv(3000) & 0xFF));
 }
 
 TEST_CASE("horizontal interrupt counts lines") {

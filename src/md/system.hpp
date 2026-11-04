@@ -72,6 +72,7 @@ private:
   Tmss tmss_;
   std::uint64_t frame_ = 0;
   std::uint32_t current_line_ = 0;
+  std::uint32_t frame_start_line_ = 192; // gpgx starts in Mode 4
   std::uint64_t line_start_master_ = 0;
 
   bool z80_bus_requested_ = false;
