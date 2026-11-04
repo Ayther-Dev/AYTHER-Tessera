@@ -34,6 +34,8 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_h_probe_rom(0x00);
   else if (std::strcmp(argv[1], "hv-h40-h") == 0)
     rom = tessera::testrom::hv_h_probe_rom(0x81);
+  else if (std::strcmp(argv[1], "mode4-pbc") == 0)
+    rom = tessera::testrom::mode4_pbc_rom();
   else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else

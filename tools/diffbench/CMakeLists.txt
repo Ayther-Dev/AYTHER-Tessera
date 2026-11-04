@@ -111,7 +111,7 @@ if(TESSERA_BUILD_MEGADRIVE)
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-106.1: the list of V counter values seen in the vertical blank.
-        foreach(mode IN ITEMS hv-v28-h32 hv-v28-h40 hv-v30-h32 hv-h32-h hv-h40-h)
+        foreach(mode IN ITEMS hv-v28-h32 hv-v28-h40 hv-v30-h32 hv-h32-h hv-h40-h mode4-pbc)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
                 "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
             set_tests_properties(integration.md_${mode}_rom PROPERTIES

@@ -24,6 +24,7 @@ struct RunResult {
   std::vector<uint64_t> frame_hashes; // FNV-1a 64 del framebuffer XRGB8888
   std::vector<uint8_t> save_ram;      // RETRO_MEMORY_SAVE_RAM al final
   std::vector<uint8_t> work_ram;      // RETRO_MEMORY_SYSTEM_RAM al final
+  std::vector<uint8_t> last_frame;    // ancho, alto (u32 LE) y R,G,B por pixel del ultimo frame
   uint32_t width = 0, height = 0;
   std::string error;
 };

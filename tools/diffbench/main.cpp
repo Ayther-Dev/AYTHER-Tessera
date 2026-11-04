@@ -114,6 +114,7 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
   };
   write_blob("--save-ram-out", r.save_ram);
   write_blob("--work-ram-out", r.work_ram);
+  write_blob("--frame-out", r.last_frame);
   if (args.count("--hashes-out")) {
     std::ofstream out(args["--hashes-out"]);
     for (const auto h : r.frame_hashes)

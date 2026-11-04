@@ -371,3 +371,81 @@ inline std::vector<std::uint8_t> hv_h_probe_rom(std::uint8_t reg12) {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `mode4_pbc` (TP-104.6): the VDP stays in Mode 4 (register 1 bit 2 clear), as
+// a Power Base Converter game leaves it. It writes VRAM with the byte and word
+// accesses of the 68000 through the control and data ports and reads it back
+// with byte and word reads into work RAM from $FF0000. Only written words are
+// read back: gpgx gives stale data for words never written, which is open.
+inline std::vector<std::uint8_t> mode4_pbc_rom() {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER MODE4PBC ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0001, // lea $C00001,a0 (data port, byte access)
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1 (control port)
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x47F9, 0x00C0, 0x0000, // lea $C00000,a3 (data port, word access)
+  };
+  const auto command = [&](std::uint16_t first, std::uint16_t second) {
+    c.insert(c.end(), {0x22BC, first, second}); // move.l #imm,(a1)
+  };
+  const auto write_byte = [&](std::uint16_t v) {
+    c.insert(c.end(), {0x10BC, v}); // move.b #v,(a0)
+  };
+  const auto write_word = [&](std::uint16_t v) {
+    c.insert(c.end(), {0x36BC, v}); // move.w #v,(a3)
+  };
+  const auto read_bytes = [&](int n) {
+    for (int i = 0; i < n; ++i)
+      c.push_back(0x14D0); // move.b (a0),(a2)+
+  };
+  const auto read_words = [&](int n) {
+    for (int i = 0; i < n; ++i)
+      c.push_back(0x34D3); // move.w (a3),(a2)+
+  };
+  command(0x4000, 0); // three byte writes, four byte reads
+  write_byte(0x11);
+  write_byte(0x22);
+  write_byte(0x33);
+  command(0x0000, 0);
+  read_bytes(4);
+  command(0x4010, 0); // two word writes, four byte reads
+  write_word(0x4455);
+  write_word(0x6677);
+  command(0x0010, 0);
+  read_bytes(2);
+  command(0x4020, 0); // one byte write, two word reads
+  write_byte(0x88);
+  command(0x0020, 0);
+  read_words(2);
+  command(0x4030, 0); // read command at an odd address
+  write_byte(0xAA);
+  write_byte(0xBB);
+  command(0x0031, 0);
+  read_bytes(2);
+  command(0x4041, 0); // write command at an odd address
+  write_byte(0xCC);
+  command(0x0040, 0);
+  read_bytes(2);
+  command(0x4005, 0x0001); // address bits 14-15 do not exist in Mode 4
+  write_byte(0x77);
+  command(0x0005, 0);
+  read_bytes(2);
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom

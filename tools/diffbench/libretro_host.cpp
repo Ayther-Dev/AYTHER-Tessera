@@ -64,6 +64,10 @@ uint64_t fnv1a(const uint8_t *p, size_t n, uint64_t h) {
 bool __cdecl environment(unsigned cmd, void *data) {
   switch (cmd) {
   case 10:                                             // SET_PIXEL_FORMAT
+    if (std::getenv("TESSERA_DEBUG_VIDEO") && data)
+      std::fprintf(stderr, "set_pixel_format %d%c", *static_cast<int32_t *>(data), 10);
+    if (data && std::getenv("TESSERA_ACCEPT_565"))
+      return *static_cast<int32_t *>(data) == 2;
     return data && *static_cast<int32_t *>(data) == 1; // XRGB8888
   case 9:                                              // GET_SYSTEM_DIRECTORY
   case 31:                                             // GET_SAVE_DIRECTORY
@@ -89,6 +93,15 @@ void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
         const uint8_t *px = rows + y * pitch + size_t{x} * 4;
         hash = fnv_rgb(hash, px[2], px[1], px[0]);
       }
+  }
+  if (data) {
+    const auto *rows = static_cast<const uint8_t *>(data);
+    auto &out = g_result->last_frame;
+    out.clear();
+    for (const unsigned v : {w, h, static_cast<unsigned>(pitch)})
+      for (unsigned b = 0; b < 4; ++b)
+        out.push_back(static_cast<uint8_t>(v >> (8 * b)));
+    out.insert(out.end(), rows, rows + size_t{h} * pitch);
   }
   g_result->width = w;
   g_result->height = h;

@@ -13,6 +13,11 @@ void Vdp::write_control(std::uint16_t value) {
                                       ((value >> 2) & 0x3CU));
     address_ = static_cast<std::uint16_t>((first_word_ & 0x3FFFU) |
                                           ((value & 3U) << 14));
+    if (mode4()) {
+      address_ &= 0x3FFFU; // 16 KiB of VRAM, no address bits 14-15
+      if ((code_ & 0x0FU) == 0)
+        address_ &= 0xFFFEU; // a read starts at the even address below
+    }
     // A DMA command only starts when DMA is enabled (register 1, bit 4).
     if ((code_ & 0x20U) != 0 && (regs_[1] & 0x10U) != 0) {
       if ((regs_[23] >> 6) == 2)
@@ -41,6 +46,15 @@ void Vdp::write_control(std::uint16_t value) {
 }
 
 void Vdp::put(std::uint16_t value) {
+  if (mode4() && (code_ & 0x0FU) == 1) {
+    // Mode 4 VRAM write (measured on gpgx): high byte at the address, low
+    // byte at the next one, no swap at odd addresses, one step per access.
+    const std::uint32_t a = address_ & 0x3FFFU;
+    vram_[a] = static_cast<std::uint8_t>(value >> 8);
+    vram_[(a + 1U) & 0x3FFFU] = static_cast<std::uint8_t>(value);
+    address_ = static_cast<std::uint16_t>((a + 1U) & 0x3FFFU);
+    return;
+  }
   switch (code_ & 0x0FU) {
   case 1:                       // VRAM write
     if ((address_ & 1U) != 0) { // odd address: bytes swapped
@@ -76,6 +90,14 @@ void Vdp::write_data(std::uint16_t value) {
 
 std::uint16_t Vdp::read_data() {
   pending_second_ = false;
+  if (mode4() && (code_ & 0x0FU) == 0) {
+    // Mode 4 VRAM read: the word of the even address, one step per read.
+    const std::uint32_t a = address_ & 0x3FFFU;
+    const auto value =
+        static_cast<std::uint16_t>((vram_[a & 0x3FFEU] << 8) | vram_[a | 1U]);
+    address_ = static_cast<std::uint16_t>((a + 1U) & 0x3FFFU);
+    return value;
+  }
   std::uint16_t value = 0;
   switch (code_ & 0x0FU) {
   case 0:

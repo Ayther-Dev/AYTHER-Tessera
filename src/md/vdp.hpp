@@ -65,6 +65,8 @@ private:
   void run_dma(std::uint16_t first_data);
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
   bool display_blank() const noexcept;
+  /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).
+  bool mode4() const noexcept { return (regs_[1] & 0x04U) == 0; }
   /// Master cycles that `slots` external-bus slots last in the current mode.
   std::uint64_t dma_cycles(std::uint64_t slots) const noexcept;
   std::uint32_t slots_per_line() const noexcept;
