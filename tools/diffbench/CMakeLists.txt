@@ -166,7 +166,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(block RANGE 0 8)
             list(APPEND frame_roms palette-sweep-${block})
         endforeach()
-        foreach(variant RANGE 0 27)
+        foreach(variant RANGE 0 31)
             list(APPEND frame_roms modes-sweep-${variant})
         endforeach()
         # sprite_limits (TP-105.5, TP-105.6): sprite table, per line limits,

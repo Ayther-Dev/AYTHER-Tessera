@@ -816,6 +816,23 @@ inline ModesVariant modes_variant(unsigned id) {
     v.reg17 = 0x85;
     v.reg18 = 0x84;
     break;
+  case 28: // H32 and V30
+    v.reg1_extra = 0x08;
+    break;
+  case 29: // H40 and V28, left column blank
+    v.reg12 = 0x81;
+    v.reg0_extra = 0x20;
+    break;
+  case 30: // H40 and V30, 64x64 planes, cell scroll
+    v.reg1_extra = 0x08;
+    v.reg12 = 0x81;
+    v.reg16 = 0x11;
+    v.reg11 = 0x02;
+    break;
+  case 31: // H32 and V30, window below
+    v.reg1_extra = 0x08;
+    v.reg18 = 0x8C;
+    break;
   default:
     break;
   }
