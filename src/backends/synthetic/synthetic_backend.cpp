@@ -204,23 +204,24 @@ Bytes SyntheticBackend::machine_record() const {
 void SyntheticBackend::restore_record(std::span<const std::uint8_t> encoded,
                                       std::uint64_t frame,
                                       const InputState &inputs) {
-  const auto fields = wire::record(encoded, TESSERA_CHECKPOINT_INVALID,
-                                   TESSERA_PHASE_RESTORE);
+  const auto fields =
+      wire::record(encoded, TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
   require(fields.size() == 3, TESSERA_CHECKPOINT_INVALID);
   const auto accumulator = static_cast<std::uint32_t>(
       wire::read(wire::get(fields, 0, 1, TESSERA_ENCODING_U32, 4,
                            TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
                  0, 4));
-  const auto persistent = wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES, 16,
-                                    TESSERA_CHECKPOINT_INVALID,
-                                    TESSERA_PHASE_RESTORE);
-  const auto phase = wire::read(
-      wire::get(fields, 2, 3, TESSERA_ENCODING_U32, 4,
-                TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
-      0, 4);
+  const auto persistent =
+      wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES, 16,
+                TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+  const auto phase =
+      wire::read(wire::get(fields, 2, 3, TESSERA_ENCODING_U32, 4,
+                           TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
+                 0, 4);
   require(phase < 256 && frame < UINT64_MAX / ticks_per_frame &&
-              std::all_of(inputs.begin(), inputs.end(),
-                          [](auto value) { return value == 0 || value == 1; }),
+              std::all_of(
+                  inputs.begin(), inputs.end(),
+                  [](auto value) { return value == 0 || value == 1; }),
           TESSERA_CHECKPOINT_INVALID);
   accumulator_ = accumulator;
   std::copy(persistent.begin(), persistent.end(), persistent_.begin());

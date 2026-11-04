@@ -42,11 +42,21 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "CHECK_COMMAND_FAILED: $Program terminó con código $LASTEXITCODE." }
 }
 
+function Test-Format {
+    $clangFormat = Join-Path ([IO.Path]::GetDirectoryName($compilerPath)) 'clang-format.exe'
+    if (-not (Test-Path -LiteralPath $clangFormat)) { $clangFormat = (Get-Command clang-format.exe -ErrorAction Stop).Source }
+    $files = @(git ls-files 'src/*.cpp' 'src/*.hpp' 'include/*.h' 'tests/*.cpp' 'tests/*.hpp' 'tests/*.c') |
+        Where-Object { $_ -notmatch 'fixtures|backend_probe|tessera_observation\.h|clown_state_codec' -and (Test-Path -LiteralPath $_) }
+    & $clangFormat --dry-run --Werror @files
+    if ($LASTEXITCODE -ne 0) { throw 'FORMAT_VIOLATION: ejecuta clang-format -i sobre los archivos indicados.' }
+}
+
 Push-Location $repoRoot
 try {
     & (Join-Path $PSScriptRoot 'bootstrap-dependencies.ps1') -Offline
     Write-Output "Check local: $Preset; etapa $Stage; paralelismo $Jobs."
     if ($Stage -in @('All', 'Configure')) {
+        Test-Format
         $configureArguments = @('--preset', $Preset, "-DCMAKE_C_COMPILER=$compilerPath", "-DCMAKE_CXX_COMPILER=$compilerPath") + $CMakeArgs
         Invoke-Checked 'cmake' $configureArguments
     }

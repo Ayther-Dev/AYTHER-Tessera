@@ -159,7 +159,8 @@ TEST_CASE("Candidate capacity is queried without a partial result and without "
   CHECK(live.state() == state);
 }
 
-TEST_CASE("Registry exposes the real Mega Drive strategy and keeps synthetic strategies isolated") {
+TEST_CASE("Registry exposes the real Mega Drive strategy and keeps synthetic "
+          "strategies isolated") {
   fx01::Session minimal(false), complete;
   CHECK(minimal.info().system == TESSERA_SYSTEM_NONE);
   CHECK(complete.info().system == TESSERA_SYSTEM_NONE);

@@ -684,7 +684,8 @@ TEST_CASE("Extended backend arrays honor each declared stride and preserve "
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
     CHECK(fixed_id(values[0].prefix.id) == "clownmdemu");
   CHECK(fixed_id(values[kFirstSynthetic].prefix.id) == "synthetic.minimal");
-  CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) == "synthetic.complete");
+  CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) ==
+        "synthetic.complete");
   for (const auto &value : values)
     CHECK(std::all_of(value.tail.begin(), value.tail.end(),
                       [](auto b) { return b == 0xA5; }));
@@ -711,19 +712,20 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
                                       &context) == TESSERA_INVALID_ARGUMENT);
   backends[1].header.size = 151;
   const auto badPrefix = object_bytes(backends);
-  CHECK(tessera_backends_enumerate_v1(backends.data(), kBackendCount,
-                                      &required, &context) ==
-        TESSERA_ABI_INCOMPATIBLE);
+  CHECK(tessera_backends_enumerate_v1(backends.data(), kBackendCount, &required,
+                                      &context) == TESSERA_ABI_INCOMPATIBLE);
   CHECK(object_bytes(backends) == badPrefix);
   backends[1] = initialized<tessera_backend_info_v1>();
   REQUIRE(tessera_test_c_enumerate(backends.data(), kBackendCount, &required,
                                    &context) == TESSERA_OK);
   std::set<std::string> ids;
   for (const auto &backend : backends) {
-    CHECK(backend.kind == (fixed_id(backend.id) == "clownmdemu" ?
-                               TESSERA_BACKEND_PRODUCT : TESSERA_BACKEND_TEST));
-    CHECK(backend.system == (fixed_id(backend.id) == "clownmdemu" ?
-                                 TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE));
+    CHECK(backend.kind == (fixed_id(backend.id) == "clownmdemu"
+                               ? TESSERA_BACKEND_PRODUCT
+                               : TESSERA_BACKEND_TEST));
+    CHECK(backend.system == (fixed_id(backend.id) == "clownmdemu"
+                                 ? TESSERA_SYSTEM_MEGA_DRIVE
+                                 : TESSERA_SYSTEM_NONE));
     CHECK((backend.capabilities & ~UINT64_C(0x1FFF)) == 0);
     ids.insert(fixed_id(backend.id));
     CHECK(!fixed_id(backend.version).empty());

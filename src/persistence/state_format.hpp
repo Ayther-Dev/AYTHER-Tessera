@@ -20,16 +20,16 @@ struct CheckpointData {
   Bytes initial_sha;
 };
 
-[[nodiscard]] Bytes encode_checkpoint(std::span<const std::uint8_t> state,
-                                      std::span<const std::uint8_t> trace,
-                                      std::uint64_t next_replay_frame,
-                                      std::span<const std::uint8_t> initial_sha);
+[[nodiscard]] Bytes encode_checkpoint(
+    std::span<const std::uint8_t> state, std::span<const std::uint8_t> trace,
+    std::uint64_t next_replay_frame, std::span<const std::uint8_t> initial_sha);
 [[nodiscard]] CheckpointData
 decode_checkpoint(std::span<const std::uint8_t> bytes);
-[[nodiscard]] ParsedState decode_state(
-    std::span<const std::uint8_t> bytes, std::string_view backend,
-    std::span<const std::uint8_t> content_sha,
-    std::span<const std::uint8_t> build_id,
-    std::span<const std::uint8_t> config_sha, std::uint64_t ticks_per_frame);
+[[nodiscard]] ParsedState
+decode_state(std::span<const std::uint8_t> bytes, std::string_view backend,
+             std::span<const std::uint8_t> content_sha,
+             std::span<const std::uint8_t> build_id,
+             std::span<const std::uint8_t> config_sha,
+             std::uint64_t ticks_per_frame);
 
 } // namespace tessera::persistence

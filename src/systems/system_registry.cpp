@@ -6,16 +6,15 @@
 #include "systems/system_detector.hpp"
 namespace tessera {
 std::span<const SystemRegistration> SystemRegistry::registrations() {
-  static const std::array<SystemRegistration, kRegistrationCount> entries{
-      {
+  static const std::array<SystemRegistration, kRegistrationCount> entries{{
 #if TESSERA_CLOWN_REFERENCE
-       {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE,
-        0x1FFF, make_megadrive_backend},
+      {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
+       make_megadrive_backend},
 #endif
-       {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
-        make_synthetic_backend},
-       {"synthetic.complete", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x1FFF,
-        make_synthetic_backend}}};
+      {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
+       make_synthetic_backend},
+      {"synthetic.complete", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x1FFF,
+       make_synthetic_backend}}};
   return entries;
 }
 std::unique_ptr<IEmulatedSystem> SystemRegistry::create(std::string_view id,

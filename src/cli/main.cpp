@@ -255,8 +255,7 @@ struct Observer {
       event_batch_bytes{}, event_records{}, event_losses{};
   explicit Observer(std::string value) : mode(std::move(value)) {}
   static std::uint64_t little_u64(const Bytes &data, std::size_t at) {
-    ensure(at <= data.size() && data.size() - at >= 8,
-           TESSERA_BACKEND_FAILURE);
+    ensure(at <= data.size() && data.size() - at >= 8, TESSERA_BACKEND_FAILURE);
     std::uint64_t result = 0;
     for (unsigned index = 0; index < 8; ++index)
       result |= std::uint64_t{data[at + index]} << (8 * index);
@@ -324,16 +323,20 @@ struct Observer {
     return data;
   }
   void finish(PublicSession &session) {
-    if (mode == "off") return;
+    if (mode == "off")
+      return;
     auto context = init<tessera_context_v1>();
     std::uint64_t required = 0;
-    const auto first = tessera_losses_query_v1(
-        session.handle(), {nullptr, 0}, &required, &context);
-    if (first != TESSERA_BUFFER_TOO_SMALL) require_ok(first, context);
+    const auto first = tessera_losses_query_v1(session.handle(), {nullptr, 0},
+                                               &required, &context);
+    if (first != TESSERA_BUFFER_TOO_SMALL)
+      require_ok(first, context);
     ensure(required >= 24 && required <= file_limit, TESSERA_BACKEND_FAILURE);
     Bytes data(static_cast<std::size_t>(required));
     require_ok(tessera_losses_query_v1(session.handle(),
-        {data.data(), data.size()}, &required, &context), context);
+                                       {data.data(), data.size()}, &required,
+                                       &context),
+               context);
     event_losses = little_u64(data, 16);
   }
   void read(PublicSession &session, const tessera_context_v1 &step_context) {
@@ -482,8 +485,8 @@ void execute(const Arguments &args, Json &report,
   costs.observation.reserve(static_cast<std::size_t>(requested));
 #ifdef TESSERA_ALLOCATION_METRICS
   report["allocations"] = {{"scope", "executable_cpp_new"},
-                            {"calls_per_frame", Json::array()},
-                            {"bytes_per_frame", Json::array()}};
+                           {"calls_per_frame", Json::array()},
+                           {"bytes_per_frame", Json::array()}};
 #endif
   for (std::uint64_t frame = 1; frame <= requested; ++frame) {
 #ifdef TESSERA_ALLOCATION_METRICS
@@ -511,10 +514,10 @@ void execute(const Arguments &args, Json &report,
     const auto observed = Clock::now();
 #ifdef TESSERA_ALLOCATION_METRICS
     const auto allocation_after = tessera::allocation_metrics::snapshot();
-    report["allocations"]["calls_per_frame"].push_back(
-        allocation_after.calls - allocation_before.calls);
-    report["allocations"]["bytes_per_frame"].push_back(
-        allocation_after.bytes - allocation_before.bytes);
+    report["allocations"]["calls_per_frame"].push_back(allocation_after.calls -
+                                                       allocation_before.calls);
+    report["allocations"]["bytes_per_frame"].push_back(allocation_after.bytes -
+                                                       allocation_before.bytes);
 #endif
     costs.step.push_back(microseconds(started, advanced));
     costs.hashes.push_back(microseconds(hash_started, hashed));

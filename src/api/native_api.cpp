@@ -547,7 +547,8 @@ tessera_checkpoint_restore_v1(tessera_session h, tessera_bytes_v1 checkpoint,
     require(s->machine->capabilities() & TESSERA_CAP_CHECKPOINT,
             TESSERA_UNSUPPORTED_CAPABILITY);
     s->restore({checkpoint.data, static_cast<std::size_t>(checkpoint.bytes)},
-               {trace.data, static_cast<std::size_t>(trace.bytes)}, c.context());
+               {trace.data, static_cast<std::size_t>(trace.bytes)},
+               c.context());
     return TESSERA_OK;
   });
 }

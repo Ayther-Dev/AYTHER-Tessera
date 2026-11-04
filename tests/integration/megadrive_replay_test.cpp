@@ -47,8 +47,8 @@ void write(const std::filesystem::path &path, View bytes) {
 }
 void write_json(const std::filesystem::path &path, const Json &value) {
   const auto data = value.dump(2) + "\n";
-  write(path, {reinterpret_cast<const std::uint8_t *>(data.data()),
-               data.size()});
+  write(path,
+        {reinterpret_cast<const std::uint8_t *>(data.data()), data.size()});
 }
 std::wstring quote(std::wstring_view input) {
   std::wstring result = L"\"";
@@ -73,9 +73,9 @@ Child run(const std::filesystem::path &executable,
           const std::vector<std::wstring> &args,
           const std::filesystem::path &log, DWORD timeout_ms = 600000) {
   SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
-  const HANDLE output = CreateFileW(log.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
-                                    &security, CREATE_ALWAYS,
-                                    FILE_ATTRIBUTE_NORMAL, nullptr);
+  const HANDLE output =
+      CreateFileW(log.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &security,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   require(output != INVALID_HANDLE_VALUE, "PROCESS_LOG_OPEN_FAILED");
   std::wstring command = quote(executable.wstring());
   for (const auto &arg : args)
@@ -87,9 +87,8 @@ Child run(const std::filesystem::path &executable,
   startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
   PROCESS_INFORMATION process{};
   const auto created =
-      CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr,
-                     TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup,
-                     &process);
+      CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, TRUE,
+                     CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
   CloseHandle(output);
   require(created != FALSE, "PROCESS_CREATE_FAILED");
   FILETIME born{}, died{}, kernel{}, user{};
@@ -157,12 +156,11 @@ Bytes trace(View content, View config, const Json &source) {
 }
 void oracle(const tessera_original_frame_v1 &frame, tessera_session session,
             tessera_context_v1 &context, bool active) {
-  require(frame.width == 320 && frame.height == 224 &&
-              frame.pcm.bytes > 0 && frame.pcm_frames > 0,
+  require(frame.width == 320 && frame.height == 224 && frame.pcm.bytes > 0 &&
+              frame.pcm_frames > 0,
           "FX02_GEOMETRY_OR_AUDIO_MISSING");
-  const auto center = (std::size_t(frame.height / 2) * frame.width +
-                       frame.width / 2) *
-                      4;
+  const auto center =
+      (std::size_t(frame.height / 2) * frame.width + frame.width / 2) * 4;
   require(frame.pixels.data[center] == (active ? 255 : 0) &&
               frame.pixels.data[center + 2] == (active ? 0 : 255),
           "FX02_VIDEO_ORACLE_FAILED");
@@ -170,13 +168,12 @@ void oracle(const tessera_original_frame_v1 &frame, tessera_session session,
   for (std::size_t offset = 0; offset < frame.pcm.bytes; offset += 2) {
     const auto bits = std::uint16_t(frame.pcm.data[offset]) |
                       std::uint16_t(frame.pcm.data[offset + 1]) << 8;
-    const auto sample = bits < 32768 ? std::int32_t(bits)
-                                     : std::int32_t(bits) - 65536;
+    const auto sample =
+        bits < 32768 ? std::int32_t(bits) : std::int32_t(bits) - 65536;
     minimum = std::min(minimum, sample);
     maximum = std::max(maximum, sample);
   }
-  require(active ? maximum - minimum > 16
-                 : minimum >= -2 && maximum <= 2,
+  require(active ? maximum - minimum > 16 : minimum >= -2 && maximum <= 2,
           "FX02_AUDIO_ORACLE_FAILED");
   tessera_snapshot snapshot{};
   require(tessera_snapshot_acquire_v1(session, &snapshot, &context) ==
@@ -185,9 +182,9 @@ void oracle(const tessera_original_frame_v1 &frame, tessera_session session,
   auto memory = client::init<tessera_snapshot_region_v1>();
   auto palette = client::init<tessera_snapshot_region_v1>();
   require(tessera_snapshot_region_query_v1(snapshot, 0, &memory, &context) ==
-              TESSERA_OK &&
+                  TESSERA_OK &&
               tessera_snapshot_region_query_v1(snapshot, 1, &palette,
-                                                &context) == TESSERA_OK,
+                                               &context) == TESSERA_OK,
           "FX02_REGIONS_MISSING");
   require(memory.kind == 1 && memory.data.bytes >= 131072 &&
               palette.kind == 2 && palette.data.bytes >= 2,
@@ -210,8 +207,8 @@ int worker(const std::filesystem::path &rom_path,
            const std::filesystem::path &trace_path,
            const std::filesystem::path &checkpoint_path,
            const std::filesystem::path &checkpoint_directory,
-           const std::filesystem::path &report_path, bool action,
-           bool observe, bool fx02, std::uint64_t frames) {
+           const std::filesystem::path &report_path, bool action, bool observe,
+           bool fx02, std::uint64_t frames) {
   const auto rom = read(rom_path), config = read(config_path),
              memory = read(memory_path), trace = read(trace_path);
   client::PublicSession session("clownmdemu", rom, config, memory);
@@ -228,8 +225,8 @@ int worker(const std::filesystem::path &rom_path,
   auto info = session.info();
   const auto start = info.frame_id.frame;
   if (observe) {
-    const std::array<tessera_control_item_v1, 2> controls{{{1, 1, 15},
-                                                           {2, 1, 31}}};
+    const std::array<tessera_control_item_v1, 2> controls{
+        {{1, 1, 15}, {2, 1, 31}}};
     session.submit(900 + start, controls);
   }
   Json report{{"start", start},
@@ -250,15 +247,13 @@ int worker(const std::filesystem::path &rom_path,
                                 {"video", hashes.video},
                                 {"audio", hashes.audio}});
     if (fx02 && observe &&
-        ((frame >= 100 && frame <= 200) ||
-         (frame >= 350 && frame <= 550) ||
+        ((frame >= 100 && frame <= 200) || (frame >= 350 && frame <= 550) ||
          (frame >= 650 && frame <= 850))) {
       auto context = client::init<tessera_context_v1>();
       const bool active = action && frame >= 350 && frame <= 550;
       oracle(original, session.handle(), context, active);
       report["oracle_checks"] = report["oracle_checks"].get<unsigned>() + 1;
-      const auto key =
-          active ? "audio_active_checks" : "audio_neutral_checks";
+      const auto key = active ? "audio_active_checks" : "audio_neutral_checks";
       report[key] = report[key].get<unsigned>() + 1;
     }
     if (checkpoint_path == "-" && checkpoint_directory != "-" &&
@@ -270,12 +265,11 @@ int worker(const std::filesystem::path &rom_path,
                   TESSERA_BUFFER_TOO_SMALL,
               "CHECKPOINT_SIZE_FAILED");
       Bytes encoded(static_cast<std::size_t>(required));
-      require(tessera_checkpoint_export_v1(
-                  session.handle(), {encoded.data(), encoded.size()},
-                  &required, &context) == TESSERA_OK,
+      require(tessera_checkpoint_export_v1(session.handle(),
+                                           {encoded.data(), encoded.size()},
+                                           &required, &context) == TESSERA_OK,
               "CHECKPOINT_EXPORT_FAILED");
-      const auto path = checkpoint_directory /
-                        (std::to_string(frame) + ".tsc");
+      const auto path = checkpoint_directory / (std::to_string(frame) + ".tsc");
       require(tessera::persistence::save_checkpoint(path, encoded).ok(),
               "CHECKPOINT_PUBLISH_FAILED");
     }
@@ -296,8 +290,8 @@ void verify_fixture(const std::filesystem::path &generated,
           "FX02_GENERATOR_HASH_MISMATCH");
   for (const auto key : {"rom", "trace_control", "trace_action", "oracle"}) {
     const auto &entry = manifest.at(key);
-    const auto bytes = read(generated / entry.at("generated_name")
-                                           .get<std::string>());
+    const auto bytes =
+        read(generated / entry.at("generated_name").get<std::string>());
     require(client::digest(bytes) == entry.at("sha256").get<std::string>(),
             "FX02_ARTIFACT_HASH_MISMATCH");
   }
@@ -319,8 +313,8 @@ int parent(const std::filesystem::path &self,
   const auto neutral_json = json(generated / "full-control.json");
   const auto memory = Bytes(65536, 0);
   const auto backend = client::find_backend("clownmdemu");
-  const auto config = tessera::wire::configuration("clownmdemu",
-                                                   backend.build_id, memory);
+  const auto config =
+      tessera::wire::configuration("clownmdemu", backend.build_id, memory);
   write(evidence / "memory.bin", memory);
   write(evidence / "config.bin", config);
   struct Scenario {
@@ -329,34 +323,32 @@ int parent(const std::filesystem::path &self,
     const Json *source;
     bool action, fx02;
   };
-  const std::array<Scenario, 3> scenarios{{
-      {"original", TESSERA_ORIGINAL_ROM, &neutral_json, false, false},
-      {"fx02-control", generated / "program.md", &neutral_json, false, true},
-      {"fx02-action", generated / "program.md", &action_json, true, true}}};
+  const std::array<Scenario, 3> scenarios{
+      {{"original", TESSERA_ORIGINAL_ROM, &neutral_json, false, false},
+       {"fx02-control", generated / "program.md", &neutral_json, false, true},
+       {"fx02-action", generated / "program.md", &action_json, true, true}}};
   std::set<std::pair<DWORD, std::uint64_t>> processes;
-  Json summary{{"schema", 1}, {"runs", Json::array()},
-               {"first_divergence", nullptr}};
+  Json summary{
+      {"schema", 1}, {"runs", Json::array()}, {"first_divergence", nullptr}};
   for (const auto &scenario : scenarios) {
     const auto rom = read(scenario.rom);
-    const auto encoded_trace = trace(rom, config,
-                                     scenario.source->at("frames"));
+    const auto encoded_trace =
+        trace(rom, config, scenario.source->at("frames"));
     const auto trace_path = evidence / (scenario.name + ".trace");
     write(trace_path, encoded_trace);
     const auto checkpoints = evidence / (scenario.name + "-checkpoints");
     std::filesystem::create_directory(checkpoints);
     Json baseline;
     for (const bool observe : {false, true}) {
-      const auto report_path = evidence /
-                               (scenario.name + (observe ? "-full" : "-off") +
-                                ".json");
+      const auto report_path =
+          evidence / (scenario.name + (observe ? "-full" : "-off") + ".json");
       const auto identity = run(
           self,
           {L"--worker", scenario.rom.wstring(),
            (evidence / "config.bin").wstring(),
            (evidence / "memory.bin").wstring(), trace_path.wstring(), L"-",
            observe ? checkpoints.wstring() : L"-", report_path.wstring(),
-           scenario.action ? L"action" : L"control",
-           observe ? L"full" : L"off",
+           scenario.action ? L"action" : L"control", observe ? L"full" : L"off",
            scenario.fx02 ? L"fx02" : L"original", L"3000"},
           evidence / (scenario.name + (observe ? "-full" : "-off") + ".log"));
       require(processes.emplace(identity.pid, identity.born).second,
@@ -379,28 +371,28 @@ int parent(const std::filesystem::path &self,
         baseline = report.at("frames");
       }
       summary["runs"].push_back({{"name", scenario.name},
-                                  {"mode", observe ? "full" : "off"},
-                                  {"pid", identity.pid},
-                                  {"born_utc_100ns", identity.born},
-                                  {"frames", 3000},
-                                  {"divergences", 0}});
+                                 {"mode", observe ? "full" : "off"},
+                                 {"pid", identity.pid},
+                                 {"born_utc_100ns", identity.born},
+                                 {"frames", 3000},
+                                 {"divergences", 0}});
     }
     for (const auto checkpoint_frame : {500, 1500, 2500}) {
       const auto report_path =
           evidence / (scenario.name + "-restore-" +
                       std::to_string(checkpoint_frame) + ".json");
-      const auto identity = run(
-          self,
-          {L"--worker", scenario.rom.wstring(),
-           (evidence / "config.bin").wstring(),
-           (evidence / "memory.bin").wstring(), trace_path.wstring(),
-           (checkpoints / (std::to_string(checkpoint_frame) + ".tsc"))
-               .wstring(),
-           L"-", report_path.wstring(),
-           scenario.action ? L"action" : L"control", L"full",
-           scenario.fx02 ? L"fx02" : L"original", L"500"},
-          evidence / (scenario.name + "-restore-" +
-                      std::to_string(checkpoint_frame) + ".log"));
+      const auto identity =
+          run(self,
+              {L"--worker", scenario.rom.wstring(),
+               (evidence / "config.bin").wstring(),
+               (evidence / "memory.bin").wstring(), trace_path.wstring(),
+               (checkpoints / (std::to_string(checkpoint_frame) + ".tsc"))
+                   .wstring(),
+               L"-", report_path.wstring(),
+               scenario.action ? L"action" : L"control", L"full",
+               scenario.fx02 ? L"fx02" : L"original", L"500"},
+              evidence / (scenario.name + "-restore-" +
+                          std::to_string(checkpoint_frame) + ".log"));
       require(processes.emplace(identity.pid, identity.born).second,
               "RESTORE_PROCESS_IDENTITY_REUSED");
       const auto restored = json(report_path);
@@ -411,20 +403,20 @@ int parent(const std::filesystem::path &self,
       for (std::size_t index = 0; index < 500; ++index) {
         if (restored.at("frames")[index] !=
             baseline[checkpoint_frame + index]) {
-          summary["first_divergence"] =
-              {{"scenario", scenario.name},
-               {"frame", checkpoint_frame + index + 1}};
+          summary["first_divergence"] = {
+              {"scenario", scenario.name},
+              {"frame", checkpoint_frame + index + 1}};
           write_json(evidence / "summary.json", summary);
           throw std::runtime_error("RESTORE_CANONICAL_DIVERGENCE");
         }
       }
       summary["runs"].push_back({{"name", scenario.name},
-                                  {"mode", "restore"},
-                                  {"from", checkpoint_frame},
-                                  {"pid", identity.pid},
-                                  {"born_utc_100ns", identity.born},
-                                  {"frames", 500},
-                                  {"divergences", 0}});
+                                 {"mode", "restore"},
+                                 {"from", checkpoint_frame},
+                                 {"pid", identity.pid},
+                                 {"born_utc_100ns", identity.born},
+                                 {"frames", 500},
+                                 {"divergences", 0}});
     }
   }
   summary["processes"] = processes.size();

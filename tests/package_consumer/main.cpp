@@ -7,8 +7,8 @@
 #include <cstring>
 #include <type_traits>
 
-extern "C" tessera_status TESSERA_CALL
-installed_c_query(tessera_api_info_v1 *, tessera_context_v1 *);
+extern "C" tessera_status TESSERA_CALL installed_c_query(tessera_api_info_v1 *,
+                                                         tessera_context_v1 *);
 
 static_assert(sizeof(tessera_context_v1) == 64);
 static_assert(alignof(tessera_context_v1) == 8);
@@ -55,6 +55,7 @@ int main() {
                                &bytes) != TESSERA_OK ||
       bytes == 0 || bytes >= message.size())
     return 6;
-  std::puts("Paquete instalado: ABI C11/C++20, consultas y ownership del caller verificados.");
+  std::puts("Paquete instalado: ABI C11/C++20, consultas y ownership del "
+            "caller verificados.");
   return 0;
 }

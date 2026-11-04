@@ -23,7 +23,8 @@ using Json = nlohmann::json;
 using Bytes = tessera::Bytes;
 
 void require(bool condition, const char *message) {
-  if (!condition) throw std::runtime_error(message);
+  if (!condition)
+    throw std::runtime_error(message);
 }
 
 template <typename T> T init() {
@@ -35,7 +36,8 @@ template <typename T> T init() {
 Bytes read(const fs::path &path) {
   std::ifstream file(path, std::ios::binary);
   require(file.good(), "Cannot open benchmark input");
-  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+  return {std::istreambuf_iterator<char>(file),
+          std::istreambuf_iterator<char>()};
 }
 
 void write(const fs::path &path, const Bytes &bytes) {
@@ -52,9 +54,9 @@ std::wstring quote(const fs::path &path) {
 
 std::uint64_t run(const fs::path &exe, const std::wstring &arguments,
                   const fs::path &log) {
-  HANDLE output = CreateFileW(log.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
-                              nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-                              nullptr);
+  HANDLE output =
+      CreateFileW(log.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   require(output != INVALID_HANDLE_VALUE, "Cannot create benchmark log");
   SetHandleInformation(output, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
   STARTUPINFOW startup{};
@@ -65,9 +67,9 @@ std::uint64_t run(const fs::path &exe, const std::wstring &arguments,
   startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
   PROCESS_INFORMATION process{};
   auto command = quote(exe) + L" " + arguments;
-  const BOOL started = CreateProcessW(exe.c_str(), command.data(), nullptr,
-                                      nullptr, TRUE, CREATE_NO_WINDOW, nullptr,
-                                      nullptr, &startup, &process);
+  const BOOL started =
+      CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, TRUE,
+                     CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
   CloseHandle(output);
   require(started != FALSE, "Cannot start benchmark consumer");
   const DWORD waited = WaitForSingleObject(process.hProcess, 120000);
@@ -79,8 +81,8 @@ std::uint64_t run(const fs::path &exe, const std::wstring &arguments,
   GetExitCodeProcess(process.hProcess, &exit_code);
   PROCESS_MEMORY_COUNTERS memory{};
   memory.cb = sizeof(memory);
-  const auto measured = GetProcessMemoryInfo(process.hProcess, &memory,
-                                              sizeof(memory));
+  const auto measured =
+      GetProcessMemoryInfo(process.hProcess, &memory, sizeof(memory));
   CloseHandle(process.hThread);
   CloseHandle(process.hProcess);
   require(waited == WAIT_OBJECT_0 && exit_code == 0,
@@ -105,11 +107,13 @@ std::map<std::string, std::string> fields(std::string line) {
 Json runtime_report(const fs::path &log, bool devices) {
   std::ifstream file(log);
   require(file.good(), "Cannot open Runtime benchmark log");
-  Json report = {{"costs", Json::object()}, {"frames", Json::object()},
+  Json report = {{"costs", Json::object()},
+                 {"frames", Json::object()},
                  {"frame_hashes", Json::array()},
-                 {"allocations", {{"scope", "executable_cpp_new"},
-                                   {"calls_per_frame", Json::array()},
-                                   {"bytes_per_frame", Json::array()}}}};
+                 {"allocations",
+                  {{"scope", "executable_cpp_new"},
+                   {"calls_per_frame", Json::array()},
+                   {"bytes_per_frame", Json::array()}}}};
   std::string line;
   while (std::getline(file, line)) {
     if (line.starts_with("AYTHER_NATIVE_CONFIG ")) {
@@ -130,12 +134,11 @@ Json runtime_report(const fs::path &log, bool devices) {
       require(std::stoull(frame) == report["frame_hashes"].size() + 1,
               "Runtime frame hash sequence is incomplete");
       report["frame_hashes"].push_back({{"original", values.at("original")},
-                                         {"pcm", values.at("pcm")},
-                                         {"presented", values.at("presented")}});
+                                        {"pcm", values.at("pcm")},
+                                        {"presented", values.at("presented")}});
       if (frame == "1" || frame == "180")
-        report["frames"][frame] = {
-            {"original", values.at("original")},
-            {"pcm", values.at("pcm")}};
+        report["frames"][frame] = {{"original", values.at("original")},
+                                   {"pcm", values.at("pcm")}};
     } else if (line.starts_with("AYTHER_NATIVE_PRESENT ")) {
       const auto values = fields(line);
       report["presentation"] = {
@@ -161,27 +164,30 @@ Json runtime_report(const fs::path &log, bool devices) {
           {"max_ms", std::stod(values.at("max_ms"))}};
     } else if (line.starts_with("AYTHER_NATIVE_FLOW ")) {
       const auto values = fields(line);
-      report["flow"] = {{"frames", std::stoull(values.at("frames"))},
-                        {"borrowed_video_bytes", std::stoull(values.at("borrowed_video"))},
-                        {"composed_frames", std::stoull(values.at("composed_frames"))},
-                        {"composed_copy_bytes", std::stoull(values.at("composed_copy"))},
-                        {"fallback_frames", std::stoull(values.at("fallback_frames"))},
-                        {"fallback_no_pack", std::stoull(values.at("fallback_no_pack"))},
-                        {"fallback_policy", std::stoull(values.at("fallback_policy"))},
-                        {"fallback_no_rule", std::stoull(values.at("fallback_no_rule"))},
-                        {"scope", values.at("scope")}};
+      report["flow"] = {
+          {"frames", std::stoull(values.at("frames"))},
+          {"borrowed_video_bytes", std::stoull(values.at("borrowed_video"))},
+          {"composed_frames", std::stoull(values.at("composed_frames"))},
+          {"composed_copy_bytes", std::stoull(values.at("composed_copy"))},
+          {"fallback_frames", std::stoull(values.at("fallback_frames"))},
+          {"fallback_no_pack", std::stoull(values.at("fallback_no_pack"))},
+          {"fallback_policy", std::stoull(values.at("fallback_policy"))},
+          {"fallback_no_rule", std::stoull(values.at("fallback_no_rule"))},
+          {"scope", values.at("scope")}};
     } else if (line.starts_with("AYTHER_NATIVE_DEVICE_BYTES ")) {
       const auto values = fields(line);
-      report["device_bytes"] = {{"gpu_staging", std::stoull(values.at("gpu_staging"))},
-                                {"audio_stream_queue", std::stoull(values.at("audio_stream_queue"))},
-                                {"scope", values.at("scope")}};
+      report["device_bytes"] = {
+          {"gpu_staging", std::stoull(values.at("gpu_staging"))},
+          {"audio_stream_queue", std::stoull(values.at("audio_stream_queue"))},
+          {"scope", values.at("scope")}};
     } else if (line.starts_with("AYTHER_NATIVE_EVENTS ")) {
       const auto values = fields(line);
-      report["events"] = {{"emitted", std::stoull(values.at("emitted"))},
-                          {"retained", std::stoull(values.at("retained"))},
-                          {"batch_bytes", std::stoull(values.at("batch_bytes"))},
-                          {"losses", std::stoull(values.at("losses"))},
-                          {"scope", values.at("scope")}};
+      report["events"] = {
+          {"emitted", std::stoull(values.at("emitted"))},
+          {"retained", std::stoull(values.at("retained"))},
+          {"batch_bytes", std::stoull(values.at("batch_bytes"))},
+          {"losses", std::stoull(values.at("losses"))},
+          {"scope", values.at("scope")}};
     } else if (line.starts_with("AYTHER_NATIVE_ALLOC ")) {
       const auto values = fields(line);
       require(std::stoull(values.at("frame")) ==
@@ -210,12 +216,12 @@ Json runtime_report(const fs::path &log, bool devices) {
               report["costs"].contains("runtime_device") &&
               report["frames"].size() == 2 &&
               report["frame_hashes"].size() == 180 &&
-              report.contains("config_sha256") &&
-              report.contains("flow") &&
+              report.contains("config_sha256") && report.contains("flow") &&
               report.contains("events") && report.contains("device_bytes") &&
               report["flow"]["frames"] == 180 &&
               report["flow"]["composed_frames"].get<std::uint64_t>() +
-                  report["flow"]["fallback_frames"].get<std::uint64_t>() == 180 &&
+                      report["flow"]["fallback_frames"].get<std::uint64_t>() ==
+                  180 &&
               report["events"]["emitted"] == report["events"]["retained"] &&
               report["events"]["losses"] == 0,
           "Runtime benchmark coverage is incomplete");
@@ -224,15 +230,15 @@ Json runtime_report(const fs::path &log, bool devices) {
               (allocation_count == 180 &&
                report["allocations"]["bytes_per_frame"].size() == 180),
           "Runtime allocation coverage is incomplete");
-  require(!devices || (report.contains("presentation") &&
-                       report.contains("audio") &&
-                       report.contains("gpu_timestamp") &&
-                       report["gpu_timestamp"]["supported"] == 1 &&
-                       report["gpu_timestamp"]["samples"] == 180 &&
-                       report["costs"].contains("gpu_execute") &&
-                       report["costs"].contains("gpu_image_wait") &&
-                       report["costs"].contains("gpu_command_span") &&
-                       report["presentation"]["validation_errors"] == 0),
+  require(!devices ||
+              (report.contains("presentation") && report.contains("audio") &&
+               report.contains("gpu_timestamp") &&
+               report["gpu_timestamp"]["supported"] == 1 &&
+               report["gpu_timestamp"]["samples"] == 180 &&
+               report["costs"].contains("gpu_execute") &&
+               report["costs"].contains("gpu_image_wait") &&
+               report["costs"].contains("gpu_command_span") &&
+               report["presentation"]["validation_errors"] == 0),
           "Device benchmark coverage is incomplete");
   return report;
 }
@@ -254,9 +260,10 @@ Json direct_report(const fs::path &path) {
     const auto percentile = [&samples](std::size_t percent) {
       return samples[(samples.size() * percent + 99) / 100 - 1];
     };
-    costs[stage] = {{"unit", "us"}, {"warmup", 30}, {"count", 150},
-                    {"p50", percentile(50)}, {"p95", percentile(95)},
-                    {"p99", percentile(99)}, {"max", samples.back()}};
+    costs[stage] = {{"unit", "us"},          {"warmup", 30},
+                    {"count", 150},          {"p50", percentile(50)},
+                    {"p95", percentile(95)}, {"p99", percentile(99)},
+                    {"max", samples.back()}};
   }
   const auto &observer = report.at("observer");
   require(observer.at("event_losses") == 0,
@@ -271,7 +278,8 @@ Json direct_report(const fs::path &path) {
               (allocations.at("calls_per_frame").size() == 180 &&
                allocations.at("bytes_per_frame").size() == 180),
           "Direct allocation coverage is incomplete");
-  return {{"costs", costs}, {"observer", observer},
+  return {{"costs", costs},
+          {"observer", observer},
           {"allocations", allocations},
           {"frame_hashes", report.at("frames")},
           {"first", report.at("frames").at(0)},
@@ -285,12 +293,14 @@ Json direct_report(const fs::path &path) {
 
 int main(int argc, char **argv) {
   if (argc < 5) {
-    std::cerr << "Usage: benchmark TESSERA_CLI RUNTIME ROM OUTPUT_DIR [--devices] [--pack PACK TRUST] [--press-b]\n";
+    std::cerr << "Usage: benchmark TESSERA_CLI RUNTIME ROM OUTPUT_DIR "
+                 "[--devices] [--pack PACK TRUST] [--press-b]\n";
     return 2;
   }
   try {
     const fs::path cli = fs::absolute(argv[1]), runtime = fs::absolute(argv[2]);
-    const fs::path rom_path = fs::absolute(argv[3]), output = fs::absolute(argv[4]);
+    const fs::path rom_path = fs::absolute(argv[3]),
+                   output = fs::absolute(argv[4]);
     bool devices = false;
     bool press_b = false;
     fs::path pack, trust;
@@ -299,7 +309,8 @@ int main(int argc, char **argv) {
         require(!devices, "Duplicate --devices");
         devices = true;
       } else if (std::string_view(argv[index]) == "--pack") {
-        require(pack.empty() && index + 2 < argc, "--pack requires PACK and TRUST");
+        require(pack.empty() && index + 2 < argc,
+                "--pack requires PACK and TRUST");
         pack = fs::absolute(argv[++index]);
         trust = fs::absolute(argv[++index]);
       } else if (std::string_view(argv[index]) == "--press-b") {
@@ -314,7 +325,8 @@ int main(int argc, char **argv) {
     const Bytes memory(65536, 0);
     auto context = init<tessera_context_v1>();
     std::array<tessera_backend_info_v1, 16> backends{};
-    for (auto &backend : backends) backend = init<tessera_backend_info_v1>();
+    for (auto &backend : backends)
+      backend = init<tessera_backend_info_v1>();
     std::uint32_t required = 0;
     require(tessera_backends_enumerate_v1(backends.data(), backends.size(),
                                           &required, &context) == TESSERA_OK,
@@ -334,7 +346,8 @@ int main(int argc, char **argv) {
     tessera::wire::scalar(trace, 3, TESSERA_ENCODING_U64, 180);
     std::vector<Bytes> frames;
     tessera::InputState input{};
-    if (press_b) input[5] = 1;
+    if (press_b)
+      input[5] = 1;
     for (std::uint64_t frame = 1; frame <= 180; ++frame) {
       Bytes item;
       tessera::wire::scalar(item, 1, TESSERA_ENCODING_U64, frame);
@@ -348,9 +361,12 @@ int main(int argc, char **argv) {
     write(output / "memory.bin", memory);
     write(output / "trace.bin", trace);
 
-    Json result = {{"schema", 2}, {"frames", 180}, {"warmup", 30},
+    Json result = {{"schema", 2},
+                   {"frames", 180},
+                   {"warmup", 30},
                    {"input_profile", press_b ? "b-held" : "neutral"},
-                   {"repetitions", 3}, {"direct_off", Json::array()},
+                   {"repetitions", 3},
+                   {"direct_off", Json::array()},
                    {"direct_full", Json::array()},
                    {"engine_minimal", Json::array()},
                    {"engine_headless", Json::array()},
@@ -358,16 +374,20 @@ int main(int argc, char **argv) {
                    {"runtime_devices", Json::array()}};
     for (int repetition = 0; repetition < 3; ++repetition) {
       for (const char *mode : {"off", "full"}) {
-        const auto name = std::string("direct-") + mode + "-" +
-                          std::to_string(repetition);
+        const auto name =
+            std::string("direct-") + mode + "-" + std::to_string(repetition);
         const auto report = output / (name + ".json");
-        const auto peak = run(cli, L"replay --backend clownmdemu --content " + quote(rom_path) +
-                     L" --config " + quote(output / "config.bin") +
-                     L" --initial-memory " + quote(output / "memory.bin") +
-                     L" --trace " + quote(output / "trace.bin") +
-                     L" --frames 180 --observer " +
-                     std::wstring(mode, mode + std::char_traits<char>::length(mode)) +
-                     L" --report " + quote(report), output / (name + ".log"));
+        const auto peak =
+            run(cli,
+                L"replay --backend clownmdemu --content " + quote(rom_path) +
+                    L" --config " + quote(output / "config.bin") +
+                    L" --initial-memory " + quote(output / "memory.bin") +
+                    L" --trace " + quote(output / "trace.bin") +
+                    L" --frames 180 --observer " +
+                    std::wstring(mode,
+                                 mode + std::char_traits<char>::length(mode)) +
+                    L" --report " + quote(report),
+                output / (name + ".log"));
         auto direct = direct_report(report);
         direct["peak_working_set_bytes"] = peak;
         result[std::string("direct_") + mode].push_back(std::move(direct));
@@ -376,20 +396,24 @@ int main(int argc, char **argv) {
                   result["direct_full"].back().at("frame_hashes"),
               "Tessera observation changed canonical frame hashes");
       const auto minimal_name = "minimal-" + std::to_string(repetition);
-      const auto minimal_peak = run(runtime, L"--provider tessera --rom " + quote(rom_path) +
-                       L" --native-trace " + quote(output / "trace.bin") +
-                       L" --frames 180 --native-deactivate-at 2",
-                       output / (minimal_name + ".log"));
+      const auto minimal_peak =
+          run(runtime,
+              L"--provider tessera --rom " + quote(rom_path) +
+                  L" --native-trace " + quote(output / "trace.bin") +
+                  L" --frames 180 --native-deactivate-at 2",
+              output / (minimal_name + ".log"));
       auto minimal = runtime_report(output / (minimal_name + ".log"), false);
       minimal["peak_working_set_bytes"] = minimal_peak;
       result["engine_minimal"].push_back(std::move(minimal));
       const auto name = "engine-" + std::to_string(repetition);
-      const auto engine_peak = run(runtime, L"--provider tessera --rom " + quote(rom_path) +
-                       L" --native-trace " + quote(output / "trace.bin") +
-                       L" --frames 180", output / (name + ".log"));
+      const auto engine_peak = run(
+          runtime,
+          L"--provider tessera --rom " + quote(rom_path) + L" --native-trace " +
+              quote(output / "trace.bin") + L" --frames 180",
+          output / (name + ".log"));
       auto engine = runtime_report(output / (name + ".log"), false);
       require(engine.at("config_sha256") ==
-                  result["direct_off"].back().at("config_sha256") &&
+                      result["direct_off"].back().at("config_sha256") &&
                   engine.at("config_sha256") ==
                       result["direct_full"].back().at("config_sha256") &&
                   engine.at("config_sha256") ==
@@ -397,30 +421,36 @@ int main(int argc, char **argv) {
               "Engine and direct Tessera did not use the same configuration");
       for (std::size_t frame = 0; frame < 180; ++frame) {
         require(engine["frame_hashes"][frame]["original"] ==
-                    result["engine_minimal"].back()["frame_hashes"][frame]["original"] &&
-                engine["frame_hashes"][frame]["pcm"] ==
-                    result["engine_minimal"].back()["frame_hashes"][frame]["pcm"],
+                        result["engine_minimal"]
+                            .back()["frame_hashes"][frame]["original"] &&
+                    engine["frame_hashes"][frame]["pcm"] ==
+                        result["engine_minimal"]
+                            .back()["frame_hashes"][frame]["pcm"],
                 "Engine observation changed original video or PCM");
       }
       engine["peak_working_set_bytes"] = engine_peak;
       result["engine_headless"].push_back(std::move(engine));
       if (!pack.empty()) {
         const auto composed_name = "composition-" + std::to_string(repetition);
-        const auto composed_peak = run(runtime,
-            L"--provider tessera --rom " + quote(rom_path) +
-            L" --native-trace " + quote(output / "trace.bin") +
-            L" --frames 180 --pack " + quote(pack) +
-            L" --trust-registry " + quote(trust),
-            output / (composed_name + ".log"));
-        auto composed = runtime_report(output / (composed_name + ".log"), false);
+        const auto composed_peak =
+            run(runtime,
+                L"--provider tessera --rom " + quote(rom_path) +
+                    L" --native-trace " + quote(output / "trace.bin") +
+                    L" --frames 180 --pack " + quote(pack) +
+                    L" --trust-registry " + quote(trust),
+                output / (composed_name + ".log"));
+        auto composed =
+            runtime_report(output / (composed_name + ".log"), false);
         require(composed.at("config_sha256") ==
                     result["engine_headless"].back().at("config_sha256"),
                 "Composition changed native configuration");
         for (std::size_t frame = 0; frame < 180; ++frame) {
           require(composed["frame_hashes"][frame]["original"] ==
-                      result["engine_headless"].back()["frame_hashes"][frame]["original"] &&
-                  composed["frame_hashes"][frame]["pcm"] ==
-                      result["engine_headless"].back()["frame_hashes"][frame]["pcm"],
+                          result["engine_headless"]
+                              .back()["frame_hashes"][frame]["original"] &&
+                      composed["frame_hashes"][frame]["pcm"] ==
+                          result["engine_headless"]
+                              .back()["frame_hashes"][frame]["pcm"],
                   "Composition changed original video or PCM");
         }
         require(composed["flow"]["composed_frames"].get<std::uint64_t>() > 0,
@@ -430,21 +460,26 @@ int main(int argc, char **argv) {
       }
       if (devices) {
         const auto device_name = "devices-" + std::to_string(repetition);
-        const auto pack_arguments = pack.empty() ? std::wstring{} :
-            L" --pack " + quote(pack) + L" --trust-registry " + quote(trust);
-        const auto device_peak = run(runtime, L"--provider tessera --rom " + quote(rom_path) +
-                         L" --native-trace " + quote(output / "trace.bin") +
-                         L" --frames 180" + pack_arguments +
-                         L" --native-visible --native-audio-device",
-            output / (device_name + ".log"));
+        const auto pack_arguments = pack.empty() ? std::wstring{}
+                                                 : L" --pack " + quote(pack) +
+                                                       L" --trust-registry " +
+                                                       quote(trust);
+        const auto device_peak =
+            run(runtime,
+                L"--provider tessera --rom " + quote(rom_path) +
+                    L" --native-trace " + quote(output / "trace.bin") +
+                    L" --frames 180" + pack_arguments +
+                    L" --native-visible --native-audio-device",
+                output / (device_name + ".log"));
         auto device = runtime_report(output / (device_name + ".log"), true);
         require(device.at("config_sha256") ==
                     result["engine_headless"].back().at("config_sha256"),
                 "Device and headless Runtime used different configurations");
         device["peak_working_set_bytes"] = device_peak;
         result["runtime_devices"].push_back(std::move(device));
-        const auto &reference = pack.empty() ? result["engine_headless"].back()
-                                             : result["engine_composition"].back();
+        const auto &reference = pack.empty()
+                                    ? result["engine_headless"].back()
+                                    : result["engine_composition"].back();
         require(result["runtime_devices"].back()["frame_hashes"] ==
                     reference["frame_hashes"],
                 "Runtime device path changed frame hashes");

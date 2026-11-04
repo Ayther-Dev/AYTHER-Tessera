@@ -16,9 +16,10 @@ std::atomic<unsigned> test_number{1};
 struct File {
   std::filesystem::path directory, path;
   File() {
-    directory = std::filesystem::current_path() /
-                ("tessera-state-store-" + std::to_string(GetCurrentProcessId()) +
-                 "-" + std::to_string(test_number.fetch_add(1)));
+    directory =
+        std::filesystem::current_path() /
+        ("tessera-state-store-" + std::to_string(GetCurrentProcessId()) + "-" +
+         std::to_string(test_number.fetch_add(1)));
     REQUIRE(std::filesystem::create_directory(directory));
     path = directory / "checkpoint.tsc";
   }
@@ -30,13 +31,13 @@ struct File {
 };
 fx01::Bytes checkpoint(fx01::Session &session) {
   std::uint64_t required{};
-  REQUIRE(tessera_checkpoint_export_v1(session.handle, {nullptr, 0},
-                                       &required, &session.context) ==
+  REQUIRE(tessera_checkpoint_export_v1(session.handle, {nullptr, 0}, &required,
+                                       &session.context) ==
           TESSERA_BUFFER_TOO_SMALL);
   fx01::Bytes result(static_cast<std::size_t>(required));
-  fx01::expect(tessera_checkpoint_export_v1(
-      session.handle, {result.data(), result.size()}, &required,
-      &session.context));
+  fx01::expect(tessera_checkpoint_export_v1(session.handle,
+                                            {result.data(), result.size()},
+                                            &required, &session.context));
   return result;
 }
 } // namespace
@@ -59,7 +60,8 @@ TEST_CASE("First checkpoint appears only after complete publication") {
   CHECK(loaded == expected);
 }
 
-TEST_CASE("Write and publish failures preserve an existing complete checkpoint") {
+TEST_CASE(
+    "Write and publish failures preserve an existing complete checkpoint") {
   File file;
   fx01::Session session;
   fx01::expect(session.step());
@@ -73,7 +75,8 @@ TEST_CASE("Write and publish failures preserve an existing complete checkpoint")
     REQUIRE(load_checkpoint(file.path, loaded).ok());
     CHECK(loaded == old);
   };
-  auto failure = save_checkpoint(file.path, replacement, StoreFault::write_denied);
+  auto failure =
+      save_checkpoint(file.path, replacement, StoreFault::write_denied);
   CHECK(failure.code == TESSERA_IO_ACCESS_DENIED);
   CHECK(failure.phase == TESSERA_PHASE_WRITE);
   CHECK(failure.os_domain == TESSERA_OS_WIN32);
@@ -121,7 +124,8 @@ TEST_CASE("Read failures preserve caller bytes and the running session") {
   CHECK(output == sentinel);
 }
 
-TEST_CASE("A process stopped after a partial temporary write never publishes it") {
+TEST_CASE(
+    "A process stopped after a partial temporary write never publishes it") {
   wchar_t child_path[MAX_PATH]{};
   const auto length = GetEnvironmentVariableW(L"TESSERA_STORE_INTERRUPT_PATH",
                                               child_path, MAX_PATH);
@@ -148,9 +152,9 @@ TEST_CASE("A process stopped after a partial temporary write never publishes it"
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION child{};
-    const auto created = CreateProcessW(executable, command.data(), nullptr,
-                                        nullptr, FALSE, CREATE_NO_WINDOW,
-                                        nullptr, nullptr, &startup, &child);
+    const auto created =
+        CreateProcessW(executable, command.data(), nullptr, nullptr, FALSE,
+                       CREATE_NO_WINDOW, nullptr, nullptr, &startup, &child);
     REQUIRE(SetEnvironmentVariableW(L"TESSERA_STORE_INTERRUPT_PATH", nullptr) !=
             FALSE);
     REQUIRE(created != FALSE);

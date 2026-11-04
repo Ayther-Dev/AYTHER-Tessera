@@ -18,14 +18,13 @@ StoreResult failure(tessera_status code, std::uint32_t phase,
 }
 
 StoreResult os_failure(std::uint32_t phase, DWORD error) {
-  const auto code = error == ERROR_DISK_FULL || error == ERROR_HANDLE_DISK_FULL
-                        ? TESSERA_IO_NO_SPACE
-                        : error == ERROR_ACCESS_DENIED ||
-                                  error == ERROR_SHARING_VIOLATION
-                              ? TESSERA_IO_ACCESS_DENIED
-                              : phase == TESSERA_PHASE_PUBLISH
-                                    ? TESSERA_IO_PUBLISH_FAILED
-                                    : TESSERA_IO_OTHER;
+  const auto code =
+      error == ERROR_DISK_FULL || error == ERROR_HANDLE_DISK_FULL
+          ? TESSERA_IO_NO_SPACE
+      : error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION
+          ? TESSERA_IO_ACCESS_DENIED
+      : phase == TESSERA_PHASE_PUBLISH ? TESSERA_IO_PUBLISH_FAILED
+                                       : TESSERA_IO_OTHER;
   return failure(code, phase, error);
 }
 
@@ -68,8 +67,8 @@ StoreResult save_checkpoint(const std::filesystem::path &path,
     return failure(TESSERA_IO_OTHER, TESSERA_PHASE_WRITE,
                    ERROR_OPERATION_ABORTED);
   if (!write_ok || !flush_ok)
-    result = os_failure(TESSERA_PHASE_WRITE,
-                        write_ok ? flush_error : write_error);
+    result =
+        os_failure(TESSERA_PHASE_WRITE, write_ok ? flush_error : write_error);
   else if (fault == StoreFault::write_no_space)
     result = failure(TESSERA_IO_NO_SPACE, TESSERA_PHASE_WRITE, ERROR_DISK_FULL);
   if (!result.ok()) {
@@ -111,9 +110,9 @@ StoreResult load_checkpoint(const std::filesystem::path &path, Bytes &out,
   if (fault == StoreFault::read_denied)
     return failure(TESSERA_IO_ACCESS_DENIED, TESSERA_PHASE_READ,
                    ERROR_ACCESS_DENIED);
-  const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
-                                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                  nullptr);
+  const HANDLE file =
+      CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE)
     return os_failure(TESSERA_PHASE_READ, GetLastError());
   LARGE_INTEGER extent{};
@@ -122,10 +121,9 @@ StoreResult load_checkpoint(const std::filesystem::path &path, Bytes &out,
   if (!size_ok || extent.QuadPart <= 0 ||
       static_cast<std::uint64_t>(extent.QuadPart) > maximum_bytes) {
     CloseHandle(file);
-    return size_ok
-               ? StoreResult{TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_READ,
-                             TESSERA_OS_NONE, 0}
-               : os_failure(TESSERA_PHASE_READ, size_error);
+    return size_ok ? StoreResult{TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_READ,
+                                 TESSERA_OS_NONE, 0}
+                   : os_failure(TESSERA_PHASE_READ, size_error);
   }
   Bytes candidate;
   try {
@@ -135,10 +133,10 @@ StoreResult load_checkpoint(const std::filesystem::path &path, Bytes &out,
     return {TESSERA_OUT_OF_MEMORY, TESSERA_PHASE_READ, TESSERA_OS_NONE, 0};
   }
   DWORD read{};
-  const bool read_ok = ReadFile(file, candidate.data(),
-                                static_cast<DWORD>(candidate.size()), &read,
-                                nullptr) &&
-                       read == candidate.size();
+  const bool read_ok =
+      ReadFile(file, candidate.data(), static_cast<DWORD>(candidate.size()),
+               &read, nullptr) &&
+      read == candidate.size();
   const auto read_error = read_ok ? ERROR_SUCCESS : GetLastError();
   CloseHandle(file);
   if (!read_ok)

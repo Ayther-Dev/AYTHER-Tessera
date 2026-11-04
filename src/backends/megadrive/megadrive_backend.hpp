@@ -26,8 +26,12 @@ public:
     return width_ != 0 && height_ != 0 && !pcm_.empty();
   }
   [[nodiscard]] std::uint32_t system() const noexcept override { return 1; }
-  [[nodiscard]] std::uint32_t frame_width() const noexcept override { return width_; }
-  [[nodiscard]] std::uint32_t frame_height() const noexcept override { return height_; }
+  [[nodiscard]] std::uint32_t frame_width() const noexcept override {
+    return width_;
+  }
+  [[nodiscard]] std::uint32_t frame_height() const noexcept override {
+    return height_;
+  }
   [[nodiscard]] std::uint64_t frame_ticks() const noexcept override {
     return megadrive::CanonicalAudio::master_ticks_per_frame;
   }
@@ -37,9 +41,10 @@ public:
   void prepare_observation(std::uint64_t mask) override;
   void step(const InputState &inputs) override;
   [[nodiscard]] Bytes machine_record() const override;
-  void restore_record(std::span<const std::uint8_t> record,
-                      std::uint64_t frame, const InputState &inputs) override;
-  [[nodiscard]] std::vector<RegionData> regions(std::uint64_t mask) const override;
+  void restore_record(std::span<const std::uint8_t> record, std::uint64_t frame,
+                      const InputState &inputs) override;
+  [[nodiscard]] std::vector<RegionData>
+  regions(std::uint64_t mask) const override;
 
 private:
   std::unique_ptr<ClownMDEmu> machine_ = std::make_unique<ClownMDEmu>();
@@ -82,7 +87,8 @@ private:
 };
 
 [[nodiscard]] std::unique_ptr<IEmulatedSystem>
-make_megadrive_backend(std::string_view id, std::span<const std::uint8_t> content,
+make_megadrive_backend(std::string_view id,
+                       std::span<const std::uint8_t> content,
                        std::span<const std::uint8_t> initial_memory);
 
 } // namespace tessera

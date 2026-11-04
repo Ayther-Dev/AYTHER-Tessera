@@ -278,7 +278,8 @@ TEST_CASE("Whole canonical traces reject duplicate contradictory missing "
   }
 }
 
-TEST_CASE("Checkpoint export and invalid restore preserve the accepted transaction and "
+TEST_CASE("Checkpoint export and invalid restore preserve the accepted "
+          "transaction and "
           "borrowed original views") {
   fx01::Session session;
   fx01::expect(session.step(32));

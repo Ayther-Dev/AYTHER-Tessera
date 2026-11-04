@@ -26,17 +26,16 @@ void Session::restore(wire::View encoded, wire::View trace_bytes,
   persistence::CheckpointData checkpoint;
   persistence::ParsedState state_data;
   checkpoint = persistence::decode_checkpoint(encoded);
-  state_data = persistence::decode_state(
-      checkpoint.state, backend, content_sha, build, config_sha,
-      machine->frame_ticks());
+  state_data =
+      persistence::decode_state(checkpoint.state, backend, content_sha, build,
+                                config_sha, machine->frame_ticks());
   require(equal(checkpoint.initial_sha, initial_sha),
           TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
 
   std::optional<wire::Trace> next_trace;
   Bytes next_raw;
   if (checkpoint.trace_length != 0) {
-    require(!trace_bytes.empty(), TESSERA_INVALID_TRACE,
-            TESSERA_PHASE_RESTORE);
+    require(!trace_bytes.empty(), TESSERA_INVALID_TRACE, TESSERA_PHASE_RESTORE);
     auto candidate = wire::trace(trace_bytes);
     require(candidate.frames.size() == checkpoint.trace_length &&
                 equal(wire::sha(trace_bytes), checkpoint.trace_sha) &&
@@ -44,14 +43,12 @@ void Session::restore(wire::View encoded, wire::View trace_bytes,
                 equal(candidate.config_sha, config_sha),
             TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
     require(state_data.completed_frames < candidate.frames.size() + 1 &&
-                checkpoint.next_replay_frame ==
-                    state_data.completed_frames + 1,
+                checkpoint.next_replay_frame == state_data.completed_frames + 1,
             TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
-    const InputState expected =
-        state_data.completed_frames
-            ? candidate.frames[static_cast<std::size_t>(
-                  state_data.completed_frames - 1)]
-            : InputState{};
+    const InputState expected = state_data.completed_frames
+                                    ? candidate.frames[static_cast<std::size_t>(
+                                          state_data.completed_frames - 1)]
+                                    : InputState{};
     require(state_data.inputs == expected, TESSERA_CHECKPOINT_INVALID,
             TESSERA_PHASE_RESTORE);
     next_raw.assign(trace_bytes.begin(), trace_bytes.end());

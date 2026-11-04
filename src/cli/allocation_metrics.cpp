@@ -53,12 +53,16 @@ void *operator new(std::size_t size) {
 void *operator new[](std::size_t size) { return ::operator new(size); }
 void operator delete(void *pointer) noexcept { std::free(pointer); }
 void operator delete[](void *pointer) noexcept { std::free(pointer); }
-void operator delete(void *pointer, std::size_t) noexcept { std::free(pointer); }
-void operator delete[](void *pointer, std::size_t) noexcept { std::free(pointer); }
+void operator delete(void *pointer, std::size_t) noexcept {
+  std::free(pointer);
+}
+void operator delete[](void *pointer, std::size_t) noexcept {
+  std::free(pointer);
+}
 
 void *operator new(std::size_t size, std::align_val_t alignment) {
-  if (void *result = allocate_aligned(size,
-                                      static_cast<std::size_t>(alignment))) {
+  if (void *result =
+          allocate_aligned(size, static_cast<std::size_t>(alignment))) {
     record(size);
     return result;
   }

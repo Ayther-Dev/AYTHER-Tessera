@@ -139,9 +139,11 @@ TEST_CASE("CLI lists implemented test backends and detects bytes independently "
   REQUIRE(list.exit_code == 0);
   // The ClownMDEmu reference backend (product kind) exists only in the local
   // reference build; the distributable core lists the two synthetic backends.
-  REQUIRE(list.report.at("backends").size() == (TESSERA_CLOWN_REFERENCE ? 3 : 2));
+  REQUIRE(list.report.at("backends").size() ==
+          (TESSERA_CLOWN_REFERENCE ? 3 : 2));
   CHECK(list.report.at("code") == 0);
-  CHECK(list.report.at("backends")[0].at("kind") == (TESSERA_CLOWN_REFERENCE ? 1 : 2));
+  CHECK(list.report.at("backends")[0].at("kind") ==
+        (TESSERA_CLOWN_REFERENCE ? 1 : 2));
   TemporaryDirectory directory;
   const auto fixture = directory.path / L"fixture with spaces";
   auto args = demo();

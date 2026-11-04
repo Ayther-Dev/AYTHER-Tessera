@@ -137,7 +137,9 @@ inline Bytes configuration(std::string_view id, View build, View memory) {
     scalar(b, 10, 1, 1);
     scalar(b, 11, 2, 32768);
     scalar(b, 12, 2, 4096);
-    field(b, 13, 6, text("integer-causal-ZOH-v1;CD-disabled-zero-required;zero-initialized-upstream-options"));
+    field(b, 13, 6,
+          text("integer-causal-ZOH-v1;CD-disabled-zero-required;zero-"
+               "initialized-upstream-options"));
   }
   return b;
 }

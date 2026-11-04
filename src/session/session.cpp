@@ -36,7 +36,9 @@ tessera_session_info_v1 Session::info() const {
 }
 Bytes Session::state() const {
   Bytes b = text("TSSTATE1");
-  field(b, 1, 6, text(machine->system() ? "tessera.megadrive.clown" : "tessera.synthetic"));
+  field(b, 1, 6,
+        text(machine->system() ? "tessera.megadrive.clown"
+                               : "tessera.synthetic"));
   scalar(b, 2, 1, 1);
   scalar(b, 3, 1, 0);
   field(b, 4, 5, content_sha);

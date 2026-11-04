@@ -13,9 +13,9 @@ namespace {
 constexpr std::uint64_t megadrive_capabilities = 0x1FFF;
 constexpr std::uint64_t supported_regions = 31;
 constexpr std::array<ClownMDEmu_Button, 8> buttons{
-    CLOWNMDEMU_BUTTON_UP, CLOWNMDEMU_BUTTON_DOWN, CLOWNMDEMU_BUTTON_LEFT,
-    CLOWNMDEMU_BUTTON_RIGHT, CLOWNMDEMU_BUTTON_A, CLOWNMDEMU_BUTTON_B,
-    CLOWNMDEMU_BUTTON_C, CLOWNMDEMU_BUTTON_START};
+    CLOWNMDEMU_BUTTON_UP,    CLOWNMDEMU_BUTTON_DOWN, CLOWNMDEMU_BUTTON_LEFT,
+    CLOWNMDEMU_BUTTON_RIGHT, CLOWNMDEMU_BUTTON_A,    CLOWNMDEMU_BUTTON_B,
+    CLOWNMDEMU_BUTTON_C,     CLOWNMDEMU_BUTTON_START};
 
 void append_u16(Bytes &output, std::uint16_t value) {
   output.push_back(static_cast<std::uint8_t>(value));
@@ -24,8 +24,8 @@ void append_u16(Bytes &output, std::uint16_t value) {
 
 RegionData region(std::uint32_t kind, std::uint32_t element_bytes,
                   std::uint32_t element_count, Bytes data) {
-  return {kind, TESSERA_ENCODING_BYTES, 0, element_bytes,
-          element_count, 0, 0, std::move(data)};
+  return {kind, TESSERA_ENCODING_BYTES, 0, element_bytes, element_count, 0,
+          0,    std::move(data)};
 }
 } // namespace
 
@@ -33,8 +33,9 @@ MegaDriveBackend &MegaDriveBackend::self(void *data) noexcept {
   return *static_cast<MegaDriveBackend *>(data);
 }
 
-MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
-                                   std::span<const std::uint8_t> initial_memory) {
+MegaDriveBackend::MegaDriveBackend(
+    std::span<const std::uint8_t> content,
+    std::span<const std::uint8_t> initial_memory) {
   require(content.size() >= 512 && content.size() % 2 == 0 &&
               content.size() <= std::numeric_limits<cc_u32f>::max() * 2ULL,
           TESSERA_INVALID_CONTENT, TESSERA_PHASE_CREATE);
@@ -44,8 +45,8 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
           TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
   rom_.reserve(content.size() / 2);
   for (std::size_t index = 0; index < content.size(); index += 2)
-    rom_.push_back(static_cast<cc_u16l>((content[index] << 8) |
-                                         content[index + 1]));
+    rom_.push_back(
+        static_cast<cc_u16l>((content[index] << 8) | content[index + 1]));
 
   callbacks_.user_data = this;
   callbacks_.colour_updated = [](void *data, cc_u16f index, cc_u16f colour) {
@@ -54,13 +55,12 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
             TESSERA_PHASE_STEP);
     backend.palette_[index] = static_cast<std::uint16_t>(colour);
   };
-  callbacks_.scanline_rendered = [](void *data, cc_u16f line,
-                                    const cc_u8l *row, cc_u16f left,
-                                    cc_u16f right,
-                                    cc_u16f width, cc_u16f height) {
+  callbacks_.scanline_rendered = [](void *data, cc_u16f line, const cc_u8l *row,
+                                    cc_u16f left, cc_u16f right, cc_u16f width,
+                                    cc_u16f height) {
     auto &backend = self(data);
-    require(width <= 1024 && height <= 1024 && line < height &&
-                left <= right && right <= width,
+    require(width <= 1024 && height <= 1024 && line < height && left <= right &&
+                right <= width,
             TESSERA_BACKEND_FAILURE, TESSERA_PHASE_STEP);
     if (backend.scanlines_ != 0 &&
         (backend.width_ != width || backend.height_ != height))
@@ -71,18 +71,19 @@ MegaDriveBackend::MegaDriveBackend(std::span<const std::uint8_t> content,
     if (backend.temporal_requested_) {
       backend.temporal_lines_[line] = true;
       std::copy(row + left, row + right,
-                backend.temporal_indices_.data() +
-                    std::size_t(line) * 1024 + left);
-      std::fill(backend.temporal_coverage_.begin() +
-                    std::size_t(line) * 1024 + left,
-                backend.temporal_coverage_.begin() +
-                    std::size_t(line) * 1024 + right, 1);
+                backend.temporal_indices_.data() + std::size_t(line) * 1024 +
+                    left);
+      std::fill(
+          backend.temporal_coverage_.begin() + std::size_t(line) * 1024 + left,
+          backend.temporal_coverage_.begin() + std::size_t(line) * 1024 + right,
+          1);
       backend.temporal_palettes_[line] = backend.palette_;
     }
     for (std::size_t x = left; x < right; ++x) {
       const auto colour = backend.palette_[row[x]];
       const auto offset = (std::size_t(line) * width + x) * 4;
-      backend.pixels_buffer_[offset] = static_cast<std::uint8_t>((colour & 15) * 17);
+      backend.pixels_buffer_[offset] =
+          static_cast<std::uint8_t>((colour & 15) * 17);
       backend.pixels_buffer_[offset + 1] =
           static_cast<std::uint8_t>(((colour >> 4) & 15) * 17);
       backend.pixels_buffer_[offset + 2] =
@@ -171,7 +172,9 @@ std::uint64_t MegaDriveBackend::tick() const noexcept {
 const InputState &MegaDriveBackend::latched_inputs() const noexcept {
   return input_;
 }
-const Bytes &MegaDriveBackend::pixels() const noexcept { return pixels_buffer_; }
+const Bytes &MegaDriveBackend::pixels() const noexcept {
+  return pixels_buffer_;
+}
 const Bytes &MegaDriveBackend::pcm() const noexcept { return pcm_; }
 
 void MegaDriveBackend::prepare_observation(std::uint64_t mask) {
@@ -243,24 +246,24 @@ Bytes MegaDriveBackend::machine_record() const {
   return record;
 }
 
-void MegaDriveBackend::restore_record(
-    std::span<const std::uint8_t> encoded, std::uint64_t frame,
-    const InputState &inputs) {
+void MegaDriveBackend::restore_record(std::span<const std::uint8_t> encoded,
+                                      std::uint64_t frame,
+                                      const InputState &inputs) {
   require(frame <= megadrive::CanonicalAudio::max_frames &&
               !(inputs[0] && inputs[1]) && !(inputs[2] && inputs[3]),
           TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
-  const auto fields = wire::record(encoded, TESSERA_CHECKPOINT_INVALID,
-                                   TESSERA_PHASE_RESTORE);
+  const auto fields =
+      wire::record(encoded, TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
   require(fields.size() == 2, TESSERA_CHECKPOINT_INVALID,
           TESSERA_PHASE_RESTORE);
   const auto machine_bytes =
       wire::get(fields, 0, 1, TESSERA_ENCODING_BYTES,
                 std::numeric_limits<std::size_t>::max(),
                 TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
-  const auto audio_bytes = wire::get(
-      fields, 1, 2, TESSERA_ENCODING_BYTES,
-      std::numeric_limits<std::size_t>::max(), TESSERA_CHECKPOINT_INVALID,
-      TESSERA_PHASE_RESTORE);
+  const auto audio_bytes =
+      wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES,
+                std::numeric_limits<std::size_t>::max(),
+                TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
   try {
     clown_state_codec::decode_machine(*machine_, machine_bytes);
     audio_.decode_state(audio_bytes);
@@ -276,8 +279,8 @@ void MegaDriveBackend::restore_record(
   frame_ = frame;
   for (std::size_t index = 0; index < 64; ++index) {
     const auto colour = machine_->vdp.state.cram[index];
-    palette_[index] = static_cast<std::uint16_t>(
-        colour | ((colour & 0x888) >> 3));
+    palette_[index] =
+        static_cast<std::uint16_t>(colour | ((colour & 0x888) >> 3));
     palette_[64 + index] = static_cast<std::uint16_t>(colour >> 1);
     palette_[128 + index] = static_cast<std::uint16_t>(0x888 + (colour >> 1));
   }

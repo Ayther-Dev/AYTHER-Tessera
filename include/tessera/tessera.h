@@ -431,9 +431,10 @@ tessera_status_format_v1(const tessera_context_v1 *context,
 /* --- API 1.1: superficie de observación (spec 008, RF-3.0). Las firmas son las
    de ayther_interface_v1 con el session delante y el contexto al final. Los
    ids, flags y layouts están en tessera_observation.h. --- */
-tessera_status TESSERA_CALL tessera_observation_region_query_v1(
-    tessera_session session, uint32_t region_id,
-    tessera_obs_region_info_v1 *out, uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL
+tessera_observation_region_query_v1(tessera_session session, uint32_t region_id,
+                                    tessera_obs_region_info_v1 *out,
+                                    uint32_t out_size, tessera_context_v1 *ctx);
 tessera_status TESSERA_CALL tessera_observation_region_read_v1(
     tessera_session session, uint32_t region_id, uint32_t offset, void *out,
     uint32_t byte_count, uint64_t expected_generation,
@@ -473,7 +474,8 @@ tessera_status TESSERA_CALL tessera_observation_frame_delta_poll_v1(
     tessera_context_v1 *ctx);
 tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
     tessera_session session, uint64_t generation_from,
-    tessera_obs_frame_delta_v1 *out, uint32_t out_size, tessera_context_v1 *ctx);
+    tessera_obs_frame_delta_v1 *out, uint32_t out_size,
+    tessera_context_v1 *ctx);
 
 /* API 1.1: límites de la observación y de la ROM (RNF-5). Estructura nueva
    porque tessera_limits_v1 es de tamaño fijo en ABI 1.0. */

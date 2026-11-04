@@ -20,19 +20,16 @@ MegaDriveBackend::tile_rgba(std::uint16_t word) const {
       const auto colour = palette_[palette * 16 + index];
       const auto offset = (y * 8 + x) * 4;
       pixels[offset] = static_cast<std::uint8_t>((colour & 15) * 17);
-      pixels[offset + 1] =
-          static_cast<std::uint8_t>(((colour >> 4) & 15) * 17);
-      pixels[offset + 2] =
-          static_cast<std::uint8_t>(((colour >> 8) & 15) * 17);
+      pixels[offset + 1] = static_cast<std::uint8_t>(((colour >> 4) & 15) * 17);
+      pixels[offset + 2] = static_cast<std::uint8_t>(((colour >> 8) & 15) * 17);
       pixels[offset + 3] = index == 0 ? 0 : 255;
     }
   return pixels;
 }
 
 void MegaDriveBackend::capture_provenance(
-    std::uint32_t line, const VDP_ProvenancePixel *sources,
-    std::uint32_t left, std::uint32_t right, std::uint32_t width,
-    std::uint32_t height) {
+    std::uint32_t line, const VDP_ProvenancePixel *sources, std::uint32_t left,
+    std::uint32_t right, std::uint32_t width, std::uint32_t height) {
   if (!temporal_requested_)
     return;
   if (width != 320 || height != 224 || line >= height || left > right ||
@@ -143,10 +140,13 @@ RegionData MegaDriveBackend::temporal_region() const {
     }
     wire::field(data, 8, TESSERA_ENCODING_BYTES, provenance);
   }
-  return {5, TESSERA_ENCODING_BYTES, 0, 1,
-          static_cast<std::uint32_t>(data.size()), 0,
-          temporal_complete_ && temporal_source_complete_
-              ? 3U : 0x80000000U,
+  return {5,
+          TESSERA_ENCODING_BYTES,
+          0,
+          1,
+          static_cast<std::uint32_t>(data.size()),
+          0,
+          temporal_complete_ && temporal_source_complete_ ? 3U : 0x80000000U,
           std::move(data)};
 }
 

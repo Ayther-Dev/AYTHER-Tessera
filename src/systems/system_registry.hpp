@@ -9,7 +9,8 @@ namespace tessera {
 // The distributed core registers only the two synthetic test backends. The
 // ClownMDEmu reference backend (AGPL-3.0) is present, and listed first, only in
 // the local reference build (TESSERA_BUILD_CLOWN_REFERENCE).
-inline constexpr std::size_t kRegistrationCount = TESSERA_CLOWN_REFERENCE ? 3 : 2;
+inline constexpr std::size_t kRegistrationCount =
+    TESSERA_CLOWN_REFERENCE ? 3 : 2;
 struct SystemRegistration {
   std::string_view id;
   std::uint32_t kind, system;
