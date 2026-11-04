@@ -21,3 +21,16 @@ Cada función corresponde a un miembro de `ayther_interface_v1`; la semántica d
 
 ## Estado de la implementación
 Esta tarea (TP-006.4) declara y documenta; ninguna función tiene aún definición. Las implementa el backend Mega Drive en la fase 1 (TP-101 a TP-107) y la sesión sintética devolverá `TESSERA_UNSUPPORTED_CAPABILITY`.
+
+## Restauración de estado sin traza (TP-007.2)
+
+```c
+tessera_status TESSERA_CALL tessera_state_restore_v1(
+    tessera_session session, tessera_bytes_v1 state, tessera_context_v1 *ctx);
+```
+
+- Restaura un savestate `TSSTATE1` (`tessera.megadrive.v1`) sin exigir una traza. `tessera_checkpoint_restore_v1`, atado a `TSTRACE1`, se conserva para el CLI y FX-01.
+- `TESSERA_CHECKPOINT_INCOMPATIBLE` (-20): generación o codec distintos de los de la sesión.
+- `TESSERA_CHECKPOINT_INVALID` (-21): bytes mal formados o truncados; la sesión queda sin cambios.
+- `TESSERA_WRONG_STATE` (-5): la sesión no admite restauración en su fase actual.
+- Tamaño máximo: 2 MiB (RNF-2); `limits_v1.snapshot_bytes` lo publica.
