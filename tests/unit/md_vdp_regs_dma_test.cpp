@@ -467,6 +467,18 @@ TEST_CASE("Mode 4 reads: even word, low byte, one step per read") {
   CHECK(v.read_data() == 0x8888);
 }
 
+TEST_CASE("Mode 4 CRAM writes: word index, 9 bit packing (gpgx probe)") {
+  Vdp v(Standard::ntsc);
+  v.write_control(0xC001); // CRAM write at word index 1, no second word
+  v.write_data(0x0E4A);
+  v.write_data(0x0123);
+  CHECK(v.cram()[1] == 0x0E24);
+  CHECK(v.cram()[2] == 0x0086);
+  v.write_control(0xC020); // the index wraps at 32
+  v.write_data(0x0E4A);
+  CHECK(v.cram()[0] == 0x0E24);
+}
+
 TEST_CASE("Mode 4: every control word is a whole command") {
   Vdp v(Standard::ntsc);
   v.write_control(0x4005);

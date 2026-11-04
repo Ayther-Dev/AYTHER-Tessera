@@ -49,6 +49,18 @@ void Vdp::write_control(std::uint16_t value) {
 }
 
 void Vdp::put(std::uint16_t value) {
+  if (mode4() && (code_ & 0x02U) != 0) {
+    // Mode 4 CRAM write (gpgx): the word index is the address & $1F, the data
+    // is packed to 9 bits (xxxBBGGRR in the low 6 bits plus the top blue bits)
+    // and a Mode 5 read gives it back with the zero bits in between.
+    const unsigned packed = ((value & 0xE00U) >> 3) | (value & 0x3FU);
+    cram_[address_ & 0x1FU] = static_cast<std::uint16_t>(
+        ((packed & 0x1C0U) << 3) | ((packed & 0x38U) << 2) |
+        ((packed & 7U) << 1));
+    address_ =
+        static_cast<std::uint16_t>((address_ + regs_[15] + 1U) & 0x3FFFU);
+    return;
+  }
   if (mode4() && (code_ & 0x02U) == 0) {
     // Mode 4 VRAM write (gpgx vdp_68k_data_w_m4): the word goes to the even
     // address, byte swapped when the address is odd, and the address steps by

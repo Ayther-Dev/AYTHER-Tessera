@@ -379,12 +379,12 @@ namespace tessera::testrom {
 // accesses of the 68000 through the control and data ports and reads it back
 // with byte and word reads into work RAM from $FF0000.
 inline std::vector<std::uint8_t> mode4_pbc_rom() {
-  std::vector<std::uint8_t> rom(0x400, 0);
+  std::vector<std::uint8_t> rom(0x600, 0);
   put32(rom, 0, 0xFFFE00);
   put32(rom, 4, 0x200);
   std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
   std::memcpy(&rom[0x120], "AYTHER MODE4PBC ", 16);
-  put32(rom, 0x1A4, 0x3FF);
+  put32(rom, 0x1A4, 0x5FF);
   std::memset(&rom[0x1F0], ' ', 16);
   rom[0x1F0] = 'U';
   std::vector<std::uint16_t> c = {
@@ -440,6 +440,16 @@ inline std::vector<std::uint8_t> mode4_pbc_rom() {
   write_byte(0x77);
   command(0x0005, 0);
   read_bytes(2);
+  // CRAM in Mode 4, read back in Mode 5 (word index = address & $1F)
+  c.insert(c.end(), {0x45F9, 0x00FF, 0x0020}); // lea $FF0020,a2: aligned
+  command(0xC001, 0);
+  write_word(0x0E4A);
+  write_word(0x0123);
+  command(0xC020, 0);
+  write_word(0x0E4A);
+  c.insert(c.end(), {0x32BC, 0x8144});         // register 1: Mode 5, display on
+  c.insert(c.end(), {0x22BC, 0x0000, 0x0020}); // CRAM read at 0 (Mode 5)
+  read_words(3);
   c.push_back(0x60FE);
   std::size_t at = 0x200;
   for (const auto word : c) {
