@@ -1,5 +1,6 @@
 #include "api/call.hpp"
 #include "build_identity.hpp"
+#include "observation/region_table.hpp"
 #include "session/session.hpp"
 #include "systems/system_detector.hpp"
 #include "systems/system_registry.hpp"
@@ -575,6 +576,84 @@ tessera_status_format_v1(const tessera_context_v1 *in, tessera_buffer_v1 out,
     return copy_bytes({reinterpret_cast<const std::uint8_t *>(message.data()),
                        message.size()},
                       out, required);
+  });
+}
+}
+namespace {
+// Solo synthetic.complete sirve observación por ahora (TP-006.5); los demás
+// backends la anuncian cuando la implementen.
+std::shared_ptr<Session> observed_session(tessera_session handle) {
+  auto s = sessions.get(handle);
+  require(s->backend == "synthetic.complete", TESSERA_UNSUPPORTED_CAPABILITY);
+  return s;
+}
+const observation::RegionRow &region_row(std::uint32_t id) {
+  require(id >= 1 && id <= observation::kRegionCount);
+  return observation::kRegions[id - 1];
+}
+} // namespace
+extern "C" {
+tessera_status TESSERA_CALL tessera_observation_region_query_v1(
+    tessera_session session, std::uint32_t region_id,
+    tessera_obs_region_info_v1 *out, std::uint32_t out_size,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    require(out && out_size >= sizeof(*out));
+    const auto &r = region_row(region_id);
+    c.start();
+    tessera_obs_region_info_v1 info{};
+    info.struct_size = sizeof(info);
+    info.region_id = r.id;
+    info.data_version = r.data_version;
+    info.element_size = r.element_size;
+    info.capacity = r.capacity;
+    info.byte_size = r.byte_size;
+    info.access_flags = r.access_flags;
+    info.legacy_memory_id = r.legacy_id;
+    *out = info;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_region_read_v1(
+    tessera_session session, std::uint32_t region_id, std::uint32_t offset,
+    void *out, std::uint32_t byte_count, std::uint64_t expected_generation,
+    std::uint64_t *actual_generation, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    const auto &r = region_row(region_id);
+    require(out && (byte_count == 0 || offset < r.byte_size) &&
+            std::uint64_t{offset} + byte_count <= r.byte_size);
+    require(expected_generation == UINT64_MAX ||
+                expected_generation == s->generation,
+            TESSERA_STALE_EPOCH);
+    c.start();
+    std::memset(out, 0, byte_count); // regiones fijas: contenido nulo
+    if (actual_generation)
+      *actual_generation = s->generation;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_write_control_v1(
+    tessera_session session, std::uint32_t region_id, std::uint32_t offset,
+    const void *data, std::uint32_t byte_count,
+    std::uint64_t expected_generation, std::uint64_t *new_generation,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_WRITE, [&](Call &c) {
+    auto s = observed_session(session);
+    const auto &r = region_row(region_id);
+    // Canales de supresión del core: fuera del contrato (PQ-1).
+    require(region_id < 6 || region_id > 9, TESSERA_UNSUPPORTED_CAPABILITY);
+    require((r.access_flags & TESSERA_OBS_REGION_ACCESS_CONTROL_WRITE) != 0);
+    require(data && byte_count != 0 && offset < r.byte_size &&
+            std::uint64_t{offset} + byte_count <= r.byte_size);
+    require(expected_generation == UINT64_MAX ||
+                expected_generation == s->generation,
+            TESSERA_STALE_EPOCH);
+    c.start();
+    if (new_generation)
+      *new_generation = s->generation;
+    return TESSERA_OK;
   });
 }
 }

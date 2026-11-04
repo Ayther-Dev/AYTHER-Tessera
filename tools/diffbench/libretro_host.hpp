@@ -9,7 +9,8 @@
 namespace diffbench {
 
 struct RegionDump {
-  uint32_t id = 0, byte_size = 0, access = 0;
+  uint32_t id = 0, byte_size = 0, access = 0, element_size = 0, capacity = 0,
+           data_version = 0, legacy_id = 0;
   int32_t query_status = 0, read_status = 0;
   uint32_t bytes_read = 0;
   uint64_t hash = 0;

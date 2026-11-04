@@ -189,3 +189,10 @@ target_link_libraries(tessera_observation_api_test PRIVATE Tessera::core Tessera
 tessera_copy_diagnostic_runtime(tessera_observation_api_test)
 add_test(NAME contract.observation_api COMMAND tessera_observation_api_test)
 set_tests_properties(contract.observation_api PROPERTIES LABELS "contract;phase1;observation" TIMEOUT 30)
+
+add_executable(tessera_synthetic_observation_test contract/synthetic_observation_test.cpp)
+target_include_directories(tessera_synthetic_observation_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_synthetic_observation_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_synthetic_observation_test)
+add_test(NAME contract.synthetic_observation COMMAND tessera_synthetic_observation_test)
+set_tests_properties(contract.synthetic_observation PROPERTIES LABELS "contract;phase1;observation" TIMEOUT 30)

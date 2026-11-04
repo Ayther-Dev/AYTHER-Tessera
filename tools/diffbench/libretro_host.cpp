@@ -199,6 +199,10 @@ RunResult run_libretro(const std::string &core_path,
         d.query_status = iface->query_region(id, &info, sizeof(info));
         d.byte_size = info.byte_size;
         d.access = info.access_flags;
+        d.element_size = info.element_size;
+        d.capacity = info.capacity;
+        d.data_version = info.data_version;
+        d.legacy_id = info.legacy_memory_id;
         if (d.query_status == 0 &&
             (info.access_flags & TESSERA_OBS_REGION_ACCESS_READ)) {
           std::vector<uint8_t> buf(info.byte_size);

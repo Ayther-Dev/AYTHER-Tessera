@@ -169,6 +169,8 @@ int main(int argc, char **argv) {
       for (const auto &d : r.regions) {
         std::cout << "region=" << d.id << " bytes=" << d.byte_size
                   << " access=" << d.access << " query=" << d.query_status
+                  << " elem=" << d.element_size << " cap=" << d.capacity
+                  << " ver=" << d.data_version << " legacy=" << d.legacy_id
                   << " read=" << d.read_status << "\n";
         if (d.access & TESSERA_OBS_REGION_ACCESS_READ) {
           ++readable;
