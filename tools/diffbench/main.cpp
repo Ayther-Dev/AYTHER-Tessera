@@ -1,12 +1,14 @@
 // Banco diferencial (spec 008, RF-7.2). Esqueleto TP-005.1: lee y valida los
 // manifiestos oracles.toml y corpus.toml. Los planos llegan en TP-005.2 en
 // adelante.
+#include "libretro_host.hpp"
+
 #include <cctype>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -99,7 +101,11 @@ void help() {
                "  --entry <id>               entrada a ejecutar\n"
                "  --planes <lista>           framebuffer,audio_writes,regions\n"
                "  --out <dir>                carpeta del informe\n"
-               "  --validate-only            solo valida los manifiestos\n";
+               "  --validate-only            solo valida los manifiestos\n"
+               "  --libretro <dll> --rom <archivo> [--frames N] "
+               "[--hashes-out <archivo>]\n"
+               "                             ejecuta un core y hashea cada "
+               "frame\n";
 }
 
 } // namespace
@@ -122,6 +128,30 @@ int main(int argc, char **argv) {
     }
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
+  }
+  if (args.count("--libretro")) {
+    if (!args.count("--rom")) {
+      std::cerr << "falta --rom\n";
+      return 2;
+    }
+    const unsigned frames = args.count("--frames")
+                                ? static_cast<unsigned>(std::strtoul(
+                                      args["--frames"].c_str(), nullptr, 10))
+                                : 600u;
+    const auto r =
+        diffbench::run_libretro(args["--libretro"], args["--rom"], frames);
+    if (!r.error.empty()) {
+      std::cerr << "error: " << r.error << "\n";
+      return 1;
+    }
+    if (args.count("--hashes-out")) {
+      std::ofstream out(args["--hashes-out"]);
+      for (const auto h : r.frame_hashes)
+        out << std::hex << h << "\n";
+    }
+    std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
+              << " size=" << r.width << "x" << r.height << "\n";
+    return r.frame_hashes.size() == frames ? 0 : 1;
   }
   if (!args.count("--oracles") || !args.count("--corpus")) {
     std::cerr << "faltan --oracles y --corpus\n";
