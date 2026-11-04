@@ -242,6 +242,8 @@ inline std::vector<std::uint8_t> hint_counter_rom(std::uint8_t hint_reg) {
       0x00C0, 0x0004, // reg0: HINT enabled
       0x33FC, static_cast<std::uint16_t>(0x8A00 | hint_reg),
       0x00C0, 0x0004,
+      0x47F9, 0x00FF,
+      0x0100,         // lea $FF0100,a3 (per frame HINT counts)
       0x46FC, 0x2000, // move #$2000,sr
       0x60FE,         // bra.s .
   };
@@ -251,7 +253,13 @@ inline std::vector<std::uint8_t> hint_counter_rom(std::uint8_t hint_reg) {
     at += 2;
   }
   const std::uint16_t hint[] = {0x52B9, 0x00FF, 0x0000, 0x4E73};
-  const std::uint16_t vint[] = {0x52B9, 0x00FF, 0x0004, 0x4E73};
+  const std::uint16_t vint[] = {
+      0x52B9, 0x00FF, 0x0004, // addq.l #1,$FF0004
+      0x2039, 0x00FF, 0x0000, // move.l $FF0000,d0
+      0x42B9, 0x00FF, 0x0000, // clr.l  $FF0000
+      0x16C0,                 // move.b d0,(a3)+
+      0x4E73,                 // rte
+  };
   at = 0x300;
   for (const auto word : hint) {
     put16(rom, at, word);
