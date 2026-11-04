@@ -188,3 +188,17 @@ permanecen sujetos al apartado anterior.
 Los archivos CMake y `.gitmodules` bajo `cache/backend-evidence` son copias de
 evidencia sin ejecutar. Sus revisiones y fuentes figuran en el lock auxiliar;
 no sustituyen una auditoría de los archivos que termine enlazando el backend.
+
+
+## Componentes del núcleo propio (spec 008, TP-003)
+
+Seleccionados, aún sin incorporar al código; sus avisos se conservarán al vendorizarlos. Ninguno es copyleft (RF-1.4). Licencias en `third_party/licenses/`.
+
+### Moira (MIT)
+Copyright (c) 2019-2023 Dirk W. Hoffmann. CPU 68000. `github.com/dirkwhoffmann/Moira`, commit `ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031`.
+
+### chips `z80.h` (zlib)
+Copyright (c) 2018 Andre Weissflog. CPU Z80. `github.com/floooh/chips`, commit `9e88298ce56319953ac7a43213a1120359f7a3a6`.
+
+### ymfm (BSD-3-Clause)
+Copyright (c) 2021 Aaron Giles. YM2612/YM3438 y YM2413. `github.com/aaronsgiles/ymfm`, commit `81aec25ccbb98f4873a255f7551ac4dadac59b4a`.
