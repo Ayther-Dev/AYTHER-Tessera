@@ -33,8 +33,19 @@ void Vdp::write_control(std::uint16_t value) {
   if ((value & 0xC000U) == 0x8000U) {
     const unsigned index = (value >> 8) & 0x1FU;
     // In mode 4 (register 1 bit 2 clear) registers above 10 do not exist.
+    const bool was_mode4 = mode4();
     if (index <= 10 || (regs_[1] & 0x04U) != 0)
       regs_[index] = static_cast<std::uint8_t>(value);
+    if (was_mode4 && !mode4()) {
+      // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
+      // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
+      std::array<std::uint8_t, 0x10000> spread{};
+      for (unsigned w = 0; w < 0x2000U; ++w) {
+        spread[w * 4U] = vram_[w * 2U];
+        spread[w * 4U + 1U] = vram_[w * 2U + 1U];
+      }
+      vram_ = spread;
+    }
     if ((regs_[0] & 0x02U) == 0)
       hv_latched_ = false; // clearing the latch enable releases the counter
     code_ = 0;

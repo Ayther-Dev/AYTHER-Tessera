@@ -14,7 +14,8 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path, frame_path, palette_path;
+  std::string rom_path, out_path, srm_path, frame_path, palette_path,
+      vram_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -28,6 +29,8 @@ int main(int argc, char **argv) {
       srm_path = argv[++i];
     } else if (arg == "--palette-out" && has_value) {
       palette_path = argv[++i];
+    } else if (arg == "--vram-out" && has_value) {
+      vram_path = argv[++i];
     } else if (arg == "--frame-out" && has_value) {
       frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
@@ -70,6 +73,12 @@ int main(int argc, char **argv) {
     std::ofstream po(palette_path, std::ios::binary | std::ios::trunc);
     po.write(reinterpret_cast<const char *>(table.data()),
              static_cast<std::streamsize>(table.size() * 2U));
+  }
+  if (!vram_path.empty()) {
+    std::ofstream vo(vram_path, std::ios::binary | std::ios::trunc);
+    const auto &vram = system.vdp().vram();
+    vo.write(reinterpret_cast<const char *>(vram.data()),
+             static_cast<std::streamsize>(vram.size()));
   }
   if (!frame_path.empty()) {
     // Same layout as the bench's oracle dump: width, height, pitch (u32 LE)
