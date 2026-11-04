@@ -1,5 +1,6 @@
 #include "md/system.hpp"
 
+
 namespace tessera::md {
 namespace {
 std::uint16_t dup(std::uint8_t v) {
@@ -47,6 +48,7 @@ void System::reset() {
   frame_start_line_ = 192;
   line_start_master_ = 0;
   cpu_.reset();
+  refresh_due_ = 0;
   // On a hard reset the 68000 starts at a fixed point of the frame, not at its
   // beginning: gpgx (genesis.c, gen_reset) measured on hardware that the first
   // HV counter read is $9F21 (NTSC) or $8421 (PAL), i.e. line 159 (132) and
@@ -61,9 +63,27 @@ void System::reset() {
   constexpr moira::i64 kBootCpuCycles = 31;
   cpu_.setClock(
       static_cast<moira::i64>(boot_master / kDivider68k + kBootCpuCycles));
+  refresh_due_ = cpu_.getClock() + 130;
 }
 
 void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
+
+// DRAM refresh: gpgx takes 2 CPU cycles away from the 68000 once every 130
+// cycles it executes (one stolen cycle count per 132 in all: 1.515 %, measured
+// with cpu_drift_long over up to 21 million cycles, TP-104.3).
+void System::run_cpu_until(moira::i64 target) {
+  while (cpu_.getClock() < target) {
+    if (refresh_due_ > target) {
+      cpu_.executeUntil(target);
+      break;
+    }
+    cpu_.executeUntil(refresh_due_);
+    if (cpu_.getClock() >= refresh_due_) {
+      cpu_.stall(2);
+      refresh_due_ = cpu_.getClock() + 130;
+    }
+  }
+}
 
 void System::run_frame() {
   const std::uint32_t lines = lines_per_frame(config_.standard);
@@ -76,6 +96,7 @@ void System::run_frame() {
     const std::uint32_t line = (first_line + index) % lines;
     current_line_ = line;
     line_start_master_ = frame_master + std::uint64_t{index} * kCyclesPerLine;
+    vdp_.set_line_start(line_start_master_);
     vdp_.begin_line(line, false);
     if (frame_ == 0) {
       vdp_.cancel_hint();
@@ -89,13 +110,13 @@ void System::run_frame() {
     if (index == 0 && frame_ != 0) {
       // The vertical interrupt comes vint_cycle cycles after the frame start
       // (gpgx), so a horizontal interrupt of that same line is served first.
-      cpu_.executeUntil(static_cast<moira::i64>(
+      run_cpu_until(static_cast<moira::i64>(
           (line_start_master_ + vdp_.vint_cycle()) / kDivider68k));
       vdp_.raise_vint();
       update_irq();
     }
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
-    cpu_.executeUntil(static_cast<moira::i64>(end_master / kDivider68k));
+    run_cpu_until(static_cast<moira::i64>(end_master / kDivider68k));
     renderer_.render_line(vdp_, line);
     const auto flags = renderer_.take_sprite_flags();
     vdp_.raise_sprite_flags(flags.overflow, flags.collision);
@@ -183,6 +204,7 @@ void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
 std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   switch (target) {
   case Target::z80_area: {
+    z80_wait();
     // The Z80 side is not emulated yet: RAM is plain storage, the sound chip
     // ports read back zero (YM2612 status: not busy, no timer flag).
     if (offset < 0x4000)
@@ -225,10 +247,22 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   }
 }
 
+// The 68000 loses 0.7 cycles on average on every access to the Z80 area
+// (measured on gpgx with cpu_z80area: 40 accesses cost 11 H counter units
+// more than the same accesses to work RAM). Spread as whole cycles.
+void System::z80_wait() {
+  z80_wait_acc_ += 70;
+  if (z80_wait_acc_ >= 100) {
+    z80_wait_acc_ -= 100;
+    cpu_.stall(1);
+  }
+}
+
 void System::write(Target target, std::uint32_t offset, std::uint16_t value,
                    bool word) {
   switch (target) {
   case Target::z80_area:
+    z80_wait();
     if (offset < 0x4000) // a word write stores its high byte
       z80_ram_[offset & 0x1FFFU] = word ? static_cast<std::uint8_t>(value >> 8)
                                         : static_cast<std::uint8_t>(value);

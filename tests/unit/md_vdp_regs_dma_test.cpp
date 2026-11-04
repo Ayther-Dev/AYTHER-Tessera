@@ -346,7 +346,8 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
   dma_regs(v, 16, 0x400, 0x00);
   dma_command(v, 0x0000, 1);
-  CHECK(v.take_cpu_stall() == 16ULL * 3420 / 167);
+  // A VRAM word takes two external slots (measured on gpgx, TP-104.4).
+  CHECK(v.take_cpu_stall() == (2ULL * 16 * 3420 + 166) / 167);
   CHECK(v.take_cpu_stall() == 0);
 }
 
@@ -494,4 +495,37 @@ TEST_CASE("Mode 4: every control word is a whole command") {
   v.write_data(0x9999);
   CHECK(v.vram()[0] == 0x99);
   CHECK(v.vram()[2] == 0x00);
+}
+
+// TP-104.3 / TP-104.4: a finished DMA leaves the length at zero and moves the
+// source registers on, as gpgx does (Sonic 1 depends on it).
+TEST_CASE("a DMA leaves the length at zero and advances the source") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14);
+  reg(v, 15, 2);
+  v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
+  dma_regs(v, 16, 0x400, 0x00);
+  dma_command(v, 0x0000, 1);
+  CHECK(v.reg(19) == 0);
+  CHECK(v.reg(20) == 0);
+  CHECK(v.reg(21) == ((0x400 >> 1) + 16 & 0xFF));
+  CHECK(v.reg(22) == (((0x400 >> 1) + 16) >> 8 & 0xFF));
+}
+
+// TP-104.3: the FIFO holds four words; the fifth write of a burst stalls the
+// 68000 until a slot of the display frees an entry.
+TEST_CASE("the fifth data port write of a burst stalls the CPU") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x44);
+  reg(v, 15, 2);
+  reg(v, 12, 0x81);
+  v.begin_line(10);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 3); // CRAM
+  v.set_time(1000);
+  for (int i = 0; i < 4; ++i)
+    v.write_data(0x0EEE);
+  CHECK(v.take_cpu_stall() == 0);
+  v.write_data(0x0EEE);
+  CHECK(v.take_cpu_stall() > 0);
 }

@@ -52,6 +52,8 @@ public:
   /// Master cycle of the access being made; the owner sets it before every
   /// port access so that DMA durations and the busy bit have a time base.
   void set_time(std::uint64_t master) noexcept { now_ = master; }
+  /// Master cycle at which the current line starts (the HV counter origin).
+  void set_line_start(std::uint64_t master) noexcept { line_start_ = master; }
   /// Master cycles the 68000 stalled in a DMA that read its bus; returns the
   /// amount once and clears it.
   std::uint64_t take_cpu_stall() noexcept {
@@ -91,6 +93,15 @@ private:
   std::uint32_t active_lines() const noexcept;
   void put(std::uint16_t value);
   void run_dma(std::uint16_t first_data);
+  void finish_dma(std::uint32_t length, bool advance_source) noexcept;
+  /// CPU data port write through the 4 entry FIFO (TP-104.3).
+  void fifo_write(std::uint16_t value);
+  void fifo_retire() noexcept;
+  /// Master cycle of the first external slot after `after` (display drawn).
+  std::uint64_t next_slot(std::uint64_t after, bool vram) const noexcept;
+  std::uint64_t slots_end(std::uint64_t start, std::uint64_t slots,
+                         bool colour_ram = false) const noexcept;
+  std::uint64_t slot_service(std::uint64_t start, unsigned slots) const noexcept;
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
   bool display_blank() const noexcept;
   /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).
@@ -119,8 +130,13 @@ private:
   std::uint16_t hv_latch_value_ = 0;
   std::int32_t hint_counter_ = 0;
   std::uint64_t now_ = 0;
+  std::uint64_t line_start_ = 0;
   std::uint64_t busy_until_ = 0;
   std::uint64_t cpu_stall_ = 0;
+  std::array<std::uint64_t, 4> fifo_done_{};
+  unsigned fifo_head_ = 0;
+  unsigned fifo_count_ = 0;
+  std::uint64_t fifo_last_done_ = 0;
   std::function<std::uint16_t(std::uint32_t)> dma_reader_;
 };
 

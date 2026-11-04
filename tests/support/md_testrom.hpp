@@ -226,13 +226,16 @@ inline std::vector<std::uint8_t> dma_fifo_rom() {
 // 40 cell mode; `in_vblank` starts the burst at the first line of the blanking
 // instead of the first line of the active display.
 inline std::vector<std::uint8_t> fifo_timing_rom(unsigned target, bool display,
-                                                 bool h40, bool in_vblank) {
-  std::vector<std::uint8_t> rom(0x400, 0);
+                                                 bool h40, bool in_vblank,
+                                                 bool reads_only = false,
+                                                 unsigned count = 64,
+                                                 bool long_write = false) {
+  std::vector<std::uint8_t> rom(0x400 + 4 * count, 0);
   put32(rom, 0, 0xFFFE00);
   put32(rom, 4, 0x200);
   std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
   std::memcpy(&rom[0x120], "AYTHER FIFO TIME", 16);
-  put32(rom, 0x1A4, 0x3FF);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
   std::memset(&rom[0x1F0], ' ', 16);
   rom[0x1F0] = 'U';
   std::vector<std::uint16_t> c = {
@@ -258,8 +261,291 @@ inline std::vector<std::uint8_t> fifo_timing_rom(unsigned target, bool display,
   const std::uint16_t first = target == 0 ? 0x4000 : target == 1 ? 0xC000 : 0x4000;
   c.insert(c.end(), {0x22BC, first, second});
   c.insert(c.end(), {0x303C, 0x0EEE}); // d0 = data
-  for (unsigned i = 0; i < 64; ++i)
-    c.insert(c.end(), {0x3080, 0x34D3}); // move.w d0,(a0); move.w (a3),(a2)+
+  for (unsigned i = 0; i < count; ++i)
+    c.insert(c.end(), {reads_only ? std::uint16_t{0x4E71}
+                                  : std::uint16_t(long_write ? 0x2080 : 0x3080),
+                       0x34D3}); // move.w d0,(a0) or nop; move.w (a3),(a2)+
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `cpu_drift` (TP-104.3): after syncing to the end of the vertical blanking
+// the 68000 runs a dbf loop of 250 * k iterations (10 cycles each, no VDP
+// access) and reads the HV counter into $FF0000 + 2 * (k - 1), k = 1..32.
+// The difference between emulators grows with the time if one of them takes
+// cycles away from the CPU (DRAM refresh).
+inline std::vector<std::uint8_t> cpu_drift_rom(bool h40) {
+  std::vector<std::uint8_t> rom(0x600, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER CPU DRIFT", 16);
+  put32(rom, 0x1A4, 0x5FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1
+      0x47F9, 0x00C0, 0x0008, // lea $C00008,a3
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x32BC, 0x8144,         // mode 5, display on (the blanking flag moves)
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  for (unsigned k = 1; k <= 32; ++k) {
+    // wait for blanking, then for its end
+    c.insert(c.end(), {0x3011, 0x0240, 0x0008, 0x67F8});
+    c.insert(c.end(), {0x3011, 0x0240, 0x0008, 0x66F8});
+    c.insert(c.end(), {0x323C, static_cast<std::uint16_t>(250 * k - 1),
+                       0x51C9, 0xFFFE});
+    c.insert(c.end(), {0x34D3}); // move.w (a3),(a2)+
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `dma_timing` (TP-104.4): after the sync of fifo_timing, runs 68000 to VDP
+// DMAs of 2, 4, 8 ... 256 words from the ROM to VRAM (`target` 0) or CRAM
+// (1), each followed by a read of the HV counter stored at $FF0000 + 2 * n.
+// The 68000 is held until the DMA ends, so the HV words are its durations.
+inline std::vector<std::uint8_t> dma_timing_rom(unsigned target, bool display,
+                                                bool h40, bool in_vblank) {
+  std::vector<std::uint8_t> rom(0x800, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER DMA TIME ", 16);
+  put32(rom, 0x1A4, 0x7FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, 0x43F9, 0x00C0, 0x0004,
+      0x47F9, 0x00C0, 0x0008, 0x45F9, 0x00FF, 0x0000,
+      0x32BC, 0x8154, 0x32BC, 0x8F02,
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  const auto wait_status = [&](bool until_set) {
+    c.insert(c.end(), {0x3011, 0x0240, 0x0008,
+                       static_cast<std::uint16_t>(until_set ? 0x67F8 : 0x66F8)});
+  };
+  for (unsigned n = 0; n < 11; ++n) {
+    c.insert(c.end(), {0x32BC, std::uint16_t{0x8154}}); // display on to sync
+    wait_status(true);
+    wait_status(false);
+    if (in_vblank)
+      wait_status(true);
+    c.insert(c.end(), {0x32BC, static_cast<std::uint16_t>(display ? 0x8154 : 0x8114)});
+    const std::uint16_t length = static_cast<std::uint16_t>(2U << n);
+    for (const std::uint16_t w :
+         {static_cast<std::uint16_t>(0x9300 | (length & 0xFF)),
+          static_cast<std::uint16_t>(0x9400 | (length >> 8)),
+          std::uint16_t{0x9500}, std::uint16_t{0x9680}, std::uint16_t{0x9700}}) {
+      c.push_back(0x32BC);
+      c.push_back(w);
+    }
+    c.insert(c.end(), {0x22BC, static_cast<std::uint16_t>(target == 0 ? 0x4000 : 0xC000), 0x0080});
+    c.insert(c.end(), {0x34D3});
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `z80_busreq` (TP-103.3): requests the Z80 bus, counts the polls of $A11100
+// until it is granted and stores the count at $FF0000 + 2 * n, 16 times with
+// a growing delay before each request; also reads the status after the
+// release.
+inline std::vector<std::uint8_t> z80_busreq_rom() {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER Z80 BUSRQ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x49F9, 0x00A1, 0x1100, // lea $A11100,a4
+      0x4BF9, 0x00A1, 0x1200, // lea $A11200,a5
+      0x3ABC, 0x0100,         // reset released
+  };
+  for (unsigned n = 0; n < 16; ++n) {
+    c.insert(c.end(), {0x323C, static_cast<std::uint16_t>(n * 3), 0x51C9, 0xFFFE});
+    c.insert(c.end(), {0x38BC, 0x0100, 0x7200});
+    c.insert(c.end(), {0x5241, 0x0814, 0x0000, 0x66F8});
+    c.insert(c.end(), {0x34C1});
+    c.insert(c.end(), {0x38BC, 0x0000});
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `cpu_timing` (TP-101.8): 40 repetitions of each instruction of a battery,
+// each group followed by a read of the HV counter stored at
+// $FF0000 + 2 * group. The differences between emulators are per instruction
+// cycle counts. `group_count` is the number of groups of the battery.
+struct CpuGroup {
+  std::vector<std::uint16_t> setup; // before every repetition
+  std::vector<std::uint16_t> code;
+};
+inline std::vector<CpuGroup> cpu_timing_groups() {
+  const std::vector<std::uint16_t> d0 = {0x203C, 0x1234, 0x5678};
+  const std::vector<std::uint16_t> d0s = {0x203C, 0x0001, 0x2345};
+  return {
+      {{}, {0x4E71}},                       // nop
+      {d0, {0xC0C1}},                       // mulu d1,d0
+      {d0, {0xC1C1}},                       // muls d1,d0
+      {d0s, {0x80C1}},                      // divu d1,d0
+      {d0s, {0x81C1}},                      // divs d1,d0
+      {d0, {0xE5A8}},                       // lsl.l d2,d0
+      {d0, {0xE468}},                       // lsr.w d2,d0
+      {d0, {0xE680}},                       // asr.l #3,d0
+      {d0, {0xE7B8}},                       // rol.l d2,d0
+      {d0, {0xE390}},                       // roxl.l #1,d0
+      {{}, {0x48D1, 0x00F0}},               // movem.l d4-d7,(a1)
+      {{}, {0x4CD1, 0x00F0}},               // movem.l (a1),d4-d7
+      {{}, {0x22D8}},                       // move.l (a0)+,(a1)+
+      {{}, {0xD195}},                       // add.l d0,(a5)
+      {d0, {0xD181}},                       // addx.l d1,d0
+      {d0, {0xC101}},                       // abcd d1,d0
+      {{}, {0x4AD5}},                       // tas (a5)
+      {{}, {0x4295}},                       // clr.l (a5)
+      {{}, {0x4855}},                       // pea (a5)
+      {{}, {0x6102, 0x4E71, 0x4E71}},       // bsr.s
+      {d0, {0x0500}},                       // btst d2,d0
+      {d0, {0x05C0}},                       // bset d2,d0
+      {d0, {0x48C0, 0x4840, 0xC141}},       // ext.l, swap, exg
+      {{}, {0xB348}},                       // cmpm.w (a0)+,(a1)+
+      {d0, {0x54C0}},                       // scc d0
+      {{}, {0x4A81, 0x6702, 0x4E71}},       // tst.l, beq.s (not taken)
+      {{}, {0x4A81, 0x6602, 0x4E71}},       // tst.l, bne.s (taken)
+      {{}, {0x2300}},                       // move.l d0,-(a1)
+      {{}, {0x4E56, 0xFFFC, 0x4E5E}},       // link, unlk
+      {d0, {0xC0FC, 0xFFFF}},               // mulu #$FFFF,d0
+      {d0, {0x80FC, 0x0003}},               // divu #3,d0
+      {{}, {0xB090}},                       // cmp.l (a0),d0
+      {{}, {0x5395}},                       // subq.l #1,(a5)
+      {d0, {0x4480, 0x4680}},               // neg.l, not.l
+      {{}, {0x3010, 0x3290}},               // move.w (a0),d0; move.w (a0),(a1)
+      {{}, {0x1030, 0x0000}},               // move.b 0(a0,d0.w),d0
+      {{}, {0x41E8, 0x0010}},               // lea 16(a0),a0 (pointer walks)
+      {{}, {0x4E75 - 0x4E75 + 0x4E71}},     // nop (reference)
+  };
+}
+inline unsigned cpu_timing_group_count() { return 38; }
+
+inline std::vector<CpuGroup> cpu_z80area_groups() {
+  return {
+      {{}, {0x4E71}},          // nop
+      {{}, {0x1016}},          // move.b (a6),d0   Z80 RAM
+      {{}, {0x3016}},          // move.w (a6),d0
+      {{}, {0x1C80}},          // move.b d0,(a6)
+      {{}, {0x3C80}},          // move.w d0,(a6)
+      {{}, {0x1019}},          // move.b (a1)+,d0  work RAM
+      {{}, {0x1039, 0x00A1, 0x1100}},  // move.b $A11100,d0
+      {{}, {0x1039, 0x00A0, 0x4000}},  // move.b $A04000,d0  YM2612
+      {{}, {0x1039, 0x00C0, 0x0011}},  // move.b $C00011,d0  PSG
+      {{}, {0x1039, 0x00A1, 0x0001}},  // move.b $A10001,d0  I/O
+      {{}, {0x1039, 0x0000, 0x0100}},  // move.b $100,d0     ROM
+  };
+}
+
+inline std::vector<CpuGroup> cpu_muldiv_groups() {
+  std::vector<CpuGroup> g;
+  const std::uint16_t values[8] = {0x0001, 0x0003, 0x00FF, 0x0100, 0x5555,
+                                   0x8000, 0xAAAA, 0xFFFF};
+  for (const std::uint16_t op : {0xC0C1, 0xC1C1, 0x80C1, 0x81C1})
+    for (const std::uint16_t v : values)
+      g.push_back({{0x223C, 0x0000, v, 0x203C, 0x0000, 0x7FFF}, {op}});
+  return g;
+}
+
+inline std::vector<std::uint8_t> cpu_timing_rom(
+    const std::vector<CpuGroup> &groups = cpu_timing_groups()) {
+  std::vector<std::uint8_t> rom(0x10000, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER CPU TIME ", 16);
+  put32(rom, 0x1A4, 0xFFFF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x43F9, 0x00FF, 0x5000, // lea $FF5000,a1
+      0x41F9, 0x00FF, 0x4000, // lea $FF4000,a0
+      0x4BF9, 0x00FF, 0x6000, // lea $FF6000,a5
+      0x47F9, 0x00C0, 0x0008, // lea $C00008,a3
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x49F9, 0x00C0, 0x0004, // lea $C00004,a4
+      0x38BC, 0x8144,         // mode 5, display on
+      0x38BC, 0x8C81,         // H40
+      0x243C, 0x0000, 0x0009, // move.l #9,d2
+      0x223C, 0x0000, 0x00FF, // move.l #$FF,d1
+      0x4DF9, 0x00A0, 0x0000, // lea $A00000,a6
+      0x33FC, 0x0100, 0x00A1, 0x1100, // bus request
+      0x33FC, 0x0100, 0x00A1, 0x1200, // reset released
+  };
+  // the HV read sits in memory (a2) so the work RAM must not be touched by
+  // the groups: they use a5/a1/a0 areas only
+  for (const auto &g : groups) {
+    c.insert(c.end(), {0x3614, 0x0243, 0x0008, 0x67F8}); // wait: blanking
+    c.insert(c.end(), {0x3614, 0x0243, 0x0008, 0x66F8}); // wait: active
+    for (unsigned i = 0; i < 40; ++i) {
+      c.insert(c.end(), g.setup.begin(), g.setup.end());
+      c.insert(c.end(), g.code.begin(), g.code.end());
+    }
+    c.push_back(0x34D3); // move.w (a3),(a2)+
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `cpu_drift_long` (TP-104.3): like cpu_drift but with loops of 1.3 frames
+// repeated K = 1, 2, 4 ... 32 times, so the stolen cycles of a DRAM refresh
+// add up to many lines. HV words at $FF0000 + 2 * n.
+inline std::vector<std::uint8_t> cpu_drift_long_rom() {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER DRIFT LNG", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x45F9, 0x00FF, 0x0000, 0x47F9, 0x00C0, 0x0008, 0x49F9, 0x00C0, 0x0004,
+      0x38BC, 0x8144, 0x38BC, 0x8C81,
+  };
+  for (unsigned k : {1U, 2U, 4U, 8U, 16U, 32U}) {
+    c.insert(c.end(), {0x3614, 0x0243, 0x0008, 0x67F8});
+    c.insert(c.end(), {0x3614, 0x0243, 0x0008, 0x66F8});
+    c.insert(c.end(), {0x363C, static_cast<std::uint16_t>(k - 1), 0x343C, 0xFFFE,
+                       0x51CA, 0xFFFE, 0x51CB, 0xFFF6});
+    c.push_back(0x34D3);
+  }
   c.push_back(0x60FE);
   std::size_t at = 0x200;
   for (const auto word : c) {

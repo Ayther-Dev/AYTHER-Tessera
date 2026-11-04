@@ -14,7 +14,8 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path;
+  std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
+      regs_path, z80_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -30,6 +31,10 @@ int main(int argc, char **argv) {
       palette_path = argv[++i];
     } else if (arg == "--vram-out" && has_value) {
       vram_path = argv[++i];
+    } else if (arg == "--z80-ram-out" && has_value) {
+      z80_path = argv[++i];
+    } else if (arg == "--regs-out" && has_value) {
+      regs_path = argv[++i];
     } else if (arg == "--frame-out" && has_value) {
       frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
@@ -72,6 +77,17 @@ int main(int argc, char **argv) {
     std::ofstream po(palette_path, std::ios::binary | std::ios::trunc);
     po.write(reinterpret_cast<const char *>(table.data()),
              static_cast<std::streamsize>(table.size() * 2U));
+  }
+  if (!z80_path.empty()) {
+    std::ofstream zo(z80_path, std::ios::binary | std::ios::trunc);
+    const auto z = system.z80_ram();
+    zo.write(reinterpret_cast<const char *>(z.data()),
+             static_cast<std::streamsize>(z.size()));
+  }
+  if (!regs_path.empty()) {
+    std::ofstream ro(regs_path, std::ios::binary | std::ios::trunc);
+    for (unsigned r = 0; r < 32; ++r)
+      ro.put(static_cast<char>(system.vdp().reg(r)));
   }
   if (!vram_path.empty()) {
     std::ofstream vo(vram_path, std::ios::binary | std::ios::trunc);

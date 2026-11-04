@@ -251,7 +251,7 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
   const unsigned max_frame = h40 ? 80U : 64U;
   const unsigned max_line = h40 ? 20U : 16U;
   const unsigned max_pixels = h40 ? 320U : 256U;
-  const std::uint32_t table = std::uint32_t{vdp.reg(5) & (h40 ? 0x7CU : 0x7EU)}
+  const std::uint32_t table = std::uint32_t{vdp.reg(5) & (h40 ? 0x7EU : 0x7FU)}
                               << 9;
   const auto &vram = vdp.vram();
   const auto byte = [&](std::uint32_t at) { return vram[at & 0xFFFFU]; };

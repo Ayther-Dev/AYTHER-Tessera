@@ -55,12 +55,29 @@ int main(int argc, char **argv) {
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
   } else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
+  else if (std::strncmp(argv[1], "dma-timing-", 11) == 0) {
+    const char *v = argv[1] + 11; // <target>-<d|b>-<h32|h40>-<a|v>
+    rom = tessera::testrom::dma_timing_rom(static_cast<unsigned>(v[0] - '0'),
+                                           v[2] == 'd', v[5] == '4', v[8] == 'v');
+  } else if (std::strcmp(argv[1], "cpu-z80area") == 0)
+    rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_z80area_groups());
+  else if (std::strcmp(argv[1], "cpu-drift-long") == 0)
+    rom = tessera::testrom::cpu_drift_long_rom();
+  else if (std::strcmp(argv[1], "cpu-muldiv") == 0)
+    rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_muldiv_groups());
+  else if (std::strcmp(argv[1], "cpu-timing") == 0)
+    rom = tessera::testrom::cpu_timing_rom();
+  else if (std::strcmp(argv[1], "z80-busreq") == 0)
+    rom = tessera::testrom::z80_busreq_rom();
+  else if (std::strcmp(argv[1], "cpu-drift") == 0)
+    rom = tessera::testrom::cpu_drift_rom(true);
   else if (std::strncmp(argv[1], "fifo-timing-", 12) == 0) {
     // fifo-timing-<target 0..2>-<d|b>-<h32|h40>-<a|v>: display on or blanked
     const char *v = argv[1] + 12;
     rom = tessera::testrom::fifo_timing_rom(
         static_cast<unsigned>(v[0] - '0'), v[2] == 'd', v[5] == '4',
-        v[8] == 'v');
+        v[8] == 'v', v[9] == 'r',
+        (v[9] == 'n' || v[10] == 'n') ? 240U : 64U, v[9] == 'l');
   } else
     return 2;
   std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);

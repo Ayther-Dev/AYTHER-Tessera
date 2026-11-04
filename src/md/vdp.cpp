@@ -117,6 +117,145 @@ void Vdp::write_data(std::uint16_t value) {
     run_dma(value);
     return;
   }
+  fifo_write(value);
+}
+
+void Vdp::fifo_retire() noexcept {
+  while (fifo_count_ != 0 && fifo_done_[fifo_head_] <= now_) {
+    fifo_head_ = (fifo_head_ + 1U) & 3U;
+    --fifo_count_;
+  }
+}
+
+namespace {
+// H counter values at which a stalled 68000 resumes while the display is
+// drawn, one per FIFO entry retired (measured on gpgx with fifo_timing). A
+// VRAM word takes two external slots, so it retires on about every other slot
+// of the CRAM and VSRAM list, but not exactly: it has its own list.
+constexpr std::uint8_t kCramH40[18] = {0x06, 0x0F, 0x17, 0x27, 0x2F, 0x38,
+                                       0x46, 0x4E, 0x57, 0x66, 0x6F, 0x78,
+                                       0x86, 0x8E, 0x97, 0xA5, 0xAE, 0xEB};
+constexpr std::uint8_t kCramH32[16] = {0x05, 0x0D, 0x15, 0x25, 0x2D, 0x35,
+                                       0x45, 0x4D, 0x55, 0x65, 0x6D, 0x75,
+                                       0x85, 0x8C, 0x93, 0xF6};
+constexpr std::uint8_t kVramH40[9] = {0x0E, 0x26, 0x36, 0x4E, 0x66,
+                                      0x76, 0x8E, 0xA5, 0xEB};
+constexpr std::uint8_t kVramH32[8] = {0x0D, 0x26, 0x35, 0x4D,
+                                      0x66, 0x75, 0x85, 0xF7};
+} // namespace
+
+std::uint64_t Vdp::next_slot(std::uint64_t after, bool vram) const noexcept {
+  // The slot is where the 68000 resumes; the HV read of the probe comes 16
+  // CPU cycles later, which the table values already contain.
+  constexpr std::int64_t delta = 112;
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const std::uint32_t steps = h40 ? 211U : 171U;
+  const std::uint32_t last_low = h40 ? 0xB6U : 0x93U;
+  const std::uint32_t first_high = h40 ? 0xE4U : 0xE9U;
+  const std::uint32_t zero = h40 ? 780U : 760U;
+  const std::uint8_t *table = vram ? (h40 ? kVramH40 : kVramH32)
+                                   : (h40 ? kCramH40 : kCramH32);
+  const unsigned count = vram ? (h40 ? 9U : 8U) : (h40 ? 18U : 16U);
+  // Slots repeat every line from the line the HV counter starts at.
+  const std::int64_t rel = static_cast<std::int64_t>(after) -
+                           static_cast<std::int64_t>(line_start_);
+  const std::int64_t k0 =
+      (rel >= 0 ? rel / kCyclesPerLine : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine));
+  std::uint64_t best = ~std::uint64_t{0};
+  for (std::int64_t lines = k0 - 1; lines <= k0 + 2; ++lines) {
+    const std::int64_t base =
+        static_cast<std::int64_t>(line_start_) + lines * kCyclesPerLine;
+    for (unsigned i = 0; i < count; ++i) {
+      const std::uint32_t h = table[i];
+      const std::uint32_t n = h <= last_low ? h : h - first_high + last_low + 1;
+      const std::int64_t at =
+          base + zero + (std::int64_t{n} * kCyclesPerLine + steps - 1) / steps -
+          delta;
+      if (at > static_cast<std::int64_t>(after) &&
+          static_cast<std::uint64_t>(at) < best)
+        best = static_cast<std::uint64_t>(at);
+    }
+  }
+  return best;
+}
+
+// Master cycle at which `slots` external slots, taken from `start` on, are
+// used up. While the display is drawn the slots are the discrete ones of the
+// CRAM list; in the blanking they are evenly spread.
+std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
+                             bool colour_ram) const noexcept {
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  // In the blanking a CRAM or VSRAM word takes 3 % more than one slot
+  // (measured on gpgx with dma_timing: 2175 against 2100 units for 2048).
+  const std::uint32_t per_line =
+      (h40 ? 205U : 167U) * (colour_ram ? 1000U : 1031U) / 1031U;
+  const std::uint32_t active_per_line = h40 ? 18U : 16U;
+  const std::uint32_t total_lines = lines_per_frame(standard_);
+  const std::uint32_t active = active_lines();
+  const bool enabled = (regs_[1] & 0x40U) != 0;
+  std::uint64_t t = start;
+  while (slots != 0) {
+    const std::int64_t rel =
+        static_cast<std::int64_t>(t) - static_cast<std::int64_t>(line_start_);
+    const std::int64_t k =
+        rel >= 0 ? rel / kCyclesPerLine
+                 : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+    const std::int64_t wrapped =
+        ((static_cast<std::int64_t>(line_) + k) % total_lines + total_lines) %
+        total_lines;
+    const std::uint64_t line_end =
+        static_cast<std::uint64_t>(static_cast<std::int64_t>(line_start_) +
+                                   (k + 1) * kCyclesPerLine);
+    if (!enabled || wrapped >= active) { // blanking: evenly spread slots
+      const std::uint64_t avail = (line_end - t) * per_line / kCyclesPerLine;
+      if (slots <= avail || avail == 0 || true) {
+        const std::uint64_t need =
+            (slots * kCyclesPerLine + per_line - 1) / per_line;
+        if (t + need <= line_end)
+          return t + need;
+      }
+      slots -= avail;
+      t = line_end;
+      continue;
+    }
+    const std::uint64_t lines_left = active - 1U - static_cast<std::uint64_t>(wrapped);
+    if (slots > 2ULL * active_per_line && lines_left > 1) {
+      std::uint64_t m = (slots - 1U) / active_per_line;
+      if (m > lines_left - 1)
+        m = lines_left - 1;
+      if (m != 0) {
+        t += m * kCyclesPerLine;
+        slots -= m * active_per_line;
+        continue;
+      }
+    }
+    t = next_slot(t, false);
+    --slots;
+  }
+  return t;
+}
+
+// Completion time of an entry of `slots` external slots started at `start`.
+std::uint64_t Vdp::slot_service(std::uint64_t start,
+                                unsigned slots) const noexcept {
+  if (display_blank())
+    return start + dma_cycles(slots);
+  return next_slot(start, slots == 2U);
+}
+
+void Vdp::fifo_write(std::uint16_t value) {
+  fifo_retire();
+  if (fifo_count_ == 4) { // full: the 68000 waits for the oldest entry
+    const std::uint64_t wait = fifo_done_[fifo_head_] - now_;
+    cpu_stall_ += wait;
+    now_ += wait;
+    fifo_retire();
+  }
+  const unsigned slots = (code_ & 0x0FU) == 1 ? 2U : 1U; // VRAM word: 2 bytes
+  const std::uint64_t start = fifo_last_done_ > now_ ? fifo_last_done_ : now_;
+  fifo_last_done_ = slot_service(start, slots);
+  fifo_done_[(fifo_head_ + fifo_count_) & 3U] = fifo_last_done_;
+  ++fifo_count_;
   put(value);
 }
 
@@ -163,7 +302,11 @@ void Vdp::run_dma(std::uint16_t first_data) {
     std::uint32_t at = source;
     for (std::uint32_t i = 0; i < length; ++i, at += 2)
       put(dma_reader_ ? dma_reader_(at) : std::uint16_t{0xFFFF});
-    cpu_stall_ += dma_cycles(length);
+    // A VRAM word takes two external slots, a CRAM or VSRAM word one.
+    cpu_stall_ += slots_end(now_, (code_ & 0x0FU) == 1 ? 2ULL * length : length,
+                         (code_ & 0x0FU) != 1) -
+                 now_;
+    finish_dma(length, true);
     return;
   }
   // Fill: one slot per byte; copy: two slots per byte (read and write).
@@ -182,6 +325,22 @@ void Vdp::run_dma(std::uint16_t first_data) {
       ++from;
       address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
     }
+    finish_dma(length, true);
+    return;
+  }
+  finish_dma(length, false);
+}
+
+// A finished DMA leaves the length registers at zero and, for the copies
+// from the bus and the VRAM, the source registers (21, 22) advanced by the
+// number of words moved (measured on gpgx: Sonic 1 relies on it).
+void Vdp::finish_dma(std::uint32_t length, bool advance_source) noexcept {
+  regs_[19] = regs_[20] = 0;
+  if (advance_source) {
+    const std::uint32_t next =
+        ((std::uint32_t{regs_[22]} << 8 | regs_[21]) + length) & 0xFFFFU;
+    regs_[21] = static_cast<std::uint8_t>(next);
+    regs_[22] = static_cast<std::uint8_t>(next >> 8);
   }
 }
 

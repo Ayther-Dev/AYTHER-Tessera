@@ -36,6 +36,7 @@ public:
   void run_frame();
 
   std::uint64_t frame() const noexcept { return frame_; }
+  std::span<const std::uint8_t> z80_ram() const noexcept { return z80_ram_; }
   std::span<const std::uint8_t> work_ram() const noexcept {
     return bus_.work_ram();
   }
@@ -58,6 +59,10 @@ public:
   void write16(std::uint32_t a, std::uint16_t v) { bus_.write16(a, v); }
 
 private:
+  void run_cpu_until(moira::i64 target);
+  moira::i64 refresh_due_ = 0;
+  void z80_wait();
+  unsigned z80_wait_acc_ = 0;
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
              bool word) override;
