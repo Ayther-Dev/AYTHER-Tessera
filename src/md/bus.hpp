@@ -20,6 +20,7 @@ enum class Target : std::uint8_t {
   z80_area,    ///< A00000-A0FFFF (offset from A00000)
   io,          ///< A10000-A10FFF (offset from A10000)
   z80_control, ///< A11000-A11FFF (offset from A10000: bus request, reset)
+  tmss,        ///< A14000-A14003 (offset from A14000)
   vdp,         ///< C00000-DFFFFF (offset = address & 0x1F)
   work_ram,    ///< E00000-FFFFFF, 64 KiB mirrored
   unmapped

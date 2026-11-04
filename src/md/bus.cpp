@@ -11,6 +11,8 @@ std::uint32_t device_offset(Target t, std::uint32_t a) noexcept {
   case Target::io:
   case Target::z80_control:
     return a - 0xA10000;
+  case Target::tmss:
+    return a - 0xA14000;
   case Target::vdp:
     return a & 0x1F;
   default:
@@ -33,6 +35,8 @@ Target classify(std::uint32_t address) noexcept {
     return Target::io;
   if (a >= 0xA11000 && a < 0xA12000)
     return Target::z80_control;
+  if (a >= 0xA14000 && a < 0xA14004)
+    return Target::tmss;
   return Target::unmapped;
 }
 
