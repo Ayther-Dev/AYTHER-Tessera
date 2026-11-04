@@ -80,4 +80,17 @@ if(TESSERA_BUILD_MEGADRIVE)
     add_executable(tessera_md_testrom testrom_main.cpp)
     target_include_directories(tessera_md_testrom PRIVATE "${PROJECT_SOURCE_DIR}/tests")
     target_link_libraries(tessera_md_testrom PRIVATE Tessera::build_options)
+    add_executable(tessera_md_run md_run_main.cpp)
+    target_include_directories(tessera_md_run PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_link_libraries(tessera_md_run PRIVATE Tessera::core Tessera::build_options)
+    tessera_copy_diagnostic_runtime(tessera_md_run)
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
+        add_test(NAME integration.md_boot_fx02 COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${TESSERA_DIFFBENCH_FX02_ROM}" 600
+            "${CMAKE_CURRENT_BINARY_DIR}/md-boot-fx02")
+        set_tests_properties(integration.md_boot_fx02 PROPERTIES
+            PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 300)
+    endif()
 endif()

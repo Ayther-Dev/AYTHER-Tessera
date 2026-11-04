@@ -1,0 +1,208 @@
+#include "md/system.hpp"
+
+namespace tessera::md {
+namespace {
+std::uint16_t dup(std::uint8_t v) {
+  return static_cast<std::uint16_t>((v << 8) | v);
+}
+} // namespace
+
+System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
+    : config_(config), bus_(std::move(rom), *this, config.mapper), cpu_(bus_),
+      vdp_(config.standard), tmss_(config.tmss) {
+  vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
+    return bus_.read16(address);
+  });
+  cpu_.set_interrupt_hook([this](std::uint8_t level) {
+    vdp_.acknowledge(level);
+    update_irq();
+  });
+}
+
+std::uint8_t System::io_version() const noexcept {
+  std::uint8_t v = 0x20; // no expansion unit attached
+  if (config_.region != Region::japan)
+    v |= 0x80; // overseas
+  if (config_.standard == Standard::pal)
+    v |= 0x40;
+  return v;
+}
+
+void System::reset() {
+  vdp_ = Vdp(config_.standard);
+  vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
+    return bus_.read16(address);
+  });
+  tmss_ = Tmss(config_.tmss);
+  for (auto &byte : bus_.work_ram())
+    byte = 0;
+  z80_ram_.fill(0);
+  z80_bus_requested_ = false;
+  z80_reset_released_ = false;
+  io_data_ = {0x00, 0x00, 0x00};
+  io_ctrl_ = {0x00, 0x00, 0x00};
+  frame_ = 0;
+  current_line_ = 0;
+  line_start_master_ = 0;
+  cpu_.reset();
+}
+
+void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
+
+void System::run_frame() {
+  const std::uint32_t lines = lines_per_frame(config_.standard);
+  const std::uint64_t frame_master =
+      frame_ * cycles_per_frame(config_.standard);
+  for (std::uint32_t line = 0; line < lines; ++line) {
+    current_line_ = line;
+    line_start_master_ = frame_master + std::uint64_t{line} * kCyclesPerLine;
+    vdp_.begin_line(line);
+    update_irq();
+    const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
+    cpu_.executeUntil(static_cast<moira::i64>(end_master / kDivider68k));
+  }
+  ++frame_;
+}
+
+void System::set_pad(unsigned port, std::uint8_t pressed) noexcept {
+  if (port < pads_.size())
+    pads_[port] = pressed;
+}
+
+// Pad port: 3 button protocol. TH (bit 6) selects the half of the buttons.
+std::uint8_t System::io_read(std::uint32_t offset) const noexcept {
+  switch (offset) {
+  case 0x01:
+    return io_version();
+  case 0x03:
+  case 0x05: {
+    const unsigned port = (offset - 3) / 2;
+    const std::uint8_t out = io_data_[port];
+    const std::uint8_t ctrl = io_ctrl_[port];
+    const std::uint8_t pressed = pads_[port];
+    const bool th = (out & 0x40U) != 0 || (ctrl & 0x40U) == 0;
+    std::uint8_t in;
+    if (th) { // C B right left down up
+      in = static_cast<std::uint8_t>(
+          ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
+          ((pressed & kPadLeft) ? 0 : 0x04) |
+          ((pressed & kPadRight) ? 0 : 0x08) | ((pressed & kPadB) ? 0 : 0x10) |
+          ((pressed & kPadC) ? 0 : 0x20) | 0x40);
+    } else { // start A 0 0 down up
+      in = static_cast<std::uint8_t>(
+          ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
+          ((pressed & kPadA) ? 0 : 0x10) | ((pressed & kPadStart) ? 0 : 0x20));
+    }
+    return static_cast<std::uint8_t>((out & ctrl) | (in & ~ctrl));
+  }
+  case 0x07:
+    return static_cast<std::uint8_t>((io_data_[2] & io_ctrl_[2]) |
+                                     (0xFFU & ~io_ctrl_[2]));
+  case 0x09:
+  case 0x0B:
+  case 0x0D:
+    return io_ctrl_[(offset - 9) / 2];
+  default:
+    return 0xFF;
+  }
+}
+
+void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
+  switch (offset) {
+  case 0x03:
+  case 0x05:
+  case 0x07:
+    io_data_[(offset - 3) / 2] = value;
+    break;
+  case 0x09:
+  case 0x0B:
+  case 0x0D:
+    io_ctrl_[(offset - 9) / 2] = value;
+    break;
+  default:
+    break;
+  }
+}
+
+std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
+  switch (target) {
+  case Target::z80_area: {
+    // The Z80 side is not emulated yet: RAM is plain storage, the sound chip
+    // ports read back zero (YM2612 status: not busy, no timer flag).
+    if (offset < 0x4000)
+      return word ? dup(z80_ram_[offset & 0x1FFFU])
+                  : z80_ram_[offset & 0x1FFFU];
+    return 0;
+  }
+  case Target::io: {
+    const std::uint8_t v = io_read(offset | 1U);
+    return word ? dup(v) : v;
+  }
+  case Target::z80_control: {
+    if (offset == 0x1100) { // bus request: bit 0 low = bus granted
+      const std::uint8_t high = z80_bus_requested_ ? 0x00 : 0x01;
+      return word ? static_cast<std::uint16_t>(high << 8) : high;
+    }
+    if (offset == 0x1200)
+      return word ? (z80_reset_released_ ? 0x0100 : 0x0000)
+                  : (z80_reset_released_ ? 0x01 : 0x00);
+    return word ? 0xFFFFU : 0xFFU;
+  }
+  case Target::vdp: {
+    if (offset < 4) {
+      const std::uint16_t v = vdp_.read_data();
+      return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
+    }
+    if (offset < 8) {
+      const std::uint16_t v = vdp_.read_status();
+      return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
+    }
+    if (offset < 0x10) {
+      const std::uint16_t v = vdp_.read_hv(static_cast<std::uint32_t>(
+          (cpu_.getClock() * kDivider68k) - line_start_master_));
+      return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
+    }
+    return word ? 0xFFFFU : 0xFFU;
+  }
+  default:
+    return word ? 0xFFFFU : 0xFFU;
+  }
+}
+
+void System::write(Target target, std::uint32_t offset, std::uint16_t value,
+                   bool word) {
+  switch (target) {
+  case Target::z80_area:
+    if (offset < 0x4000) // a word write stores its high byte
+      z80_ram_[offset & 0x1FFFU] = word ? static_cast<std::uint8_t>(value >> 8)
+                                        : static_cast<std::uint8_t>(value);
+    break;
+  case Target::io:
+    io_write(offset | (word ? 1U : 0U), static_cast<std::uint8_t>(value));
+    break;
+  case Target::z80_control:
+    if (offset == 0x1100)
+      z80_bus_requested_ = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
+    else if (offset == 0x1200)
+      z80_reset_released_ = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
+    break;
+  case Target::vdp: {
+    const std::uint16_t v =
+        word ? value : dup(static_cast<std::uint8_t>(value));
+    if (offset < 4)
+      vdp_.write_data(v);
+    else if (offset < 8) {
+      vdp_.write_control(v);
+      update_irq(); // a register write can enable a pending interrupt
+    }
+    break;
+  }
+  case Target::tmss:
+    tmss_.write(offset, value, word);
+    break;
+  default:
+    break;
+  }
+}
+
+} // namespace tessera::md

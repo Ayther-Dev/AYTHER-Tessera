@@ -4,6 +4,11 @@ namespace tessera::md {
 
 M68k::M68k(Bus &bus) : bus_(bus) { setModel(moira::Model::M68000); }
 
+void M68k::willInterrupt(moira::u8 level) {
+  if (interrupt_hook_)
+    interrupt_hook_(level);
+}
+
 moira::u8 M68k::read8(moira::u32 addr) const { return bus_.read8(addr); }
 moira::u16 M68k::read16(moira::u32 addr) const { return bus_.read16(addr); }
 moira::u32 M68k::read32(moira::u32 addr) const { return bus_.read32(addr); }

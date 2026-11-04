@@ -8,13 +8,21 @@
 
 #include "Moira.h"
 
+#include <functional>
+
 namespace tessera::md {
 
 class M68k final : public moira::Moira {
 public:
   explicit M68k(Bus &bus);
 
+  /// Called when the CPU is about to take an interrupt of the given level.
+  void set_interrupt_hook(std::function<void(std::uint8_t)> hook) {
+    interrupt_hook_ = std::move(hook);
+  }
+
 protected:
+  void willInterrupt(moira::u8 level) override;
   moira::u8 read8(moira::u32 addr) const override;
   moira::u16 read16(moira::u32 addr) const override;
   moira::u32 read32(moira::u32 addr) const override;
@@ -24,6 +32,7 @@ protected:
 
 private:
   Bus &bus_;
+  std::function<void(std::uint8_t)> interrupt_hook_;
 };
 
 } // namespace tessera::md

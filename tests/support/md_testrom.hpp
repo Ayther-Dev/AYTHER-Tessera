@@ -82,3 +82,45 @@ inline std::vector<std::uint8_t> ssf2_sweep_rom() {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `vint_counter`: sets VDP register 1 to enable the vertical interrupt, opens
+// the 68000 interrupt mask and idles; the level 6 handler adds one to the long
+// at $FF0000 (work RAM). After N frames the counter holds N.
+inline std::vector<std::uint8_t> vint_counter_rom() {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  put32(rom, 0x78, 0x300); // level 6 autovector
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER VINT CNT ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  const std::uint16_t main_code[] = {
+      0x33FC, 0x8164,
+      0x00C0, 0x0004, // move.w #$8164,$C00004 (reg1: display, VINT)
+      0x46FC, 0x2000, // move   #$2000,sr
+      0x60FE,         // bra.s  .
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t handler[] = {
+      0x52B9,
+      0x00FF,
+      0x0000, // addq.l #1,$FF0000
+      0x4E73, // rte
+  };
+  at = 0x300;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom
