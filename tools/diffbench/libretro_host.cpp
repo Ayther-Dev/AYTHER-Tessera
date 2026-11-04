@@ -4,6 +4,7 @@
 
 #include "tessera/tessera_observation.h"
 
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 
@@ -49,6 +50,8 @@ struct AytherInterface {
 };
 
 RunResult *g_result = nullptr;
+const std::vector<TraceFrame> *g_trace = nullptr;
+size_t g_frame = 0;
 
 uint64_t fnv1a(const uint8_t *p, size_t n, uint64_t h) {
   for (size_t i = 0; i < n; ++i) {
@@ -87,10 +90,33 @@ void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
   g_result->height = h;
   g_result->frame_hashes.push_back(hash);
 }
-void __cdecl audio(int16_t, int16_t) {}
-size_t __cdecl audio_batch(const int16_t *, size_t frames) { return frames; }
-void __cdecl poll() {}
-int16_t __cdecl input(unsigned, unsigned, unsigned, unsigned) { return 0; }
+void note_peak(int v) {
+  if (g_result && std::abs(v) > g_result->peak)
+    g_result->peak = std::abs(v);
+}
+void __cdecl audio(int16_t l, int16_t r) {
+  note_peak(l);
+  note_peak(r);
+}
+size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
+  for (size_t i = 0; i < frames * 2; ++i)
+    note_peak(data[i]);
+  return frames;
+}
+void __cdecl poll() { ++g_frame; }
+// Controles de la API (up down left right A B C start) -> ids libretro de gpgx
+// (A=JOYPAD_Y, B=JOYPAD_B, C=JOYPAD_A, start=START).
+int16_t __cdecl input(unsigned port, unsigned device, unsigned, unsigned id) {
+  if (port != 0 || device != 1 || !g_trace || g_frame == 0 ||
+      g_frame > g_trace->size())
+    return 0;
+  static constexpr unsigned ids[8] = {4, 5, 6, 7, 1, 0, 8, 3};
+  const auto &row = (*g_trace)[g_frame - 1];
+  for (size_t i = 0; i < 8; ++i)
+    if (ids[i] == id)
+      return static_cast<int16_t>(row[i] != 0);
+  return 0;
+}
 
 template <class F> bool sym(HMODULE m, const char *name, F &out) {
   out = reinterpret_cast<F>(GetProcAddress(m, name));
@@ -101,7 +127,8 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
-                       bool dump_regions) {
+                       bool dump_regions,
+                       const std::vector<TraceFrame> *trace) {
   RunResult result;
   std::ifstream in(rom_path, std::ios::binary);
   if (!in) {
@@ -140,6 +167,8 @@ RunResult run_libretro(const std::string &core_path,
     return result;
   }
   g_result = &result;
+  g_trace = trace;
+  g_frame = 0;
   set_env(environment);
   init();
   set_video(video);

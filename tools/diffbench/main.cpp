@@ -2,6 +2,7 @@
 // manifiestos oracles.toml y corpus.toml. Los planos llegan en TP-005.2 en
 // adelante.
 #include "libretro_host.hpp"
+#include "trace_input.hpp"
 #include "tessera/tessera_observation.h"
 
 #include <cctype>
@@ -139,9 +140,19 @@ int main(int argc, char **argv) {
                                 ? static_cast<unsigned>(std::strtoul(
                                       args["--frames"].c_str(), nullptr, 10))
                                 : 600u;
+    std::vector<diffbench::TraceFrame> trace;
+    if (args.count("--trace")) {
+      std::string terr;
+      trace = diffbench::load_trace(args["--trace"], terr);
+      if (!terr.empty()) {
+        std::cerr << "error: " << terr << "\n";
+        return 1;
+      }
+    }
     const auto r =
         diffbench::run_libretro(args["--libretro"], args["--rom"], frames,
-                                args.count("--dump-regions") > 0);
+                                args.count("--dump-regions") > 0,
+                                args.count("--trace") ? &trace : nullptr);
     if (!r.error.empty()) {
       std::cerr << "error: " << r.error << "\n";
       return 1;
@@ -168,7 +179,8 @@ int main(int argc, char **argv) {
       return read_ok == readable && size_ok == readable ? 0 : 1;
     }
     std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
-              << " size=" << r.width << "x" << r.height << "\n";
+              << " size=" << r.width << "x" << r.height
+              << " audio_peak=" << r.peak << " \n";
     return r.frame_hashes.size() == frames ? 0 : 1;
   }
   if (!args.count("--oracles") || !args.count("--corpus")) {
