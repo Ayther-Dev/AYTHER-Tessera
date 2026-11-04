@@ -1542,3 +1542,152 @@ inline SpriteVariant sprite_variant(unsigned id) {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `mode4_scene`: a Master System style scene through the 68000 side of the
+// VDP (Power Base Converter): register 15 is set to 1 in Mode 5 so that every
+// word write steps 2 bytes, then the VDP goes to Mode 4 (register 1 bit 2
+// clear) and every control word is a whole command. Random tiles, name table,
+// sprites and CRAM, deterministic.
+struct Mode4Variant {
+  std::uint8_t reg0 = 0x04; // bit 5 left column, 6 lock top rows, 7 lock right
+  std::uint8_t reg1 = 0x40; // bit 0 zoom, bit 1 8x16 sprites (display on)
+  std::uint8_t reg6 = 0x00; // bit 2: sprite tiles from 256
+  std::uint8_t reg7 = 0x00;
+  std::uint8_t reg8 = 0x00; // horizontal scroll
+  std::uint8_t reg9 = 0x00; // vertical scroll
+  unsigned sprites = 8;
+  unsigned seed = 1;
+};
+
+/// Variant `id` of `mode4_scene`; mirrored in tools/diffbench/CMakeLists.txt.
+inline Mode4Variant mode4_variant(unsigned id) {
+  Mode4Variant v;
+  v.seed = id;
+  switch (id) {
+  case 1:
+    break;
+  case 2: // scrolls with the left column blank (gpgx draws stale pixels
+          // in the first reg8 & 7 columns otherwise)
+    v.reg0 = 0x04 | 0x20;
+    v.reg8 = 37;
+    v.reg9 = 53;
+    break;
+  case 3: // scroll locks and left column
+    v.reg0 = 0x04 | 0x20 | 0x40 | 0x80;
+    v.reg8 = 21;
+    v.reg9 = 77;
+    break;
+  case 4: // 8x16 sprites
+    v.reg1 = 0x42;
+    v.sprites = 10;
+    break;
+  case 5: // zoomed sprites
+    v.reg1 = 0x41;
+    break;
+  case 6: // sprite tiles from 256, backdrop colour 5
+    v.reg6 = 0x04;
+    v.reg7 = 0x05;
+    break;
+  case 7: // sprites shifted left by 8
+    v.reg0 = 0x04 | 0x08;
+    break;
+  case 8: // more than 8 sprites on a line (overflow)
+    v.sprites = 40;
+    break;
+  case 9: // 64 sprites, 8x16
+    v.reg1 = 0x42;
+    v.sprites = 64;
+    break;
+  case 10: // display off
+    v.reg1 = 0x00;
+    v.reg7 = 0x03;
+    break;
+  case 11: // scroll wrap on both axes, left column
+    v.reg0 = 0x04 | 0x20;
+    v.reg8 = 250;
+    v.reg9 = 200;
+    break;
+  default:
+    break;
+  }
+  return v;
+}
+
+inline std::vector<std::uint8_t> mode4_scene_rom(const Mode4Variant &v) {
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0 (data port)
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1 (control port)
+  };
+  const auto reg = [&](std::uint8_t r, std::uint8_t value) {
+    c.insert(c.end(),
+             {0x32BC, static_cast<std::uint16_t>(0x8000 | (r << 8) | value)});
+  };
+  const auto command = [&](std::uint16_t w) { c.insert(c.end(), {0x32BC, w}); };
+  const auto data = [&](std::uint16_t w) { c.insert(c.end(), {0x30BC, w}); };
+  reg(0, 0x04);
+  reg(1, 0x04); // Mode 5, display off
+  reg(15, 1);
+  reg(1, 0x00); // Mode 4, display off
+  reg(0, v.reg0);
+  reg(2, 0x0E); // name table at $3800
+  reg(5, 0x7E); // sprite table at $3F00
+  reg(6, v.reg6);
+  reg(7, v.reg7);
+  reg(8, v.reg8);
+  reg(9, v.reg9);
+  reg(10, 0xFF);
+  Lcg rng{0x5EED4000U + v.seed};
+  // tiles 0..63 at $0000 (and 256..319 at $2000): 32 bytes of planar data
+  for (unsigned base : {0x0000U, 0x2000U}) {
+    command(static_cast<std::uint16_t>(0x4000 | base));
+    for (unsigned t = 0; t < 64; ++t)
+      for (unsigned i = 0; i < 16; ++i)
+        data(static_cast<std::uint16_t>(rng.next() & 0xFFFFU));
+  }
+  // name table: 32x28 entries. The low byte of an entry comes first in
+  // VRAM, i.e. in the high half of the word written: tile low, then flags
+  // (bit 0 tile bit 8, 1 h flip, 2 v flip, 3 palette, 4 priority).
+  command(0x7800);
+  for (unsigned i = 0; i < 32 * 28; ++i) {
+    const std::uint32_t r = rng.next();
+    data(static_cast<std::uint16_t>((((r >> 12) % 64U) << 8) |
+                                    ((r >> 4) & 0x1FU)));
+  }
+  // sprite table: 64 Y bytes (0xD0 ends the list), then X and tile pairs
+  command(0x7F00);
+  std::vector<std::uint8_t> ys(64, 0xD0), xs(128, 0);
+  for (unsigned n = 0; n < v.sprites && n < 64; ++n) {
+    ys[n] = static_cast<std::uint8_t>(rng.next() % 180U);
+    xs[2 * n] = static_cast<std::uint8_t>(rng.next() % 256U);
+    xs[2 * n + 1] = static_cast<std::uint8_t>(rng.next() % 64U);
+  }
+  for (unsigned i = 0; i < 64; i += 2)
+    data(static_cast<std::uint16_t>((ys[i] << 8) | ys[i + 1]));
+  for (unsigned i = 0; i < 128; i += 2)
+    data(static_cast<std::uint16_t>((xs[i] << 8) | xs[i + 1]));
+  // CRAM: one command per entry (a word write steps 2 entries otherwise)
+  for (unsigned i = 0; i < 32; ++i) {
+    command(static_cast<std::uint16_t>(0xC000 | i));
+    data(static_cast<std::uint16_t>(rng.next() & 0x3FU));
+  }
+  reg(1, v.reg1);
+  c.push_back(0x60FE);
+  std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER MODE4SCEN", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom

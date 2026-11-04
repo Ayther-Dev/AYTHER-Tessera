@@ -73,6 +73,15 @@ if(Python3_Interpreter_FOUND)
             -DPY=${Python3_EXECUTABLE} -DVALIDATOR=${CMAKE_CURRENT_SOURCE_DIR}/validate_report.py
             -DOUT=${CMAKE_CURRENT_BINARY_DIR}/fx02-report.json -P ${CMAKE_CURRENT_SOURCE_DIR}/report_fx02.cmake)
         set_tests_properties(tool.diffbench_report_fx02 PROPERTIES LABELS "tool;phase0;local" TIMEOUT 120)
+        # mode4_pbc: its final frame and PALETTE against gpgx (TP-105.10)
+        add_test(NAME integration.md_mode4-pbc_frame COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_frame.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/mode4-pbc.bin" 8
+            "${CMAKE_CURRENT_BINARY_DIR}/md-mode4-pbc-frame")
+        set_tests_properties(integration.md_mode4-pbc_frame PROPERTIES
+            FIXTURES_REQUIRED md_mode4-pbc_rom
+            PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
     endif()
 endif()
 
@@ -183,6 +192,11 @@ if(TESSERA_BUILD_MEGADRIVE)
             foreach(variant RANGE ${first} ${last})
                 list(APPEND sprite_variants ${variant})
             endforeach()
+        endforeach()
+        # mode4_scene: Master System style VDP through the 68000 (TP-105.10);
+        # the list is mode4_variant() in tests/support/md_testrom.hpp.
+        foreach(variant RANGE 1 11)
+            list(APPEND frame_roms mode4-scene-${variant})
         endforeach()
         foreach(variant IN LISTS sprite_variants)
             list(APPEND frame_roms sprite-limits-${variant})

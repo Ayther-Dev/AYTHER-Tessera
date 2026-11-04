@@ -437,9 +437,9 @@ TEST_CASE("Mode 4 writes: one step per access, high byte then low byte") {
   v.write_data(0x4455);
   v.write_data(0x6677);
   // the second write is at the odd address $11: its word is byte swapped and
-  // lands on the even word $10
-  CHECK(v.vram()[0x10] == 0x77);
-  CHECK(v.vram()[0x11] == 0x66);
+  // lands on the even word $10, whose low byte is at the even address
+  CHECK(v.vram()[0x10] == 0x66);
+  CHECK(v.vram()[0x11] == 0x77);
   CHECK(v.vram()[0x12] == 0x00);
 }
 

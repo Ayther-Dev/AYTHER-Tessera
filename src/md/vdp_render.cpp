@@ -6,9 +6,27 @@ namespace tessera::md {
 
 FrameSize frame_size(const Vdp &vdp) noexcept {
   FrameSize size;
+  if (vdp.mode4_active()) {
+    size.width = 256U;
+    size.height = 192U;
+    return size;
+  }
   size.width = (vdp.reg(12) & 0x81U) != 0 ? 320U : 256U;
   size.height = (vdp.reg(1) & 0x08U) != 0 ? 240U : 224U;
   return size;
+}
+
+unsigned mode4_raw(std::uint16_t cram) noexcept {
+  // CRAM keeps the Mode 4 word the way gpgx packs it for Mode 5 reads (3 bits
+  // per channel, the low 6 bits of the word in R and G): undo that.
+  return ((cram >> 1) & 7U) | (((cram >> 5) & 7U) << 3);
+}
+
+std::uint16_t mode4_565(unsigned raw) noexcept {
+  const unsigned r = raw & 3U, g = (raw >> 2) & 3U, b = (raw >> 4) & 3U;
+  const auto five = [](unsigned c) { return (c << 3) | (c << 1) | (c >> 1); };
+  const auto six = [](unsigned c) { return (c << 4) | (c << 2) | c; };
+  return static_cast<std::uint16_t>((five(r) << 11) | (six(g) << 5) | five(b));
 }
 
 std::uint16_t colour_to_565(std::uint16_t cram, Shade shade) noexcept {
@@ -42,6 +60,21 @@ std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept {
   // PALETTE region: shadow, normal and highlight tables of the 64 CRAM
   // entries, then 64 zero entries (layout read from gpgx r4).
   std::array<std::uint16_t, 256> table{};
+  if (vdp.mode4_active()) {
+    // Mode 4 (measured on gpgx): the 32 CRAM colours, 2 bits per channel
+    // widened by bit replication, repeat in the shadow and highlight tables;
+    // the backdrop (entry 16 + reg 7 & 15) sits at 64, 96, 192 and 224.
+    std::array<std::uint16_t, 32> pal{};
+    for (unsigned i = 0; i < 32U; ++i)
+      pal[i] = mode4_565(mode4_raw(vdp.cram()[i]));
+    for (unsigned i = 0; i < 64U; ++i) {
+      table[i] = pal[i & 31U];
+      table[128U + i] = pal[i & 31U];
+    }
+    const std::uint16_t back = pal[16U + (vdp.reg(7) & 15U)];
+    table[64] = table[96] = table[192] = table[224] = back;
+    return table;
+  }
   const bool limited = (vdp.reg(0) & 0x04U) == 0;
   // Measured on gpgx: entry 0 holds the backdrop colour (register 7), the
   // transparent entry of palettes 1 to 3 is black, and without shadow and
@@ -314,10 +347,120 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
   }
 }
 
+void Renderer::render_line_m4(const Vdp &vdp, std::uint32_t line) {
+  const auto &vram = vdp.vram();
+  const auto rgba = [&](unsigned index) {
+    const std::uint32_t c = mode4_565(mode4_raw(vdp.cram()[index & 31U]));
+    const std::uint32_t r5 = c >> 11, g6 = (c >> 5) & 63U, b5 = c & 31U;
+    return ((r5 << 3) | (r5 >> 2)) | (((g6 << 2) | (g6 >> 4)) << 8) |
+           (((b5 << 3) | (b5 >> 2)) << 16) | 0xFF000000U;
+  };
+  const unsigned width = size_.width;
+  const auto row = std::span<std::uint32_t>(frame_).subspan(
+      std::size_t{line} * width, width);
+  const std::uint32_t backdrop = rgba(16U + (vdp.reg(7) & 15U));
+  if ((vdp.reg(1) & 0x40U) == 0) {
+    std::fill(row.begin(), row.end(), backdrop);
+    return;
+  }
+  // background: 32 x 28 name table entries (2 bytes, low byte first)
+  struct Bg {
+    unsigned colour = 0;
+    unsigned index = 0;
+    bool priority = false;
+  };
+  std::vector<Bg> bg(width);
+  const std::uint32_t table = std::uint32_t{vdp.reg(2) & 0x0EU} << 10;
+  const bool lock_top = (vdp.reg(0) & 0x40U) != 0 && line < 16U;
+  const unsigned hscroll = lock_top ? 0U : vdp.reg(8);
+  for (unsigned x = 0; x < width; ++x) {
+    // Measured on gpgx (mode4_scene 13, 16-18): register 9 has no effect on
+    // the picture, whatever its value or the moment it is written.
+    const unsigned vscroll = 0U;
+    const unsigned sx = (x + 256U - hscroll) & 255U;
+    const unsigned sy = (line + vscroll) % 224U;
+    const std::uint32_t at = table + ((sy / 8U) * 32U + sx / 8U) * 2U;
+    const unsigned entry =
+        vram[at & 0xFFFFU] | (vram[(at + 1U) & 0xFFFFU] << 8);
+    unsigned tx = sx & 7U, ty = sy & 7U;
+    if (entry & 0x0200U)
+      tx = 7U - tx;
+    if (entry & 0x0400U)
+      ty = 7U - ty;
+    const std::uint32_t tile = ((entry & 0x1FFU) * 32U + ty * 4U) & 0xFFFFU;
+    unsigned colour = 0;
+    for (unsigned plane = 0; plane < 4U; ++plane)
+      colour |= ((vram[(tile + plane) & 0xFFFFU] >> (7U - tx)) & 1U) << plane;
+    bg[x].colour = colour;
+    bg[x].index = colour + ((entry & 0x0800U) ? 16U : 0U);
+    bg[x].priority = (entry & 0x1000U) != 0;
+  }
+  // sprites: up to 8 per line, the first of the list on top
+  std::vector<int> sprite(width, -1);
+  const std::uint32_t sat = std::uint32_t{vdp.reg(5) & 0x7EU} << 7;
+  const bool tall = (vdp.reg(1) & 0x02U) != 0;
+  const unsigned height = tall ? 16U : 8U;
+  unsigned shown = 0;
+  for (unsigned n = 0; n < 64U; ++n) {
+    const unsigned y = vram[(sat + n) & 0xFFFFU];
+    if (y == 0xD0U)
+      break;
+    const int top = static_cast<int>((y + 1U) & 0xFFU);
+    const int top_s = top > 0xF0 ? top - 256 : top;
+    const int r = static_cast<int>(line) - top_s;
+    if (r < 0 || r >= static_cast<int>(height))
+      continue;
+    if (shown == 8U) {
+      flags_.overflow = true;
+      break;
+    }
+    ++shown;
+    const int sx0 = vram[(sat + 128U + n * 2U) & 0xFFFFU] -
+                    ((vdp.reg(0) & 0x08U) != 0 ? 8 : 0);
+    unsigned tile = vram[(sat + 129U + n * 2U) & 0xFFFFU];
+    if (tall)
+      tile &= 0xFEU;
+    tile += (vdp.reg(6) & 0x04U) != 0 ? 256U : 0U;
+    const std::uint32_t at =
+        ((tile * 32U) + static_cast<unsigned>(r) * 4U) & 0xFFFFU;
+    for (unsigned px = 0; px < 8U; ++px) {
+      const int x = sx0 + static_cast<int>(px);
+      if (x < 0 || x >= static_cast<int>(width))
+        continue;
+      unsigned colour = 0;
+      for (unsigned plane = 0; plane < 4U; ++plane)
+        colour |= ((vram[(at + plane) & 0xFFFFU] >> (7U - px)) & 1U) << plane;
+      if (colour == 0)
+        continue;
+      if (sprite[static_cast<unsigned>(x)] >= 0)
+        flags_.collision = true;
+      else
+        sprite[static_cast<unsigned>(x)] = static_cast<int>(16U + colour);
+    }
+  }
+  for (unsigned x = 0; x < width; ++x) {
+    // colour 0 of a tile shows colour 0 of its palette (not the backdrop)
+    unsigned index = bg[x].index;
+    const bool show_bg = bg[x].colour != 0;
+    if (sprite[x] >= 0 && !(show_bg && bg[x].priority))
+      index = static_cast<unsigned>(sprite[x]);
+    row[x] = rgba(index);
+  }
+  if ((vdp.reg(0) & 0x20U) != 0)
+    for (unsigned x = 0; x < 8U; ++x)
+      row[x] = backdrop;
+  if (hook_)
+    hook_(line, row);
+}
+
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (line >= size_.height ||
       frame_.size() < std::size_t{size_.width} * size_.height)
     return;
+  if (vdp.mode4_active()) {
+    render_line_m4(vdp, line);
+    return;
+  }
   // Register 0 bit 2 clear (limited palette): gpgx keeps only the lowest bit
   // of each 3-bit channel (color_update_m5, data &= 0x49).
   const bool limited = (vdp.reg(0) & 0x04U) == 0;

@@ -54,8 +54,7 @@ def main(argv):
     palette_diff = [i for i in range(0, min(len(pn), len(pg)), 2)
                     if pn[i:i + 2] != pg[i:i + 2]]
     print("palette entries=%d differing=%d" % (len(pg) // 2, len(palette_diff)))
-    if len(pn) != len(pg) or palette_diff:
-        return 1
+    palette_ok = len(pn) == len(pg) and not palette_diff
     # Work RAM word at $FF0000 (sprite flags accumulated by the ROM, if any).
     with open(os.path.join(out_dir, "native.wram"), "rb") as f:
         wn = f.read(2)
@@ -85,7 +84,7 @@ def main(argv):
     print("frame %dx%d pixels=%d differing=%d" % (nw, nh, nw * nh, len(diff)))
     for y, x, got, ref in diff[:8]:
         print("  y=%d x=%d native=%s gpgx=%s" % (y, x, got, ref))
-    if diff or not flags_ok:
+    if diff or not flags_ok or not palette_ok:
         return 1
     print("result=identical")
     return 0

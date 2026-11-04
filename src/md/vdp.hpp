@@ -65,6 +65,8 @@ public:
     dma_reader_ = std::move(reader);
   }
 
+  /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).
+  bool mode4_active() const noexcept { return mode4(); }
   std::uint8_t reg(unsigned index) const noexcept { return regs_[index & 31U]; }
   const std::array<std::uint8_t, 0x10000> &vram() const noexcept {
     return vram_;

@@ -22,6 +22,10 @@ struct FrameSize {
 /// Visible size for the current mode: H32 256 / H40 320, V28 224 / V30 240.
 FrameSize frame_size(const Vdp &vdp) noexcept;
 
+/// Mode 4 CRAM entry (as kept in CRAM) to its raw 6 bit value and to 565.
+unsigned mode4_raw(std::uint16_t cram) noexcept;
+std::uint16_t mode4_565(unsigned raw) noexcept;
+
 /// CRAM colour (0000BBB0GGG0RRR0) as RGBA8, the way a host sees the 565 frame
 /// of gpgx (TP-105.2); `highlight` is the same rule, not yet checked on gpgx.
 enum class Shade : std::uint8_t { normal, shadow, highlight };
@@ -78,6 +82,8 @@ private:
   /// fills `out` (one entry per visible column) with the first opaque pixel
   /// of each column, in list order.
   void sprite_line(const Vdp &vdp, std::uint32_t line, std::span<Pixel> out);
+  /// Mode 4 (TP-105.10): background, sprites and CRAM of the SMS VDP.
+  void render_line_m4(const Vdp &vdp, std::uint32_t line);
   std::vector<std::uint32_t> frame_;
   FrameSize size_;
   LineHook hook_;

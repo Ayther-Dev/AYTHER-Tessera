@@ -80,8 +80,10 @@ void Vdp::put(std::uint16_t value) {
     const std::uint32_t index = a & 0x3FFEU;
     const auto word = static_cast<std::uint16_t>(
         (a & 1U) != 0 ? ((value >> 8) | (value << 8)) : value);
-    vram_[index] = static_cast<std::uint8_t>(word >> 8);
-    vram_[index + 1U] = static_cast<std::uint8_t>(word);
+    // gpgx keeps the low byte at the even address (SMS layout; measured on
+    // its VRAM region with mode4_scene).
+    vram_[index] = static_cast<std::uint8_t>(word);
+    vram_[index + 1U] = static_cast<std::uint8_t>(word >> 8);
     address_ = static_cast<std::uint16_t>((a + regs_[15] + 1U) & 0x3FFFU);
     return;
   }
@@ -125,7 +127,7 @@ std::uint16_t Vdp::read_data() {
     // then the address steps by register 15 + 1.
     const std::uint32_t a = address_ & 0x3FFFU;
     const auto value =
-        static_cast<std::uint16_t>((vram_[a & 0x3FFEU] << 8) | vram_[a | 1U]);
+        static_cast<std::uint16_t>((vram_[a | 1U] << 8) | vram_[a & 0x3FFEU]);
     address_ = static_cast<std::uint16_t>((a + regs_[15] + 1U) & 0x3FFFU);
     return value;
   }

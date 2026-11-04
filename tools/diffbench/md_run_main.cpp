@@ -14,8 +14,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path, frame_path, palette_path,
-      vram_path;
+  std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
