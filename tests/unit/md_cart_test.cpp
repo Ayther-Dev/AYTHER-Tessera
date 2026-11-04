@@ -133,3 +133,82 @@ TEST_CASE("malformed input is invalid content") {
   odd.push_back(0);
   CHECK(status_of(odd) == TESSERA_INVALID_CONTENT); // odd length
 }
+
+// ---- TP-101.6: SRAM and .srm
+// -------------------------------------------------
+#include "md/sram.hpp"
+#include "support/md_testrom.hpp"
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
+namespace {
+Bytes read_file(const std::filesystem::path &p) {
+  std::ifstream in(p, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+} // namespace
+
+TEST_CASE("bus_sweep header declares odd-bus SRAM") {
+  const Cart cart = md::load_cart(testrom::bus_sweep_rom());
+  CHECK(cart.sram.present);
+  CHECK(cart.sram.bus == md::SramBus::odd);
+  CHECK(cart.sram.start == 0x200001);
+  CHECK(cart.sram.end == 0x203FFF);
+}
+
+TEST_CASE("a .srm produced by gpgx loads and is saved back identical") {
+  const Cart cart = md::load_cart(testrom::bus_sweep_rom());
+  const Bytes gpgx = read_file(SRM_FIXTURE);
+  REQUIRE(gpgx.size() == 0x4000);
+
+  md::Sram sram(cart.sram);
+  CHECK(sram.image_size() == 0x4000);
+  CHECK(sram.load_srm(gpgx));
+  CHECK(sram.to_srm() == gpgx);
+
+  // bus view: values written by the ROM at odd addresses, erased (0xFF) at even
+  CHECK(sram.read8(0x200001) == 0xFF);
+  CHECK(sram.read8(0x200003) == 0xFE);
+  CHECK(sram.read8(0x203FFF) == 0x00);
+  CHECK(sram.read8(0x200000) == 0xFF);
+  CHECK(sram.read8(0x200002) == 0xFF);
+
+  const auto path = std::filesystem::temp_directory_path() / "md_cart_test.srm";
+  std::filesystem::remove(path);
+  CHECK(sram.save_atomic(path.string()));
+  CHECK(read_file(path) == gpgx);
+  CHECK_FALSE(std::filesystem::exists(path.string() + ".tmp"));
+}
+
+TEST_CASE("fresh SRAM is erased and writes only land on the declared bus") {
+  const Cart cart = md::load_cart(testrom::bus_sweep_rom());
+  md::Sram sram(cart.sram);
+  CHECK(sram.read8(0x200001) == 0xFF);
+  sram.write8(0x200001, 0x12); // odd: stored
+  sram.write8(0x200002, 0x34); // even: ignored on an odd bus
+  CHECK(sram.read8(0x200001) == 0x12);
+  CHECK(sram.read8(0x200002) == 0xFF);
+  CHECK(sram.dirty());
+  sram.write8(0x204001, 0x56); // outside the range: ignored
+  CHECK(sram.read8(0x204001) == 0xFF);
+}
+
+TEST_CASE("bad .srm sizes are rejected and a failed save keeps the old file") {
+  const Cart cart = md::load_cart(testrom::bus_sweep_rom());
+  md::Sram sram(cart.sram);
+  CHECK_FALSE(sram.load_srm(Bytes(0x4001, 0)));
+  CHECK(sram.load_srm(Bytes(0x100, 0x11))); // short file: rest stays erased
+  CHECK(sram.to_srm().size() == 0x4000);
+  CHECK(sram.to_srm()[0x100] == 0xFF);
+
+  const auto dir = std::filesystem::temp_directory_path() / "md_cart_test_dir";
+  std::filesystem::create_directories(dir);
+  const auto path = dir / "keep.srm";
+  {
+    std::ofstream(path, std::ios::binary) << "old";
+  }
+  CHECK_FALSE(sram.save_atomic((dir / "missing" / "x.srm").string()));
+  CHECK(read_file(path) == Bytes{'o', 'l', 'd'});
+}

@@ -39,6 +39,8 @@ set_tests_properties(unit.md_machine PROPERTIES LABELS "unit;phase1;md" TIMEOUT 
 add_executable(tessera_md_cart_test unit/md_cart_test.cpp)
 target_include_directories(tessera_md_cart_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(tessera_md_cart_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+target_include_directories(tessera_md_cart_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(tessera_md_cart_test PRIVATE SRM_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/md/bus_sweep.srm")
 tessera_copy_diagnostic_runtime(tessera_md_cart_test)
 add_test(NAME unit.md_cart COMMAND tessera_md_cart_test)
 set_tests_properties(unit.md_cart PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)

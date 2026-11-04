@@ -105,6 +105,15 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
     std::cerr << "error: " << r.error << "\n";
     return 1;
   }
+  const auto write_blob = [&](const char *flag, const std::vector<uint8_t> &data) {
+    if (!args.count(flag))
+      return;
+    std::ofstream blob(args[flag], std::ios::binary | std::ios::trunc);
+    blob.write(reinterpret_cast<const char *>(data.data()),
+               static_cast<std::streamsize>(data.size()));
+  };
+  write_blob("--save-ram-out", r.save_ram);
+  write_blob("--work-ram-out", r.work_ram);
   if (args.count("--hashes-out")) {
     std::ofstream out(args["--hashes-out"]);
     for (const auto h : r.frame_hashes)

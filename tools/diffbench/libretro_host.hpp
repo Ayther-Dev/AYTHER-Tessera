@@ -22,6 +22,8 @@ struct RunResult {
   int peak = 0;                       // pico absoluto del PCM entregado
   std::vector<RegionDump> regions;    // ABI 1.10, si se pidió el volcado
   std::vector<uint64_t> frame_hashes; // FNV-1a 64 del framebuffer XRGB8888
+  std::vector<uint8_t> save_ram;      // RETRO_MEMORY_SAVE_RAM al final
+  std::vector<uint8_t> work_ram;      // RETRO_MEMORY_SYSTEM_RAM al final
   uint32_t width = 0, height = 0;
   std::string error;
 };

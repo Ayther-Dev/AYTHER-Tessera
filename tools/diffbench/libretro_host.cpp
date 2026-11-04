@@ -221,6 +221,21 @@ RunResult run_libretro(const std::string &core_path,
         result.regions.push_back(d);
       }
     }
+    using MemSize = size_t(__cdecl *)(unsigned);
+    using MemData = void *(__cdecl *)(unsigned);
+    MemSize mem_size = nullptr;
+    MemData mem_data = nullptr;
+    if (sym(core, "retro_get_memory_size", mem_size) &&
+        sym(core, "retro_get_memory_data", mem_data)) {
+      const auto grab = [&](unsigned id, std::vector<uint8_t> &out) {
+        const size_t n = mem_size(id);
+        const auto *p = static_cast<const uint8_t *>(mem_data(id));
+        if (n != 0 && p != nullptr)
+          out.assign(p, p + n);
+      };
+      grab(0, result.save_ram);
+      grab(2, result.work_ram);
+    }
     unload();
   }
   deinit();
