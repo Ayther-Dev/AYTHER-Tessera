@@ -3,6 +3,8 @@
 // adelante.
 #include "libretro_host.hpp"
 #include "trace_input.hpp"
+
+#include <nlohmann/json.hpp>
 #include "tessera/tessera_observation.h"
 
 #include <cctype>
@@ -177,6 +179,23 @@ int main(int argc, char **argv) {
       std::cout << "regions=" << r.regions.size() << " readable=" << readable
                 << " read_ok=" << read_ok << " size_ok=" << size_ok << "\n";
       return read_ok == readable && size_ok == readable ? 0 : 1;
+    }
+    if (args.count("--report-out")) {
+      // Informe del plan §3.3. Esta ejecución solo corre el oráculo, así que no
+      // hay candidato ni divergencia; nunca incluye framebuffers ni PCM.
+      nlohmann::json report = {
+          {"tool", "tessera_diffbench"},
+          {"contract", 1},
+          {"entry", args.count("--entry") ? args["--entry"] : "unnamed"},
+          {"segment", {0, frames}},
+          {"reference", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
+          {"candidate", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
+          {"frames_compared", r.frame_hashes.size()},
+          {"first_divergence", nullptr},
+          {"exceptions_applied", nlohmann::json::array()},
+          {"audio_writes", {{"frames_equal", r.frame_hashes.size()}}}};
+      std::ofstream out(args["--report-out"]);
+      out << report.dump(2) << "\n";
     }
     std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
               << " size=" << r.width << "x" << r.height

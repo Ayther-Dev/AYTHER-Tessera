@@ -1,0 +1,10 @@
+execute_process(COMMAND "${BENCH}" --libretro "${CORE}" --rom "${ROM}" --frames 600 --report-out "${OUT}"
+    --entry fx-02 RESULT_VARIABLE r1)
+if(NOT r1 EQUAL 0)
+    message(FATAL_ERROR "diffbench falló: ${r1}")
+endif()
+execute_process(COMMAND "${PY}" -I "${VALIDATOR}" "${OUT}" RESULT_VARIABLE r2 OUTPUT_VARIABLE o ERROR_VARIABLE e)
+message("${o}${e}")
+if(NOT r2 EQUAL 0)
+    message(FATAL_ERROR "el informe no valida contra el esquema")
+endif()

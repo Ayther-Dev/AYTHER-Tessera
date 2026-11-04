@@ -50,3 +50,16 @@ target_link_libraries(tessera_diffbench_selftest PRIVATE Tessera::build_options 
 tessera_copy_diagnostic_runtime(tessera_diffbench_selftest)
 add_test(NAME integration.diffbench_selftest COMMAND tessera_diffbench_selftest)
 set_tests_properties(integration.diffbench_selftest PROPERTIES LABELS "tool;phase0" TIMEOUT 30)
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME tool.diffbench_report_schema COMMAND ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/test_validate_report.py")
+    set_tests_properties(tool.diffbench_report_schema PROPERTIES LABELS "tool;phase0" TIMEOUT 60)
+    if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
+        add_test(NAME tool.diffbench_report_fx02 COMMAND ${CMAKE_COMMAND}
+            -DBENCH=$<TARGET_FILE:tessera_diffbench> -DCORE=${TESSERA_DIFFBENCH_GPGX_CORE} -DROM=${TESSERA_DIFFBENCH_FX02_ROM}
+            -DPY=${Python3_EXECUTABLE} -DVALIDATOR=${CMAKE_CURRENT_SOURCE_DIR}/validate_report.py
+            -DOUT=${CMAKE_CURRENT_BINARY_DIR}/fx02-report.json -P ${CMAKE_CURRENT_SOURCE_DIR}/report_fx02.cmake)
+        set_tests_properties(tool.diffbench_report_fx02 PROPERTIES LABELS "tool;phase0;local" TIMEOUT 120)
+    endif()
+endif()

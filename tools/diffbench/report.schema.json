@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": ["tool", "contract", "entry", "segment", "reference", "candidate", "frames_compared", "first_divergence", "exceptions_applied", "audio_writes"],
+  "additionalProperties": false,
+  "properties": {
+    "tool": {"enum": ["tessera_diffbench"]},
+    "contract": {"type": "integer"},
+    "entry": {"type": "string"},
+    "segment": {"type": "array", "items": {"type": "integer"}, "length": 2},
+    "reference": {"type": "object", "required": ["core", "build_id"], "additionalProperties": false,
+      "properties": {"core": {"type": "string"}, "build_id": {"type": "string"}}},
+    "candidate": {"type": "object", "required": ["core", "build_id"], "additionalProperties": false,
+      "properties": {"core": {"type": "string"}, "backend_id": {"type": "string"}, "build_id": {"type": "string"}}},
+    "frames_compared": {"type": "integer"},
+    "first_divergence": {"type": ["object", "null"], "additionalProperties": false,
+      "properties": {
+        "frame": {"type": "integer"}, "plane": {"enum": ["framebuffer", "audio_writes", "regions", "framedata"]},
+        "line": {"type": "integer"}, "x": {"type": "integer"},
+        "reference": {"type": "string"}, "candidate": {"type": "string"},
+        "context": {"type": "object"}}},
+    "exceptions_applied": {"type": "array", "items": {"type": "string"}},
+    "audio_writes": {"type": "object", "additionalProperties": false, "properties": {"frames_equal": {"type": "integer"}}},
+    "pcm_rms_diff_db": {"type": "number"}
+  }
+}
