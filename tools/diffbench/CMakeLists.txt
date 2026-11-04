@@ -109,4 +109,21 @@ if(TESSERA_BUILD_MEGADRIVE)
             FIXTURES_REQUIRED md_dma_fifo_rom
             PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-106.1: the list of V counter values seen in the vertical blank.
+        foreach(mode IN ITEMS hv-v28-h32 hv-v28-h40 hv-v30-h32)
+            add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
+                "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
+            set_tests_properties(integration.md_${mode}_rom PROPERTIES
+                FIXTURES_SETUP md_${mode}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+            add_test(NAME integration.md_${mode} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 5
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}")
+            set_tests_properties(integration.md_${mode} PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+    endif()
 endif()

@@ -176,12 +176,17 @@ void Vdp::latch_hv(std::uint32_t line_cycle) noexcept {
 }
 
 std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
-  // NTSC counts 0x00-0xEA, then continues at 0xE5 up to 0xFF; PAL has its own
-  // jump. Both are provisional until compared with gpgx.
+  // The V counter jumps back once in the vertical blank: NTSC V28 from $EA to
+  // $E5, PAL V28 from $102 to $CA, PAL V30 from $10A to $D2; NTSC V30 does not
+  // jump. Verified against gpgx for NTSC (TP-106.1).
   std::uint32_t v = line_;
+  const bool v30 = (regs_[1] & 0x08U) != 0;
   if (standard_ == Standard::ntsc) {
-    if (v > 0xEA)
+    if (!v30 && v > 0xEA)
       v = v - 0xEA + 0xE4;
+  } else if (v30) {
+    if (v > 0x10A)
+      v = v - 0x10A + 0xD2;
   } else if (v > 0x102) {
     v = v - 0x102 + 0xCA;
   }

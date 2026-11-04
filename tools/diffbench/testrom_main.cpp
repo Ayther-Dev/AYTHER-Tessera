@@ -24,6 +24,12 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hint_counter_rom(9);
   else if (std::strcmp(argv[1], "hint-every-line") == 0)
     rom = tessera::testrom::hint_counter_rom(0);
+  else if (std::strcmp(argv[1], "hv-v28-h32") == 0)
+    rom = tessera::testrom::hv_probe_rom(0x00, 0x00);
+  else if (std::strcmp(argv[1], "hv-v28-h40") == 0)
+    rom = tessera::testrom::hv_probe_rom(0x00, 0x81);
+  else if (std::strcmp(argv[1], "hv-v30-h32") == 0)
+    rom = tessera::testrom::hv_probe_rom(0x08, 0x00);
   else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else

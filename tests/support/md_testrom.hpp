@@ -266,3 +266,59 @@ inline std::vector<std::uint8_t> hint_counter_rom(std::uint8_t hint_reg) {
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `hv_probe` (V counter part, TP-106.1): the level 6 handler samples the V
+// counter ($C00008, high byte) in a loop from the first line after the display
+// and stores every distinct value, in order, from $FF0010 until the counter
+// wraps to 0. The list does not depend on the CPU timing, only on how the V
+// counter steps, so it shows the jumps of each mode. `reg1_extra` can add the
+// V30 bit (0x08) and `reg12` selects H32/H40.
+inline std::vector<std::uint8_t> hv_probe_rom(std::uint8_t reg1_extra,
+                                              std::uint8_t reg12) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  put32(rom, 0x78, 0x310); // level 6 autovector
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER HV PROBE ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  const std::uint16_t main_code[] = {
+      0x33FC, static_cast<std::uint16_t>(0x8164 | reg1_extra),
+      0x00C0, 0x0004,
+      0x33FC, static_cast<std::uint16_t>(0x8C00 | reg12),
+      0x00C0, 0x0004,
+      0x46FC, 0x2000, // move #$2000,sr
+      0x60FE,         // bra.s .
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t handler[] = {
+      0x41F9, 0x00C0, 0x0008, // lea $C00008,a0
+      0x45F9, 0x00FF, 0x0010, // lea $FF0010,a2
+      0x123C, 0x00FF,         // move.b #$FF,d1
+      0x3010,                 // loop: move.w (a0),d0
+      0xE048,                 //       lsr.w  #8,d0
+      0xB001,                 //       cmp.b  d1,d0
+      0x67F8,                 //       beq    loop
+      0x14C0,                 //       move.b d0,(a2)+
+      0x1200,                 //       move.b d0,d1
+      0x4A00,                 //       tst.b  d0
+      0x66F0,                 //       bne    loop
+      0x4E73,                 //       rte
+  };
+  at = 0x310;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom
