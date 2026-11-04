@@ -23,6 +23,7 @@ option(TESSERA_ENGINE_INTEGRATION "Link a minimal installed Engine SDK consumer.
 option(TESSERA_RUNTIME_INTEGRATION "Require the native Runtime integration acceptance target." OFF)
 option(TESSERA_BUILD_BACKEND_PROBES "Build the explicitly enabled Gate 0 backend probes." OFF)
 option(TESSERA_BUILD_CLOWN_REFERENCE "Build the ClownMDEmu reference backend (AGPL-3.0) for local differential testing only. Never installed or distributed." OFF)
+option(TESSERA_BUILD_DIFFBENCH "Build the differential bench against oracles (local tool, never installed)." OFF)
 option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
 
 if(TESSERA_RUNTIME_INTEGRATION)
@@ -60,4 +61,8 @@ if(TESSERA_BUILD_BACKEND_PROBES)
         message(FATAL_ERROR "BACKEND_PROBES_UNAVAILABLE: tests/backend_probe/CMakeLists.txt is not implemented.")
     endif()
     add_subdirectory(tests/backend_probe)
+endif()
+
+if(TESSERA_BUILD_DIFFBENCH)
+    add_subdirectory(tools/diffbench)
 endif()

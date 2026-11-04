@@ -1,0 +1,3 @@
+gpgx_core = "C:/cores/gpgx.dll"
+gpgx_sha256 = "abababababababababababababababababababababababababababababababab"
+corpus_dir = "C:/roms"

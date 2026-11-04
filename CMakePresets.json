@@ -63,6 +63,14 @@
       "cacheVariables": {
         "TESSERA_BUILD_CLOWN_REFERENCE": "ON"
       }
+    },
+    {
+      "name": "windows-md-dev",
+      "displayName": "Windows x64 development with the differential bench",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "TESSERA_BUILD_DIFFBENCH": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -94,6 +102,11 @@
     {
       "name": "windows-clown-reference",
       "configurePreset": "windows-clown-reference",
+      "jobs": 2
+    },
+    {
+      "name": "windows-md-dev",
+      "configurePreset": "windows-md-dev",
       "jobs": 2
     }
   ],
@@ -161,6 +174,18 @@
     {
       "name": "windows-clown-reference",
       "configurePreset": "windows-clown-reference",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-md-dev",
+      "configurePreset": "windows-md-dev",
       "output": {
         "outputOnFailure": true
       },

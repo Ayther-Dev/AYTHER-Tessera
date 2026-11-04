@@ -1,0 +1,5 @@
+[[entry]]
+id = "sin-hash"
+system = "megadrive"
+region = "overseas"
+segments = [[0, 600]]
