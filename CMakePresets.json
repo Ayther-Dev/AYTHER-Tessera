@@ -69,7 +69,8 @@
       "displayName": "Windows x64 development with the differential bench",
       "inherits": "windows-dev",
       "cacheVariables": {
-        "TESSERA_BUILD_DIFFBENCH": "ON"
+        "TESSERA_BUILD_DIFFBENCH": "ON",
+        "TESSERA_BUILD_MEGADRIVE": "ON"
       }
     }
   ],

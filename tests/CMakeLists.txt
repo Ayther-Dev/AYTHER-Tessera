@@ -39,7 +39,8 @@ set_tests_properties(contract.snapshot PROPERTIES LABELS "contract;phase1" TIMEO
 add_executable(tessera_cli_test integration/cli_test.cpp)
 target_link_libraries(tessera_cli_test PRIVATE Tessera::build_options doctest::doctest nlohmann_json::nlohmann_json)
 target_compile_definitions(tessera_cli_test PRIVATE
-    TESSERA_CLOWN_REFERENCE=$<BOOL:${TESSERA_BUILD_CLOWN_REFERENCE}>)
+    TESSERA_CLOWN_REFERENCE=$<BOOL:${TESSERA_BUILD_CLOWN_REFERENCE}>
+    TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>)
 tessera_copy_diagnostic_runtime(tessera_cli_test)
 add_test(NAME integration.cli COMMAND tessera_cli_test "${PROJECT_BINARY_DIR}/src/tessera.exe")
 set_tests_properties(integration.cli PROPERTIES LABELS "integration;phase1" TIMEOUT 120)
@@ -51,7 +52,9 @@ tessera_copy_diagnostic_runtime(tessera_replay_test)
 add_test(NAME integration.replay COMMAND tessera_replay_test "${PROJECT_BINARY_DIR}/src/tessera.exe" "${PROJECT_BINARY_DIR}/../evidence/phase1-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
 set_tests_properties(integration.replay PROPERTIES LABELS "integration;replay;phase1;FX-01" TIMEOUT 240 RUN_SERIAL TRUE)
 
-if(NOT TESSERA_BUILD_CLOWN_REFERENCE)
+# El paquete distribuible solo lista los backends sintéticos; con los núcleos
+# de referencia o el núcleo Mega Drive en construcción se verifica en windows-dev.
+if(NOT TESSERA_BUILD_CLOWN_REFERENCE AND NOT TESSERA_BUILD_MEGADRIVE)
 add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     "-DPRODUCER_BUILD=${PROJECT_BINARY_DIR}"
     "-DPROJECT_SOURCE=${PROJECT_SOURCE_DIR}"

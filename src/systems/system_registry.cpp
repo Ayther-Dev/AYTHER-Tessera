@@ -3,6 +3,9 @@
 #if TESSERA_CLOWN_REFERENCE
 #include "backends/megadrive/megadrive_backend.hpp"
 #endif
+#if TESSERA_MEGADRIVE
+#include "md/md_backend.hpp"
+#endif
 #include "systems/system_detector.hpp"
 namespace tessera {
 std::span<const SystemRegistration> SystemRegistry::registrations() {
@@ -10,6 +13,10 @@ std::span<const SystemRegistration> SystemRegistry::registrations() {
 #if TESSERA_CLOWN_REFERENCE
       {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
        make_megadrive_backend},
+#endif
+#if TESSERA_MEGADRIVE
+      {"megadrive", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
+       md::make_backend},
 #endif
       {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
        make_synthetic_backend},

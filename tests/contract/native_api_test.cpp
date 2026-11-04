@@ -658,10 +658,14 @@ TEST_CASE("Extended structures reject aliases in foreign tails before writing "
 #ifndef TESSERA_CLOWN_REFERENCE
 #define TESSERA_CLOWN_REFERENCE 0
 #endif
+#ifndef TESSERA_MEGADRIVE
+#define TESSERA_MEGADRIVE 0
+#endif
 // The distributed core registers only the two synthetic test backends. The
 // ClownMDEmu reference backend (AGPL-3.0) exists only in the local reference
 // build (TESSERA_BUILD_CLOWN_REFERENCE) and is listed first when present.
-constexpr std::uint32_t kBackendCount = TESSERA_CLOWN_REFERENCE ? 3 : 2;
+constexpr std::uint32_t kBackendCount =
+    2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 1 : 0);
 constexpr std::uint32_t kFirstSynthetic = kBackendCount - 2;
 
 TEST_CASE("Extended backend arrays honor each declared stride and preserve "
@@ -720,12 +724,12 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
                                    &context) == TESSERA_OK);
   std::set<std::string> ids;
   for (const auto &backend : backends) {
-    CHECK(backend.kind == (fixed_id(backend.id) == "clownmdemu"
-                               ? TESSERA_BACKEND_PRODUCT
-                               : TESSERA_BACKEND_TEST));
-    CHECK(backend.system == (fixed_id(backend.id) == "clownmdemu"
-                                 ? TESSERA_SYSTEM_MEGA_DRIVE
-                                 : TESSERA_SYSTEM_NONE));
+    const bool product = fixed_id(backend.id) == "clownmdemu" ||
+                         fixed_id(backend.id) == "megadrive";
+    CHECK(backend.kind ==
+          (product ? TESSERA_BACKEND_PRODUCT : TESSERA_BACKEND_TEST));
+    CHECK(backend.system ==
+          (product ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE));
     CHECK((backend.capabilities & ~UINT64_C(0x1FFF)) == 0);
     ids.insert(fixed_id(backend.id));
     CHECK(!fixed_id(backend.version).empty());
@@ -735,6 +739,9 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
   std::set<std::string> expected{"synthetic.minimal", "synthetic.complete"};
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
     expected.insert("clownmdemu");
+  // TP-101.1: the native core is listed only when built with the option.
+  if constexpr (TESSERA_MEGADRIVE != 0)
+    expected.insert("megadrive");
   CHECK(ids == expected);
   const std::string first = fixed_id(backends[0].id);
   backends[0].id[0] = '?'; // A caller copy cannot corrupt the registry.

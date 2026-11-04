@@ -29,6 +29,9 @@ if(TESSERA_BUILD_CLOWN_REFERENCE)
         backends/megadrive/canonical_audio.cpp
         backends/megadrive/clown_state_codec.cpp)
 endif()
+if(TESSERA_BUILD_MEGADRIVE)
+    list(APPEND core_sources md/md_backend.cpp)
+endif()
 add_library(tessera_core STATIC ${core_sources})
 add_library(Tessera::core ALIAS tessera_core)
 target_include_directories(tessera_core PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
@@ -43,6 +46,7 @@ if(TESSERA_BUILD_CLOWN_REFERENCE)
 else()
     target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_CLOWN_REFERENCE=0>")
 endif()
+target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>>")
 target_compile_options(tessera_core PRIVATE /utf-8)
 
 file(GLOB_RECURSE identity_sources CONFIGURE_DEPENDS

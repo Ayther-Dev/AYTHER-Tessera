@@ -57,6 +57,9 @@ function Test-Tidy {
     $files = @(git ls-files 'src/*.cpp' 'tools/*.cpp') |
         Where-Object { $_ -notmatch 'clown_state_codec|backend_probe' -and ($Preset -eq 'windows-clown-reference' -or $_ -notmatch 'backends/megadrive') -and (Test-Path -LiteralPath $_) }
     $db = Join-Path $repoRoot "build/$Preset"
+    # Solo los archivos presentes en la base de compilacion del preset.
+    $commands = (Get-Content -Raw (Join-Path $db 'compile_commands.json')) -replace '\\', '/'
+    $files = @($files | Where-Object { $commands.Contains($_) })
     & $tidy -p $db --quiet @files
     if ($LASTEXITCODE -ne 0) { throw 'TIDY_VIOLATION: clang-tidy encontró problemas.' }
 }
