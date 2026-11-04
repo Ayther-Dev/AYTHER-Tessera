@@ -23,12 +23,14 @@ bool has_sega(std::span<const std::uint8_t> b) {
 }
 
 bool is_smd_header(std::span<const std::uint8_t> h) {
-  return h.size() >= kCopierHeader && h[1] == 0x03 && h[8] == 0xAA && h[9] == 0xBB;
+  return h.size() >= kCopierHeader && h[1] == 0x03 && h[8] == 0xAA &&
+         h[9] == 0xBB;
 }
 
 std::vector<std::uint8_t> deinterleave(std::span<const std::uint8_t> data) {
   std::vector<std::uint8_t> out(data.size());
-  for (std::size_t block = 0; block + kSmdBlock <= data.size(); block += kSmdBlock) {
+  for (std::size_t block = 0; block + kSmdBlock <= data.size();
+       block += kSmdBlock) {
     for (std::size_t i = 0; i < kSmdBlock / 2; ++i) {
       out[block + 2 * i + 1] = data[block + i];
       out[block + 2 * i] = data[block + kSmdBlock / 2 + i];
@@ -42,23 +44,39 @@ std::uint8_t parse_regions(std::span<const std::uint8_t> rom) {
   bool letters = false;
   for (std::size_t i = 0; i < 3; ++i) {
     const char c = static_cast<char>(rom[0x1F0 + i]);
-    if (c == 'J') { mask |= kRegionJapan; letters = true; }
-    if (c == 'U') { mask |= kRegionUsa; letters = true; }
-    if (c == 'E') { mask |= kRegionEurope; letters = true; }
+    if (c == 'J') {
+      mask |= kRegionJapan;
+      letters = true;
+    }
+    if (c == 'U') {
+      mask |= kRegionUsa;
+      letters = true;
+    }
+    if (c == 'E') {
+      mask |= kRegionEurope;
+      letters = true;
+    }
   }
   if (letters)
     return mask;
-  // New style: one hexadecimal digit, bit 0 Japan, bit 2 Americas, bit 3 Europe.
+  // New style: one hexadecimal digit, bit 0 Japan, bit 2 Americas, bit 3
+  // Europe.
   const char c = static_cast<char>(rom[0x1F0]);
   int value = -1;
-  if (c >= '0' && c <= '9') value = c - '0';
-  else if (c >= 'A' && c <= 'F') value = c - 'A' + 10;
-  else if (c >= 'a' && c <= 'f') value = c - 'a' + 10;
+  if (c >= '0' && c <= '9')
+    value = c - '0';
+  else if (c >= 'A' && c <= 'F')
+    value = c - 'A' + 10;
+  else if (c >= 'a' && c <= 'f')
+    value = c - 'a' + 10;
   if (value < 0)
     return 0;
-  if (value & 1) mask |= kRegionJapan;
-  if (value & 4) mask |= kRegionUsa;
-  if (value & 8) mask |= kRegionEurope;
+  if (value & 1)
+    mask |= kRegionJapan;
+  if (value & 4)
+    mask |= kRegionUsa;
+  if (value & 8)
+    mask |= kRegionEurope;
   return mask;
 }
 
@@ -74,9 +92,15 @@ SramInfo parse_sram(std::span<const std::uint8_t> rom) {
   sram.start = start;
   sram.end = end;
   switch (rom[0x1B2]) {
-  case 0xF8: sram.bus = SramBus::odd; break;
-  case 0xE8: sram.bus = SramBus::even; break;
-  default: sram.bus = SramBus::both; break;
+  case 0xF8:
+    sram.bus = SramBus::odd;
+    break;
+  case 0xE8:
+    sram.bus = SramBus::even;
+    break;
+  default:
+    sram.bus = SramBus::both;
+    break;
   }
   const std::uint32_t range = end - start + 1;
   sram.size_bytes = sram.bus == SramBus::both ? range : (range + 1) / 2;

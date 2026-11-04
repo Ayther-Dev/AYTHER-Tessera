@@ -44,7 +44,8 @@ Bytes make_rom(const char *region = "JUE", bool sram = false,
   }
   return rom;
 }
-// Interleaved .smd: 16 KiB blocks, odd bytes in the first half, even in the second.
+// Interleaved .smd: 16 KiB blocks, odd bytes in the first half, even in the
+// second.
 Bytes to_smd(const Bytes &rom) {
   Bytes out(512, 0);
   out[0] = static_cast<std::uint8_t>(rom.size() / 0x4000);

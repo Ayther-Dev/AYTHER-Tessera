@@ -27,8 +27,8 @@ struct SramInfo {
 
 struct Cart {
   CartFormat format = CartFormat::plain;
-  std::vector<std::uint8_t> rom;  ///< plain, de-interleaved, header-less
-  std::uint8_t regions = 0;       ///< bit mask of kRegion*; 0 = not declared
+  std::vector<std::uint8_t> rom; ///< plain, de-interleaved, header-less
+  std::uint8_t regions = 0;      ///< bit mask of kRegion*; 0 = not declared
   SramInfo sram;
 };
 
