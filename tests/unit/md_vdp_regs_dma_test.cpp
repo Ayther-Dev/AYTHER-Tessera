@@ -383,9 +383,9 @@ TEST_CASE("the V counter jump depends on the standard and on V28/V30") {
   CHECK(v_of(Standard::ntsc, 1, 0xF0) == 0xF0); // no jump in V30 on NTSC
   CHECK(v_of(Standard::ntsc, 1, 0xFF) == 0xFF);
   CHECK(v_of(Standard::pal, 0, 0x102) == 0x02);
-  CHECK(v_of(Standard::pal, 0, 0x103) == 0xCB);
+  CHECK(v_of(Standard::pal, 0, 0x103) == 0xCA);
   CHECK(v_of(Standard::pal, 1, 0x10A) == 0x0A);
-  CHECK(v_of(Standard::pal, 1, 0x10B) == 0xD3);
+  CHECK(v_of(Standard::pal, 1, 0x10B) == 0xD2);
 }
 
 // TP-106.1 (RF-2.2): the H counter steps through 171 (H32) or 211 (H40) values

@@ -333,6 +333,40 @@ inline std::vector<std::uint8_t> hv_probe_rom(std::uint8_t reg1_extra,
 
 namespace tessera::testrom {
 
+// `hv_probe` for PAL (TP-106.1): the same sampling, but it does not stop at the
+// first wrap to 0: it keeps the first 100 distinct values, so the list shows
+// the jump of the PAL counter ($102 -> $CA in V28, $10A -> $D2 in V30) that
+// comes after the wrap. The region byte of the header is 'E' so that gpgx
+// picks 50 Hz.
+inline std::vector<std::uint8_t> hv_pal_probe_rom(std::uint8_t reg1_extra) {
+  auto rom = hv_probe_rom(reg1_extra, 0x00);
+  rom[0x1F0] = 'E';
+  const std::uint16_t handler[] = {
+      0x41F9, 0x00C0, 0x0008, // lea $C00008,a0
+      0x45F9, 0x00FF, 0x0010, // lea $FF0010,a2
+      0x123C, 0x00FF,         // move.b #$FF,d1
+      0x7463,                 // moveq #99,d2
+      0x3010,                 // loop: move.w (a0),d0
+      0xE048,                 //       lsr.w  #8,d0
+      0xB001,                 //       cmp.b  d1,d0
+      0x67F8,                 //       beq    loop
+      0x14C0,                 //       move.b d0,(a2)+
+      0x1200,                 //       move.b d0,d1
+      0x51CA, 0xFFF2,         //       dbra   d2,loop
+      0x4E73,                 //       rte
+  };
+  std::size_t at = 0x310;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom
+
+namespace tessera::testrom {
+
 // `hv_probe` (H counter part, TP-106.1): samples the H counter ($C00009) in a
 // tight loop and sets byte `$FF0100 + value` for every value seen, so after a
 // few frames the table lists which H values exist in the mode (the jump of the

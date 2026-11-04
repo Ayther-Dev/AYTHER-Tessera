@@ -220,7 +220,8 @@ void Vdp::latch_hv(std::uint32_t line_cycle) noexcept {
 std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
   // The V counter jumps back once in the vertical blank: NTSC V28 from $EA to
   // $E5, PAL V28 from $102 to $CA, PAL V30 from $10A to $D2; NTSC V30 does not
-  // jump. Verified against gpgx for NTSC (TP-106.1).
+  // jump. Verified against gpgx for NTSC and PAL (TP-106.1): the counter reads
+  // $CA (V28) or $D2 (V30) right after $102 / $10A.
   std::uint32_t v = line_;
   const bool v30 = (regs_[1] & 0x08U) != 0;
   if (standard_ == Standard::ntsc) {
@@ -228,9 +229,9 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
       v = v - 0xEA + 0xE4;
   } else if (v30) {
     if (v > 0x10A)
-      v = v - 0x10A + 0xD2;
+      v = v - 0x10B + 0xD2;
   } else if (v > 0x102) {
-    v = v - 0x102 + 0xCA;
+    v = v - 0x103 + 0xCA;
   }
   // The H counter runs through 171 (H32: $00-$93, $E9-$FF) or 211 (H40:
   // $00-$B6, $E4-$FF) values per line (verified against gpgx).

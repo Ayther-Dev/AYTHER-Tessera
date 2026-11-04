@@ -6,6 +6,7 @@ the 64 KiB with the bytes of every 16 bit word swapped (host order), so its
 dump is swapped back before comparing.
 
 usage: compare_work_ram.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
+       [region]   native region j|u|e (gpgx reads it from the ROM header)
 exit:  0 identical, 1 different, 2 a tool failed
 """
 import os
@@ -19,7 +20,8 @@ def main(argv):
     mine = os.path.join(out_dir, "native.wram")
     gpgx = os.path.join(out_dir, "gpgx.wram")
     runs = [
-        [md_run, "--rom", rom, "--frames", frames, "--work-ram-out", mine],
+        [md_run, "--rom", rom, "--frames", frames, "--work-ram-out", mine]
+        + (["--region", argv[7]] if len(argv) > 7 else []),
         [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
          "--work-ram-out", gpgx],
     ]
