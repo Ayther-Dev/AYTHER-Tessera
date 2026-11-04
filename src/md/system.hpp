@@ -39,6 +39,7 @@ public:
     return bus_.work_ram();
   }
   const Vdp &vdp() const noexcept { return vdp_; }
+  const Sram &sram() const noexcept { return sram_; }
   const M68k &cpu() const noexcept { return cpu_; }
 
   void set_pad(unsigned port, std::uint8_t pressed) noexcept;
@@ -62,6 +63,7 @@ private:
   void update_irq() noexcept;
 
   MachineConfig config_;
+  Sram sram_; ///< declared before the bus: built from the ROM header first
   Bus bus_;
   M68k cpu_;
   Vdp vdp_;

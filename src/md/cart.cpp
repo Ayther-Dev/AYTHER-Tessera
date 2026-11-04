@@ -109,6 +109,12 @@ SramInfo parse_sram(std::span<const std::uint8_t> rom) {
 
 } // namespace
 
+SramInfo read_sram_header(std::span<const std::uint8_t> rom) {
+  if (rom.size() < 0x1BC)
+    return {};
+  return parse_sram(rom);
+}
+
 Cart load_cart(std::span<const std::uint8_t> content) {
   require(!content.empty() && content.size() <= kMaxRomSize + kCopierHeader,
           TESSERA_INVALID_CONTENT);

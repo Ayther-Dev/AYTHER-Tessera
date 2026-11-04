@@ -17,6 +17,10 @@ public:
   explicit Sram(const SramInfo &info);
 
   std::size_t image_size() const noexcept { return image_.size(); }
+  /// True when `address` falls inside the image.
+  bool contains(std::uint32_t address) const noexcept {
+    return address >= base_ && address - base_ < image_.size();
+  }
   bool dirty() const noexcept { return dirty_; }
 
   /// Bus access; addresses outside the range read 0xFF and are not written.

@@ -41,9 +41,7 @@ public:
     return vram_;
   }
   const std::array<std::uint16_t, 64> &cram() const noexcept { return cram_; }
-  const std::array<std::uint16_t, 40> &vsram() const noexcept {
-    return vsram_;
-  }
+  const std::array<std::uint16_t, 40> &vsram() const noexcept { return vsram_; }
   std::uint32_t line() const noexcept { return line_; }
 
 private:

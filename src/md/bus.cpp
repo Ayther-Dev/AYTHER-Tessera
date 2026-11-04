@@ -44,8 +44,9 @@ Target classify(std::uint32_t address) noexcept {
   return Target::unmapped;
 }
 
-Bus::Bus(std::vector<std::uint8_t> rom, BusDevices &devices, Mapper mapper)
-    : rom_(std::move(rom)), devices_(devices), mapper_(mapper) {}
+Bus::Bus(std::vector<std::uint8_t> rom, BusDevices &devices, Mapper mapper,
+         Sram *sram)
+    : rom_(std::move(rom)), devices_(devices), mapper_(mapper), sram_(sram) {}
 
 // Offset inside the ROM image of a cartridge address. With SSF2, slot 0
 // (first 512 KiB) is fixed and slots 1-7 follow the bank registers; a bank
@@ -59,19 +60,21 @@ std::uint32_t Bus::rom_offset(std::uint32_t a) const noexcept {
 }
 
 void Bus::write_mapper(std::uint32_t a, std::uint8_t value) noexcept {
-  if (mapper_ != Mapper::ssf2)
-    return;
   const std::uint32_t reg = a & 0xF; // registers live on odd bytes
-  if (reg == 1)
+  if (reg == 1) { // $A130F1: bit 0 maps the SRAM, bit 1 write-protects it
     sram_mapped_ = (value & 1U) != 0;
-  else if ((reg & 1U) != 0 && reg >= 3)
+    sram_protected_ = (value & 2U) != 0;
+  } else if (mapper_ == Mapper::ssf2 && (reg & 1U) != 0 && reg >= 3) {
     banks_[(reg - 1) / 2] = value & 0x3F;
+  }
 }
 
 std::uint8_t Bus::read8(std::uint32_t address) {
   const std::uint32_t a = address & kMask;
   switch (const Target t = classify(a)) {
   case Target::rom: {
+    if (sram_hit(a))
+      return sram_->read8(a);
     const std::uint32_t o = rom_offset(a);
     return o < rom_.size() ? rom_[o] : kUnmappedByte;
   }
@@ -90,6 +93,9 @@ std::uint16_t Bus::read16(std::uint32_t address) {
   const std::uint32_t a = address & kMask & ~1U;
   switch (const Target t = classify(a)) {
   case Target::rom: {
+    if (sram_hit(a))
+      return static_cast<std::uint16_t>((sram_->read8(a) << 8) |
+                                        sram_->read8(a + 1));
     const std::uint32_t o = rom_offset(a);
     return o + 1 < rom_.size()
                ? static_cast<std::uint16_t>((rom_[o] << 8) | rom_[o + 1])
@@ -115,6 +121,9 @@ void Bus::write8(std::uint32_t address, std::uint8_t value) {
   const std::uint32_t a = address & kMask;
   switch (const Target t = classify(a)) {
   case Target::rom:
+    if (sram_hit(a) && !sram_protected_)
+      sram_->write8(a, value);
+    return;
   case Target::unmapped:
     return;
   case Target::mapper:
@@ -133,6 +142,11 @@ void Bus::write16(std::uint32_t address, std::uint16_t value) {
   const std::uint32_t a = address & kMask & ~1U;
   switch (const Target t = classify(a)) {
   case Target::rom:
+    if (sram_hit(a) && !sram_protected_) {
+      sram_->write8(a, static_cast<std::uint8_t>(value >> 8));
+      sram_->write8(a + 1, static_cast<std::uint8_t>(value));
+    }
+    return;
   case Target::unmapped:
     return;
   case Target::mapper:

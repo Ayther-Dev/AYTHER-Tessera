@@ -36,4 +36,8 @@ struct Cart {
 /// Mega Drive ROM or exceeds 16 MiB.
 Cart load_cart(std::span<const std::uint8_t> content);
 
+/// SRAM declared by the header of an already plain ROM image ("RA" at $1B0);
+/// `present` is false when there is none or the image is too short.
+SramInfo read_sram_header(std::span<const std::uint8_t> rom);
+
 } // namespace tessera::md

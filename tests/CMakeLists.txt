@@ -71,6 +71,16 @@ tessera_copy_diagnostic_runtime(tessera_md_system_test)
 add_test(NAME unit.md_system COMMAND tessera_md_system_test)
 set_tests_properties(unit.md_system PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
+add_executable(tessera_md_testrom_bus_sweep integration/md_testrom_bus_sweep.cpp)
+target_include_directories(tessera_md_testrom_bus_sweep PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_md_testrom_bus_sweep PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+target_compile_definitions(tessera_md_testrom_bus_sweep PRIVATE
+    GOLDEN_FILE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/md/bus_sweep.golden"
+    SRM_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/md/bus_sweep.srm")
+tessera_copy_diagnostic_runtime(tessera_md_testrom_bus_sweep)
+add_test(NAME integration.md_testrom_bus_sweep COMMAND tessera_md_testrom_bus_sweep)
+set_tests_properties(integration.md_testrom_bus_sweep PROPERTIES LABELS "integration;phase1;md" TIMEOUT 60)
+
 add_test(NAME unit.md_bus COMMAND tessera_md_bus_test)
 set_tests_properties(unit.md_bus PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 

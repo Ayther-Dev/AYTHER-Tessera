@@ -4,6 +4,7 @@
 // endian; a long access is two word accesses, high word first.
 #pragma once
 #include "md/machine.hpp"
+#include "md/sram.hpp"
 
 #include <array>
 #include <cstdint>
@@ -45,7 +46,7 @@ public:
 class Bus {
 public:
   Bus(std::vector<std::uint8_t> rom, BusDevices &devices,
-      Mapper mapper = Mapper::none);
+      Mapper mapper = Mapper::none, Sram *sram = nullptr);
 
   std::uint8_t read8(std::uint32_t address);
   std::uint16_t read16(std::uint32_t address);
@@ -67,7 +68,13 @@ private:
   Mapper mapper_;
   /// SSF2: 512 KiB bank mapped in each of the 8 slots of the 4 MiB window.
   std::array<std::uint8_t, 8> banks_{0, 1, 2, 3, 4, 5, 6, 7};
+  Sram *sram_;
   bool sram_mapped_ = false;
+  bool sram_protected_ = false;
+
+  bool sram_hit(std::uint32_t address) const noexcept {
+    return sram_mapped_ && sram_ != nullptr && sram_->contains(address);
+  }
 };
 
 } // namespace tessera::md

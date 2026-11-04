@@ -41,18 +41,33 @@ inline std::vector<std::uint8_t> bus_sweep_rom() {
   put32(rom, 0x1B8, 0x203FFF);
   std::memset(&rom[0x1F0], ' ', 16);
   rom[0x1F0] = 'U';
+  // Work RAM accesses of every width (byte, word, long, a 64 KiB mirror and
+  // a subroutine call that pushes the return address), then the SRAM sweep.
   const std::uint16_t code[] = {
-      0x13FC, 0x0001, 0x00A1, 0x30F1, // move.b #1,$A130F1
-      0x41F9, 0x0020, 0x0001,         // lea    $200001,a0
-      0x303C, 0x1FFF,                 // move.w #$1FFF,d0
-      0x1080,                         // loop: move.b d0,(a0)
-      0x5488,                         //       addq.l #2,a0
-      0x51C8, 0xFFFA,                 //       dbra   d0,loop
-      0x60FE,                         // hang: bra.s  hang
+      0x23FC, 0x0123, 0x4567, 0x00FF, 0x0000, // $200 move.l #$01234567,$FF0000
+      0x33FC, 0x89AB, 0x00FF, 0x0004,         // $20A move.w #$89AB,$FF0004
+      0x13FC, 0x00CD, 0x00FF, 0x0006,         // $212 move.b #$CD,$FF0006
+      0x33FC, 0x1357, 0x00E2, 0x0008,         // $21A move.w #$1357,$E20008
+      0x6100, 0x003C,                         // $222 bsr.w  $260
+      0x13FC, 0x0001, 0x00A1, 0x30F1,         // $226 move.b #1,$A130F1
+      0x41F9, 0x0020, 0x0001,                 // $22E lea    $200001,a0
+      0x303C, 0x1FFF,                         // $234 move.w #$1FFF,d0
+      0x1080,                                 // $238 loop: move.b d0,(a0)
+      0x5488,                                 //      addq.l #2,a0
+      0x51C8, 0xFFFA,                         //      dbra   d0,loop
+      0x60FE,                                 // $240 hang: bra.s hang
   };
-  std::size_t at = 0x200 - 0x200; // code lives at $200; ROM is 0x400 bytes
-  at = 0x200;
+  std::size_t at = 0x200;
   for (const auto word : code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t subroutine[] = {
+      0x23FC, 0xDEAD, 0xBEEF, 0x00FF, 0x0010, // $260 move.l #$DEADBEEF,$FF0010
+      0x4E75,                                 //      rts
+  };
+  at = 0x260;
+  for (const auto word : subroutine) {
     put16(rom, at, word);
     at += 2;
   }

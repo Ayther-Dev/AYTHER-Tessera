@@ -199,3 +199,59 @@ TEST_CASE("without the mapper the registers are ignored") {
   CHECK(bus.read8(0x10) == static_cast<std::uint8_t>(0x10 * 7 + 3));
   CHECK(spy.log.empty());
 }
+
+// ---- TP-101.10: cartridge SRAM on the bus
+// --------------------------------------
+#include "md/sram.hpp"
+
+namespace {
+SramInfo odd_sram() {
+  SramInfo info;
+  info.present = true;
+  info.start = 0x200001;
+  info.end = 0x203FFF;
+  info.bus = SramBus::odd;
+  info.size_bytes = 0x2000;
+  return info;
+}
+} // namespace
+
+TEST_CASE("SRAM: hidden until $A130F1 maps it, then byte accesses reach it") {
+  Spy spy;
+  Sram sram(odd_sram());
+  Bus bus(rom_image(0x400), spy, Mapper::none, &sram);
+  CHECK(bus.read8(0x200001) == kUnmappedByte); // ROM is 1 KiB: nothing there
+  bus.write8(0x200001, 0x12);                  // ignored while unmapped
+  CHECK(sram.read8(0x200001) == 0xFF);
+
+  bus.write8(0xA130F1, 0x01);
+  bus.write8(0x200001, 0x12);
+  bus.write8(0x200003, 0x34);
+  CHECK(bus.read8(0x200001) == 0x12);
+  CHECK(sram.read8(0x200003) == 0x34);
+  CHECK(bus.read8(0x200000) == 0xFF); // even byte of an odd-bus SRAM
+  CHECK(bus.read16(0x200002) == 0xFF34);
+  CHECK(sram.dirty());
+
+  bus.write8(0xA130F1, 0x00); // unmapped again
+  CHECK(bus.read8(0x200001) == kUnmappedByte);
+}
+
+TEST_CASE("SRAM: write protect bit keeps the contents") {
+  Spy spy;
+  Sram sram(odd_sram());
+  Bus bus(rom_image(0x400), spy, Mapper::none, &sram);
+  bus.write8(0xA130F1, 0x01);
+  bus.write8(0x200001, 0x55);
+  bus.write8(0xA130F1, 0x03); // mapped + write protected
+  bus.write8(0x200001, 0x66);
+  CHECK(bus.read8(0x200001) == 0x55);
+}
+
+TEST_CASE("SRAM: outside the declared range the ROM answers") {
+  Spy spy;
+  Sram sram(odd_sram());
+  Bus bus(rom_image(0x400), spy, Mapper::none, &sram);
+  bus.write8(0xA130F1, 0x01);
+  CHECK(bus.read8(0x204001) == kUnmappedByte);
+}

@@ -8,7 +8,8 @@ std::uint16_t dup(std::uint8_t v) {
 } // namespace
 
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
-    : config_(config), bus_(std::move(rom), *this, config.mapper), cpu_(bus_),
+    : config_(config), sram_(read_sram_header(rom)),
+      bus_(std::move(rom), *this, config.mapper, &sram_), cpu_(bus_),
       vdp_(config.standard), tmss_(config.tmss) {
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
     return bus_.read16(address);

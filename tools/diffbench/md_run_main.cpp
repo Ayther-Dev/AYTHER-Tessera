@@ -14,7 +14,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path;
+  std::string rom_path, out_path, srm_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -24,6 +24,8 @@ int main(int argc, char **argv) {
       rom_path = argv[++i];
     } else if (arg == "--work-ram-out" && has_value) {
       out_path = argv[++i];
+    } else if (arg == "--save-ram-out" && has_value) {
+      srm_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
@@ -59,6 +61,12 @@ int main(int argc, char **argv) {
   out.write(reinterpret_cast<const char *>(ram.data()),
             static_cast<std::streamsize>(ram.size()));
   out.close();
+  if (!srm_path.empty()) {
+    const auto srm = system.sram().to_srm();
+    std::ofstream srm_out(srm_path, std::ios::binary | std::ios::trunc);
+    srm_out.write(reinterpret_cast<const char *>(srm.data()),
+                  static_cast<std::streamsize>(srm.size()));
+  }
   std::printf("frames=%u work_ram=%zu\n", frames, ram.size());
   return out.good() ? 0 : 1;
 }

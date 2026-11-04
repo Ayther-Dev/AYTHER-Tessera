@@ -37,7 +37,7 @@ void Vdp::write_control(std::uint16_t value) {
 
 void Vdp::put(std::uint16_t value) {
   switch (code_ & 0x0FU) {
-  case 1: // VRAM write
+  case 1:                       // VRAM write
     if ((address_ & 1U) != 0) { // odd address: bytes swapped
       vram_[address_] = static_cast<std::uint8_t>(value >> 8);
       vram_[address_ ^ 1U] = static_cast<std::uint8_t>(value);
