@@ -2,6 +2,7 @@
 // manifiestos oracles.toml y corpus.toml. Los planos llegan en TP-005.2 en
 // adelante.
 #include "libretro_host.hpp"
+#include "tessera/tessera_observation.h"
 
 #include <cctype>
 #include <cstdlib>
@@ -118,7 +119,7 @@ int main(int argc, char **argv) {
       help();
       return 0;
     }
-    if (a == "--validate-only") {
+    if (a == "--validate-only" || a == "--dump-regions") {
       args[a] = "1";
       continue;
     }
@@ -139,7 +140,8 @@ int main(int argc, char **argv) {
                                       args["--frames"].c_str(), nullptr, 10))
                                 : 600u;
     const auto r =
-        diffbench::run_libretro(args["--libretro"], args["--rom"], frames);
+        diffbench::run_libretro(args["--libretro"], args["--rom"], frames,
+                                args.count("--dump-regions") > 0);
     if (!r.error.empty()) {
       std::cerr << "error: " << r.error << "\n";
       return 1;
@@ -148,6 +150,22 @@ int main(int argc, char **argv) {
       std::ofstream out(args["--hashes-out"]);
       for (const auto h : r.frame_hashes)
         out << std::hex << h << "\n";
+    }
+    if (args.count("--dump-regions")) {
+      unsigned readable = 0, read_ok = 0, size_ok = 0;
+      for (const auto &d : r.regions) {
+        std::cout << "region=" << d.id << " bytes=" << d.byte_size
+                  << " access=" << d.access << " query=" << d.query_status
+                  << " read=" << d.read_status << "\n";
+        if (d.access & TESSERA_OBS_REGION_ACCESS_READ) {
+          ++readable;
+          read_ok += d.read_status == 0;
+          size_ok += d.bytes_read == d.byte_size && d.byte_size > 0;
+        }
+      }
+      std::cout << "regions=" << r.regions.size() << " readable=" << readable
+                << " read_ok=" << read_ok << " size_ok=" << size_ok << "\n";
+      return read_ok == readable && size_ok == readable ? 0 : 1;
     }
     std::cout << "frames=" << frames << " hashed=" << r.frame_hashes.size()
               << " size=" << r.width << "x" << r.height << "\n";

@@ -7,7 +7,15 @@
 
 namespace diffbench {
 
+struct RegionDump {
+  uint32_t id = 0, byte_size = 0, access = 0;
+  int32_t query_status = 0, read_status = 0;
+  uint32_t bytes_read = 0;
+  uint64_t hash = 0;
+};
+
 struct RunResult {
+  std::vector<RegionDump> regions;    // ABI 1.10, si se pidió el volcado
   std::vector<uint64_t> frame_hashes; // FNV-1a 64 del framebuffer XRGB8888
   uint32_t width = 0, height = 0;
   std::string error;
@@ -15,6 +23,7 @@ struct RunResult {
 
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,
-                       const std::string &rom_path, unsigned frames);
+                       const std::string &rom_path, unsigned frames,
+                       bool dump_regions = false);
 
 } // namespace diffbench

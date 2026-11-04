@@ -1,4 +1,5 @@
 add_executable(tessera_diffbench main.cpp libretro_host.cpp)
+target_include_directories(tessera_diffbench PRIVATE "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(tessera_diffbench PRIVATE Tessera::build_options)
 
 set(fx "${PROJECT_SOURCE_DIR}/tests/fixtures/diffbench")
@@ -23,4 +24,11 @@ if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
         --frames 600 --hashes-out "${CMAKE_CURRENT_BINARY_DIR}/gpgx-fx02.hashes")
     set_tests_properties(tool.diffbench_gpgx_fx02 PROPERTIES
         PASS_REGULAR_EXPRESSION "frames=600 hashed=600" LABELS "tool;phase0;local" TIMEOUT 120)
+endif()
+if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
+    add_test(NAME tool.diffbench_gpgx_regions COMMAND tessera_diffbench
+        --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_ROM}"
+        --frames 60 --dump-regions)
+    set_tests_properties(tool.diffbench_gpgx_regions PROPERTIES
+        PASS_REGULAR_EXPRESSION "regions=26 readable=26 read_ok=26 size_ok=26" LABELS "tool;phase0;local" TIMEOUT 120)
 endif()

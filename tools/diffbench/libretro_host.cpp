@@ -2,6 +2,8 @@
 
 #include <windows.h>
 
+#include "tessera/tessera_observation.h"
+
 #include <fstream>
 #include <iterator>
 
@@ -21,6 +23,30 @@ using AudioCb = void(__cdecl *)(int16_t, int16_t);
 using AudioBatchCb = size_t(__cdecl *)(const int16_t *, size_t);
 using PollCb = void(__cdecl *)();
 using InputCb = int16_t(__cdecl *)(unsigned, unsigned, unsigned, unsigned);
+
+// Espejo de ayther_interface_v1 hasta set_subscriptions (mismo orden y
+// alineación naturales que el header de referencia).
+struct AytherInterface {
+  uint32_t abi_version, struct_size;
+  uint64_t capabilities;
+  uint32_t host_endianness, pointer_size, region_info_size, frame_snapshot_size,
+      sprite_size, audio_write_size;
+  const char *build_id;
+  uint32_t build_id_size, reserved0;
+  int32_t(__cdecl *query_region)(uint32_t, tessera_obs_region_info_v1 *,
+                                 uint32_t);
+  int32_t(__cdecl *read_region)(uint32_t, uint32_t, void *, uint32_t, uint64_t,
+                                uint64_t *);
+  void *write_control;
+  void *capture_snapshot;
+  void *recompose_frame;
+  uint32_t audio_event_size, audio_transport_stats_size;
+  void *poll_audio_events;
+  void *get_audio_transport_stats;
+  uint32_t subscription_state_size, reserved1;
+  void *get_subscriptions;
+  int32_t(__cdecl *set_subscriptions)(uint32_t);
+};
 
 RunResult *g_result = nullptr;
 
@@ -74,7 +100,8 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 } // namespace
 
 RunResult run_libretro(const std::string &core_path,
-                       const std::string &rom_path, unsigned frames) {
+                       const std::string &rom_path, unsigned frames,
+                       bool dump_regions) {
   RunResult result;
   std::ifstream in(rom_path, std::ios::binary);
   if (!in) {
@@ -124,8 +151,39 @@ RunResult run_libretro(const std::string &core_path,
   if (!load(&info)) {
     result.error = "retro_load_game falló";
   } else {
-    for (unsigned i = 0; i < frames; ++i)
+    using GetIface = const AytherInterface *(__cdecl *)(uint32_t);
+    GetIface get_iface = nullptr;
+    const AytherInterface *iface = nullptr;
+    if (dump_regions && sym(core, "ayther_get_interface", get_iface))
+      iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
+    if (dump_regions && !iface)
+      result.error = "el core no ofrece la interfaz AYTHER 1.10";
+    if (iface)
+      iface->set_subscriptions(TESSERA_OBS_SUB_ALL);
+    for (unsigned i = 0; i < frames && result.error.empty(); ++i)
       run();
+    if (iface) {
+      for (uint32_t id = 1; id < TESSERA_OBS_REGION_COUNT; ++id) {
+        RegionDump d;
+        d.id = id;
+        tessera_obs_region_info_v1 info{};
+        d.query_status = iface->query_region(id, &info, sizeof(info));
+        d.byte_size = info.byte_size;
+        d.access = info.access_flags;
+        if (d.query_status == 0 &&
+            (info.access_flags & TESSERA_OBS_REGION_ACCESS_READ)) {
+          std::vector<uint8_t> buf(info.byte_size);
+          uint64_t generation = 0;
+          d.read_status = iface->read_region(id, 0, buf.data(), info.byte_size,
+                                             UINT64_MAX, &generation);
+          if (d.read_status == 0) {
+            d.bytes_read = info.byte_size;
+            d.hash = fnv1a(buf.data(), buf.size(), 1469598103934665603ull);
+          }
+        }
+        result.regions.push_back(d);
+      }
+    }
     unload();
   }
   deinit();
