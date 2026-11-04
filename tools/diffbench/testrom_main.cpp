@@ -55,7 +55,13 @@ int main(int argc, char **argv) {
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
   } else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
-  else
+  else if (std::strncmp(argv[1], "fifo-timing-", 12) == 0) {
+    // fifo-timing-<target 0..2>-<d|b>-<h32|h40>-<a|v>: display on or blanked
+    const char *v = argv[1] + 12;
+    rom = tessera::testrom::fifo_timing_rom(
+        static_cast<unsigned>(v[0] - '0'), v[2] == 'd', v[5] == '4',
+        v[8] == 'v');
+  } else
     return 2;
   std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);
   out.write(reinterpret_cast<const char *>(rom.data()),

@@ -218,6 +218,57 @@ inline std::vector<std::uint8_t> dma_fifo_rom() {
   return rom;
 }
 
+// `fifo_timing` (TP-104.3): writes 64 words to the data port, each one
+// followed by a read of the HV counter ($C00008) stored at $FF0000 + 2 * n.
+// A write that finds the FIFO full stalls the 68000, so the sequence of HV
+// words is the observable of the FIFO timing. `target` 0 = VRAM, 1 = CRAM,
+// 2 = VSRAM; `display` leaves the display on (reg 1 bit 6); `h40` selects the
+// 40 cell mode; `in_vblank` starts the burst at the first line of the blanking
+// instead of the first line of the active display.
+inline std::vector<std::uint8_t> fifo_timing_rom(unsigned target, bool display,
+                                                 bool h40, bool in_vblank) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER FIFO TIME", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1
+      0x47F9, 0x00C0, 0x0008, // lea $C00008,a3
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x32BC, 0x8144,         // mode 5, display on
+      0x32BC, 0x8F02,         // autoincrement 2
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  const auto wait_status = [&](bool until_set) { // status bit 3 (vblank)
+    c.insert(c.end(), {0x3011, 0x0240, 0x0008,
+                       static_cast<std::uint16_t>(until_set ? 0x67F8 : 0x66F8)});
+  };
+  wait_status(true);  // inside the blanking
+  wait_status(false); // first line of the active display
+  if (in_vblank) {
+    wait_status(true); // first line of the next blanking
+  }
+  c.insert(c.end(), {0x32BC, static_cast<std::uint16_t>(display ? 0x8144 : 0x8104)});
+  const std::uint16_t second = target == 0 ? 0x0000 : target == 1 ? 0x0000 : 0x0010;
+  const std::uint16_t first = target == 0 ? 0x4000 : target == 1 ? 0xC000 : 0x4000;
+  c.insert(c.end(), {0x22BC, first, second});
+  c.insert(c.end(), {0x303C, 0x0EEE}); // d0 = data
+  for (unsigned i = 0; i < 64; ++i)
+    c.insert(c.end(), {0x3080, 0x34D3}); // move.w d0,(a0); move.w (a3),(a2)+
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 } // namespace tessera::testrom
 
 namespace tessera::testrom {
