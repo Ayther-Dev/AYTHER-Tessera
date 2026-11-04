@@ -52,7 +52,10 @@ RunResult run_tessera(const std::string &backend_id,
         result.peak = std::max(result.peak, std::abs(int{pcm[k]}));
     }
   } catch (const tessera::cli::ClientError &e) {
-    result.error = "API pública: " + e.text;
+    result.error = "API pública: " + e.text + " " +
+                   tessera::cli::status_text(e.context) + " (código " +
+                   std::to_string(e.context.code) + ", fase " +
+                   std::to_string(e.context.phase) + ")";
   } catch (const std::exception &e) {
     result.error = e.what();
   }

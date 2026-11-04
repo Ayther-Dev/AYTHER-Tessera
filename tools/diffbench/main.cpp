@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include "tessera/tessera_observation.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
@@ -128,8 +129,8 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
     return read_ok == readable && size_ok == readable ? 0 : 1;
   }
   if (args.count("--report-out")) {
-    // Informe del plan §3.3. Esta ejecución solo corre el oráculo, así que no
-    // hay candidato ni divergencia; nunca incluye framebuffers ni PCM.
+    // Informe del plan §3.3. Esta ejecución solo corre el oráculo, así que
+    // no hay candidato ni divergencia; nunca incluye framebuffers ni PCM.
     nlohmann::json report = {
         {"tool", "tessera_diffbench"},
         {"contract", 1},
@@ -185,6 +186,64 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
+#ifdef TESSERA_DIFFBENCH_WITH_TESSERA
+  if (args.count("--libretro") && args.count("--tessera") &&
+      args.count("--first-divergence-out")) {
+    // Primera divergencia del plano 1 entre el or�culo y el candidato. El
+    // plano 2 no se compara: el backend de referencia no expone escrituras de
+    // audio por la API p�blica, y se registra como no disponible.
+    const unsigned frames = args.count("--frames")
+                                ? static_cast<unsigned>(std::strtoul(
+                                      args["--frames"].c_str(), nullptr, 10))
+                                : 600u;
+    const auto a =
+        diffbench::run_libretro(args["--libretro"], args["--rom"], frames);
+    const auto b =
+        diffbench::run_tessera(args["--tessera"], args["--rom"], frames);
+    if (!a.error.empty()) {
+      std::cerr << "error: " << a.error << b.error << "\n";
+      return 1;
+    }
+    nlohmann::json first = nullptr;
+    unsigned equal = 0;
+    for (size_t i = 0;
+         i < std::min(a.frame_hashes.size(), b.frame_hashes.size()); ++i) {
+      if (a.frame_hashes[i] != b.frame_hashes[i]) {
+        first = {{"plane", "framebuffer"},
+                 {"frame", i},
+                 {"reference_hash", a.frame_hashes[i]},
+                 {"candidate_hash", b.frame_hashes[i]}};
+        break;
+      }
+      ++equal;
+    }
+    if (first.is_null() && !b.error.empty())
+      first = {{"plane", "framebuffer"},
+               {"frame", b.frame_hashes.size()},
+               {"candidate_error", b.error}};
+    nlohmann::json out = {
+        {"tool", "tessera_diffbench"},
+        {"entry", args.count("--entry") ? args["--entry"] : "unnamed"},
+        {"segment", {0, frames}},
+        {"reference", {{"core", "gpgx"}, {"build_id", "ayther-abi-1.10-r4"}}},
+        {"candidate", {{"core", args["--tessera"]}}},
+        {"frames_compared",
+         std::min(a.frame_hashes.size(), b.frame_hashes.size())},
+        {"frames_equal", equal},
+        {"first_divergence", first},
+        {"candidate_error", b.error},
+        {"audio_writes", {{"status", "not_available"}}},
+        {"audio_peak", {{"reference", a.peak}, {"candidate", b.peak}}}};
+    std::ofstream f(args["--first-divergence-out"]);
+    f << out.dump(2) << "\n";
+    std::cout << "frames_equal=" << equal << " first_divergence="
+              << (first.is_null()
+                      ? "none"
+                      : "frame " + std::to_string(first["frame"].get<size_t>()))
+              << "\n";
+    return 0;
+  }
+#endif
   if (args.count("--libretro")) {
     if (!args.count("--rom")) {
       std::cerr << "falta --rom\n";
