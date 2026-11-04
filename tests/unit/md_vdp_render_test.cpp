@@ -1,6 +1,8 @@
 // TP-105.1 (RF-3.9): frame of the VDP renderer. Per line, RGBA8 output, one
 // emission hook per line for phase 2 and no pass after the last line. The
 // content is the backdrop colour only; planes and sprites come with TP-105.3+.
+// TP-105.5/6: sprites (table, order, priority, X = 0 mask, per line limits and
+// the overflow and collision flags).
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "md/vdp.hpp"
 #include "md/vdp_render.hpp"
@@ -179,4 +181,96 @@ TEST_CASE("shadow mode darkens a pixel without the priority bit") {
   r.begin_frame(v);
   r.render_line(v, 0);
   CHECK((r.frame()[0] & 0xFF) == 0x73); // level 7 as shadow: 14 -> 8 bits
+}
+
+namespace {
+// Sprite table at $E000 (register 5 = $70). Entry n: y, size and link,
+// attributes, x (all raw values, 128 added to the positions).
+void sprite(Vdp &v, unsigned n, int x, int y, unsigned size_link,
+            unsigned attr) {
+  const unsigned at = 0xE000U + n * 8U;
+  v.write_control(static_cast<std::uint16_t>(0x4000 | (at & 0x3FFF)));
+  v.write_control(static_cast<std::uint16_t>((at >> 14) & 3));
+  v.write_data(static_cast<std::uint16_t>(y + 128));
+  v.write_data(static_cast<std::uint16_t>(size_link));
+  v.write_data(static_cast<std::uint16_t>(attr));
+  v.write_data(static_cast<std::uint16_t>(x == -128 ? 0 : x + 128));
+}
+void sprite_scene(Vdp &v) {
+  reg(v, 0, 0x04);
+  reg(v, 1, 0x44);
+  reg(v, 5, 0x70);
+  reg(v, 15, 2);
+  set_colour(v, 1, 0x000E);
+  set_colour(v, 2, 0x00E0);
+  // tile 1: all pixels colour 1, tile 2: all pixels colour 2 (8 rows each)
+  v.write_control(0x4020);
+  v.write_control(0x0000);
+  for (unsigned i = 0; i < 8; ++i) {
+    v.write_data(0x1111);
+    v.write_data(0x1111);
+  }
+  for (unsigned i = 0; i < 8; ++i) {
+    v.write_data(0x2222);
+    v.write_data(0x2222);
+  }
+}
+std::uint32_t pixel_at(Renderer &r, unsigned x) { return r.frame()[x]; }
+} // namespace
+
+TEST_CASE("a sprite is drawn at its position with its palette colour") {
+  Vdp v(Standard::ntsc);
+  sprite_scene(v);
+  sprite(v, 0, 10, 0, 0x0000, 1); // 1x1 cell, link 0
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((pixel_at(r, 10) & 0xFF) == 0xEF);
+  CHECK((pixel_at(r, 17) & 0xFF) == 0xEF);
+  CHECK((pixel_at(r, 9) & 0xFF) != 0xEF);
+  CHECK((pixel_at(r, 18) & 0xFF) != 0xEF);
+  CHECK(!r.take_sprite_flags().collision);
+}
+
+TEST_CASE("the first sprite of the list is on top and overlap is a collision") {
+  Vdp v(Standard::ntsc);
+  sprite_scene(v);
+  sprite(v, 0, 10, 0, 0x0001, 1); // link to 1
+  sprite(v, 1, 14, 0, 0x0000, 2);
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((pixel_at(r, 15) & 0xFF) == 0xEF);        // sprite 0 over sprite 1
+  CHECK(((pixel_at(r, 20) >> 8) & 0xFF) == 0xEF); // sprite 1 beyond sprite 0
+  const auto flags = r.take_sprite_flags();
+  CHECK(flags.collision);
+  CHECK(!flags.overflow);
+  CHECK(!r.take_sprite_flags().collision); // reading clears
+}
+
+TEST_CASE(
+    "X = 0 masks the sprites after it once another sprite is on the line") {
+  Vdp v(Standard::ntsc);
+  sprite_scene(v);
+  sprite(v, 0, 10, 0, 0x0001, 1);
+  sprite(v, 1, -128, 0, 0x0002, 1); // raw X = 0
+  sprite(v, 2, 30, 0, 0x0000, 2);   // masked
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK((pixel_at(r, 10) & 0xFF) == 0xEF);
+  CHECK(((pixel_at(r, 30) >> 8) & 0xFF) != 0xEF);
+}
+
+TEST_CASE("a seventeenth sprite on a line sets overflow in H32") {
+  Vdp v(Standard::ntsc);
+  sprite_scene(v);
+  for (unsigned n = 0; n < 17; ++n)
+    sprite(v, n, static_cast<int>(n) * 10, 0, n == 16 ? 0x0000 : n + 1, 1);
+  Renderer r;
+  r.begin_frame(v);
+  r.render_line(v, 0);
+  CHECK(r.take_sprite_flags().overflow);
+  CHECK((pixel_at(r, 15 * 10) & 0xFF) == 0xEF); // sixteenth drawn
+  CHECK((pixel_at(r, 16 * 10) & 0xFF) != 0xEF); // seventeenth dropped
 }

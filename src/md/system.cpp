@@ -95,6 +95,8 @@ void System::run_frame() {
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     cpu_.executeUntil(static_cast<moira::i64>(end_master / kDivider68k));
     renderer_.render_line(vdp_, line);
+    const auto flags = renderer_.take_sprite_flags();
+    vdp_.raise_sprite_flags(flags.overflow, flags.collision);
   }
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();

@@ -37,6 +37,12 @@ public:
     return (regs_[12] & 0x81U) != 0 ? 788U : 770U;
   }
   void raise_vint() noexcept { vint_flag_ = true; }
+  /// Sprite overflow (status bit 6) and collision (bit 5), set by the
+  /// renderer and cleared by a status read.
+  void raise_sprite_flags(bool overflow, bool collision) noexcept {
+    sprite_overflow_ |= overflow;
+    sprite_collision_ |= collision;
+  }
   /// Highest pending interrupt level that is enabled (6 VINT, 4 HINT), or 0.
   std::uint8_t irq_level() const noexcept;
   void acknowledge(std::uint8_t level) noexcept;
@@ -101,6 +107,8 @@ private:
   bool dma_pending_ = false;
   std::uint32_t line_ = 0;
   bool vint_flag_ = false;
+  bool sprite_overflow_ = false;
+  bool sprite_collision_ = false;
   bool hint_flag_ = false;
   bool hv_latched_ = false;
   std::uint16_t hv_latch_value_ = 0;

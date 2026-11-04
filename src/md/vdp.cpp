@@ -183,6 +183,11 @@ std::uint16_t Vdp::read_status() {
     status |= 0x0002U; // DMA fill or copy in progress
   if (vint_flag_)
     status |= 0x0080U;
+  if (sprite_overflow_)
+    status |= 0x0040U;
+  if (sprite_collision_)
+    status |= 0x0020U;
+  sprite_overflow_ = sprite_collision_ = false;
   return status;
 }
 

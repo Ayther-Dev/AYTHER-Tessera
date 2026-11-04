@@ -169,6 +169,24 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(variant RANGE 0 21)
             list(APPEND frame_roms modes-sweep-${variant})
         endforeach()
+        # sprite_limits (TP-105.5, TP-105.6): sprite table, per line limits,
+        # X = 0 masking and the status flags in work RAM. 0 to 25: random
+        # and edge scenes; 100 to 120 and 130 to 176: probes of the columns
+        # outside the screen that gpgx keeps for collisions; 180 to 188:
+        # masking and limits with sprites outside the screen. The list is
+        # sprite_variant() in tests/support/md_testrom.hpp.
+        set(sprite_variants)
+        foreach(range IN ITEMS "0;25" "100;120" "130;135" "140;145" "150;167"
+                               "170;176" "180;188")
+            list(GET range 0 first)
+            list(GET range 1 last)
+            foreach(variant RANGE ${first} ${last})
+                list(APPEND sprite_variants ${variant})
+            endforeach()
+        endforeach()
+        foreach(variant IN LISTS sprite_variants)
+            list(APPEND frame_roms sprite-limits-${variant})
+        endforeach()
         foreach(mode IN LISTS frame_roms)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
                 "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
@@ -181,7 +199,7 @@ if(TESSERA_BUILD_MEGADRIVE)
                 "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}")
             set_tests_properties(integration.md_${mode} PROPERTIES
                 FIXTURES_REQUIRED md_${mode}_rom
-                PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
+                PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()
 endif()

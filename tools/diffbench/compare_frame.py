@@ -56,6 +56,17 @@ def main(argv):
     print("palette entries=%d differing=%d" % (len(pg) // 2, len(palette_diff)))
     if len(pn) != len(pg) or palette_diff:
         return 1
+    # Work RAM word at $FF0000 (sprite flags accumulated by the ROM, if any).
+    with open(os.path.join(out_dir, "native.wram"), "rb") as f:
+        wn = f.read(2)
+    gw_ram = os.path.join(out_dir, "gpgx.wram")
+    subprocess.run([diffbench, "--libretro", core, "--rom", rom, "--frames",
+                    frames, "--work-ram-out", gw_ram], capture_output=True)
+    with open(gw_ram, "rb") as f:
+        wg = f.read(2)
+    wg = wg[::-1]  # gpgx serves work RAM with the bytes of each word swapped
+    print("sprite flags native=%s gpgx=%s" % (wn.hex(), wg.hex()))
+    flags_ok = wn == wg
     nw, nh, npitch, nd = load(mine)
     gw, gh, gpitch, gd = load(gpgx)
     if (nw, nh) != (gw, gh):
@@ -74,7 +85,10 @@ def main(argv):
     print("frame %dx%d pixels=%d differing=%d" % (nw, nh, nw * nh, len(diff)))
     for y, x, got, ref in diff[:8]:
         print("  y=%d x=%d native=%s gpgx=%s" % (y, x, got, ref))
-    return 0 if not diff else 1
+    if diff or not flags_ok:
+        return 1
+    print("result=identical")
+    return 0
 
 
 if __name__ == "__main__":

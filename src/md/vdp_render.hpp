@@ -42,6 +42,18 @@ public:
   /// Draws `line` (0 based). Lines outside the active display are ignored.
   void render_line(const Vdp &vdp, std::uint32_t line);
 
+  /// Sprite flags of the lines drawn since the last call (status register bits
+  /// 6 overflow and 5 collision); reading clears them.
+  struct SpriteFlags {
+    bool overflow = false;
+    bool collision = false;
+  };
+  SpriteFlags take_sprite_flags() noexcept {
+    const SpriteFlags flags = flags_;
+    flags_ = {};
+    return flags;
+  }
+
   const std::vector<std::uint32_t> &frame() const noexcept { return frame_; }
   FrameSize size() const noexcept { return size_; }
 
@@ -59,9 +71,18 @@ private:
   /// Fills `out` (one entry per visible column) with plane A (0) or B (1).
   void plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
                   std::span<Pixel> out) const;
+  /// Sprites of `line` (TP-105.5): walks the link list of the sprite table and
+  /// fills `out` (one entry per visible column) with the first opaque pixel
+  /// of each column, in list order.
+  void sprite_line(const Vdp &vdp, std::uint32_t line, std::span<Pixel> out);
   std::vector<std::uint32_t> frame_;
   FrameSize size_;
   LineHook hook_;
+  SpriteFlags flags_;
+  /// Sprite pixels left outside the visible columns (x from -128 to 383):
+  /// gpgx never clears them, so a later opaque sprite pixel on the same
+  /// column counts as a collision (measured, sprite_limits 17 to 25).
+  std::array<bool, 512> offscreen_{};
 };
 
 } // namespace tessera::md

@@ -509,6 +509,7 @@ struct Scene {
   std::vector<std::uint16_t> cram;  // from index 0
   std::vector<std::uint16_t> vsram; // from index 0
   std::uint8_t reg1 = 0x44;         // final value of register 1
+  bool poll_status = false;         // accumulate status bits 5-6 in work RAM
 };
 
 inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
@@ -547,7 +548,18 @@ inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
       data(w);
   }
   reg(1, scene.reg1);
-  c.push_back(0x60FE); // bra.s .
+  if (scene.poll_status) {
+    // d1 |= status & $60, stored at $FF0000, forever (overflow and collision
+    // flags are cleared by every read, so the loop accumulates them).
+    c.insert(c.end(), {0x7200,                 // moveq #0,d1
+                       0x3011,                 // move.w (a1),d0
+                       0x0240, 0x0060,         // andi.w #$60,d0
+                       0x8240,                 // or.w d0,d1
+                       0x33C1, 0x00FF, 0x0000, // move.w d1,$FF0000
+                       0x60F0});               // bra loop
+  } else {
+    c.push_back(0x60FE); // bra.s .
+  }
   std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
   put32(rom, 0, 0xFFFE00);
   put32(rom, 4, 0x200);
@@ -779,6 +791,594 @@ inline ModesVariant modes_variant(unsigned id) {
   case 21: // limited palette with shadow/highlight
     v.limited_palette = true;
     v.reg12 = 0x08;
+    break;
+  default:
+    break;
+  }
+  return v;
+}
+
+} // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `sprite_limits` variant: random but deterministic sprites over random
+// planes. `count` sprites chained in the table (link order = index order),
+// each up to `max_cells` cells per side, so a variant stays inside or crosses
+// the per line limits as chosen.
+struct ExplicitSprite {
+  int x = 0, y = 0; // screen position (raw table value is +128)
+  unsigned w = 1, h = 1;
+  std::uint16_t attr = 1; // tile, flips, palette and priority
+};
+
+struct SpriteVariant {
+  std::vector<ExplicitSprite> sprites; // when not empty: these, in order
+  unsigned count = 8;
+  unsigned max_cells = 2;    // 1..4 cells per side
+  std::uint8_t reg12 = 0x00; // 0x81 for H40
+  unsigned seed = 1;
+  bool planes = true;       // draw both planes under the sprites
+  bool x_zero = false;      // some sprites with raw X = 0 (mask)
+  bool dense = false;       // pack the sprites into a few lines (limits)
+  bool custom_tile = false; // tile 127: left half opaque, right half clear
+  bool col7_tile = false;   // tile 127: only column 7 opaque
+  bool col0_tile = false;   // tile 127: only column 0 opaque
+  bool row0_tile = false;   // tile 127: only the right half of row 0 opaque
+  unsigned fixed_w = 0;     // cells wide for every sprite (0 = random)
+  unsigned fixed_h = 0;     // cells tall (0 = random)
+  bool poll_status = false; // read the sprite flags into work RAM
+  std::uint8_t reg1_extra = 0x00;
+};
+
+inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
+  Scene scene;
+  scene.regs = {{2, 0x10},  {4, 0x06},  {3, 0x34},  {13, 0x38},
+                {5, 0x70},  {11, 0x00}, {16, 0x00}, {12, v.reg12},
+                {17, 0x00}, {18, 0x00}, {7, 0x05}};
+  scene.reg1 = static_cast<std::uint8_t>(0x44 | v.reg1_extra);
+  scene.poll_status = v.poll_status;
+  Lcg rng{0x5EED1000U + v.seed};
+  std::vector<std::uint16_t> tiles;
+  for (unsigned t = 0; t < 128; ++t)
+    for (unsigned row = 0; row < 8; ++row) {
+      std::uint32_t word = 0;
+      for (unsigned col = 0; col < 8; ++col) {
+        const unsigned colour =
+            (t == 0) ? 0U : (((t * 7U + row * 3U + col * 5U) % 15U) + 1U);
+        const unsigned c = (rng.next() % 4U == 0U) ? 0U : colour;
+        word = (word << 4) | c;
+      }
+      tiles.push_back(static_cast<std::uint16_t>(word >> 16));
+      tiles.push_back(static_cast<std::uint16_t>(word));
+    }
+  scene.vram.emplace_back(0x0000, tiles);
+  if (v.custom_tile) {
+    std::vector<std::uint16_t> custom;
+    for (unsigned row = 0; row < 16; ++row) {
+      custom.push_back(0x1234);
+      custom.push_back(0x0000);
+    }
+    scene.vram.emplace_back(127U * 32U, custom);
+  }
+  if (v.col7_tile) {
+    std::vector<std::uint16_t> custom;
+    for (unsigned row = 0; row < 8; ++row) {
+      custom.push_back(0x0000);
+      custom.push_back(0x0001);
+    }
+    scene.vram.emplace_back(127U * 32U, custom);
+  }
+  if (v.col0_tile) {
+    std::vector<std::uint16_t> custom;
+    for (unsigned row = 0; row < 8; ++row) {
+      custom.push_back(0x1000);
+      custom.push_back(0x0000);
+    }
+    scene.vram.emplace_back(127U * 32U, custom);
+  }
+  if (v.row0_tile) {
+    std::vector<std::uint16_t> custom(16, 0);
+    custom[1] = 0x1234;
+    scene.vram.emplace_back(127U * 32U, custom);
+  }
+  std::vector<std::uint16_t> plane(32 * 32);
+  for (auto &e : plane) {
+    const std::uint32_t r = rng.next();
+    e = v.planes ? static_cast<std::uint16_t>(((r & 0x100U) ? 0x8000U : 0U) |
+                                              (((r >> 9) & 3U) << 13) |
+                                              ((r >> 12) % 64U))
+                 : 0;
+  }
+  scene.vram.emplace_back(0x4000, plane);
+  for (auto &e : plane) {
+    const std::uint32_t r = rng.next();
+    e = v.planes ? static_cast<std::uint16_t>(((r & 0x100U) ? 0x8000U : 0U) |
+                                              (((r >> 9) & 3U) << 13) |
+                                              ((r >> 12) % 64U))
+                 : 0;
+  }
+  scene.vram.emplace_back(0xC000, plane);
+  const bool h40 = (v.reg12 & 0x81U) != 0;
+  const unsigned width = h40 ? 320U : 256U;
+  std::vector<std::uint16_t> sat;
+  for (unsigned n = 0; n < v.sprites.size(); ++n) {
+    const auto &e = v.sprites[n];
+    const unsigned link = n + 1U < v.sprites.size() ? n + 1U : 0U;
+    sat.push_back(static_cast<std::uint16_t>(e.y + 128));
+    sat.push_back(static_cast<std::uint16_t>(((e.w - 1U) << 10) |
+                                             ((e.h - 1U) << 8) | link));
+    sat.push_back(e.attr);
+    sat.push_back(static_cast<std::uint16_t>(e.x + 128));
+  }
+  for (unsigned n = 0; n < v.count && v.sprites.empty(); ++n) {
+    unsigned w = rng.next() % v.max_cells + 1U;
+    unsigned h = rng.next() % v.max_cells + 1U;
+    if (v.fixed_w != 0)
+      w = v.fixed_w;
+    if (v.fixed_h != 0)
+      h = v.fixed_h;
+    unsigned y = 128U + rng.next() % 240U - 16U;
+    unsigned x = 128U + rng.next() % (width + 16U) - 16U;
+    if (v.dense) {
+      y = 128U + 40U + rng.next() % 3U;
+      x = 128U + rng.next() % width;
+    }
+    if (v.x_zero && n % 5U == 3U)
+      x = 0;
+    const std::uint32_t r = rng.next();
+    const unsigned link = n + 1U < v.count ? n + 1U : 0U;
+    sat.push_back(static_cast<std::uint16_t>(y));
+    sat.push_back(
+        static_cast<std::uint16_t>(((w - 1U) << 10) | ((h - 1U) << 8) | link));
+    sat.push_back(static_cast<std::uint16_t>(
+        ((r & 0x100U) ? 0x8000U : 0U) | (((r >> 9) & 3U) << 13) |
+        ((r & 0x200U) ? 0x1000U : 0U) | ((r & 0x400U) ? 0x0800U : 0U) |
+        ((r >> 12) % (128U - w * h))));
+    sat.push_back(static_cast<std::uint16_t>(x));
+  }
+  scene.vram.emplace_back(0xE000, sat);
+  scene.cram.resize(64);
+  for (auto &c : scene.cram)
+    c = static_cast<std::uint16_t>(rng.next() & 0x0EEEU);
+  scene.vsram.assign(40, 0);
+  return scene_rom(scene, "AYTHER SPRITELIM");
+}
+
+/// Variant `id` of `sprite_limits`; mirrored in tools/diffbench/CMakeLists.txt.
+inline SpriteVariant sprite_variant(unsigned id) {
+  SpriteVariant v;
+  v.seed = id;
+  switch (id) {
+  case 0: // few sprites, H32, planes under
+    v.count = 6;
+    break;
+  case 1: // H40, bigger sprites
+    v.count = 8;
+    v.max_cells = 3;
+    v.reg12 = 0x81;
+    break;
+  case 2: // no planes: sprites alone over the backdrop
+    v.count = 10;
+    v.planes = false;
+    break;
+  case 3: // 1 cell sprites, many
+    v.count = 40;
+    v.max_cells = 1;
+    break;
+  case 4: // V30
+    v.count = 8;
+    v.reg1_extra = 0x08;
+    break;
+  case 5: // more sprites than the line count limit, H32 (16)
+    v.count = 25;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 6: // pixel limit: 10 sprites of 32 pixels, H32 (256)
+    v.count = 10;
+    v.fixed_w = 4;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 7: // X = 0 masking
+    v.count = 12;
+    v.max_cells = 2;
+    v.dense = true;
+    v.x_zero = true;
+    v.poll_status = true;
+    break;
+  case 8: // collision between a few overlapping sprites
+    v.count = 5;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 9: // line count limit in H40 (20)
+    v.count = 24;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.reg12 = 0x81;
+    v.poll_status = true;
+    break;
+  case 10: // pixel limit in H40 (320): 12 sprites of 32 pixels
+    v.count = 12;
+    v.fixed_w = 4;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.reg12 = 0x81;
+    v.poll_status = true;
+    break;
+  case 11: // more sprites than the frame limit, H32 (64)
+    v.count = 72;
+    v.max_cells = 1;
+    v.poll_status = true;
+    break;
+  case 12: // no overlap at all: flags stay clear
+    v.count = 3;
+    v.max_cells = 1;
+    v.poll_status = true;
+    break;
+  case 13:
+    v.count = 1;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 14:
+    v.count = 2;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 15:
+    v.count = 3;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 16:
+    v.count = 4;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    break;
+  case 17: // one sprite cut by the right edge, alone
+    v.poll_status = true;
+    v.planes = false;
+    v.sprites = {{252, 40, 1, 2, 0x0F}};
+    break;
+  case 18: // one sprite cut by the left edge, alone
+    v.poll_status = true;
+    v.planes = false;
+    v.sprites = {{-4, 40, 1, 2, 0x0F}};
+    break;
+  case 19: // two sprites that do not overlap, one cut by the right edge
+    v.poll_status = true;
+    v.planes = false;
+    v.sprites = {{252, 42, 1, 1, 0x0F}, {100, 42, 2, 1, 0x4B}};
+    break;
+  case 20: // the same two with the cut one on the screen
+    v.poll_status = true;
+    v.planes = false;
+    v.sprites = {{200, 42, 1, 1, 0x0F}, {100, 42, 2, 1, 0x4B}};
+    break;
+  case 21: // cut by the right edge, the part outside is clear
+    v.sprites = {{252, 40, 1, 1, 0x7F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 22: // cut by the right edge, the part outside is opaque (h flip)
+    v.sprites = {{252, 40, 1, 1, 0x087F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 23: // cut by the left edge, the part outside is opaque
+    v.sprites = {{-4, 40, 1, 1, 0x7F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 24: // cut by the left edge, the part outside is clear (h flip)
+    v.sprites = {{-4, 40, 1, 1, 0x087F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 25: // one line of opaque pixels outside the right edge
+    v.sprites = {{252, 40, 1, 1, 0x7F}};
+    v.row0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 100:
+  case 101:
+  case 102:
+  case 103:
+  case 104:
+  case 105:
+  case 106:
+  case 107:
+  case 108:
+  case 109:
+  case 110:
+  case 111:
+  case 112:
+  case 113:
+  case 114:
+  case 115:
+  case 116:
+  case 117:
+  case 118:
+  case 119:
+  case 120: {
+    // one sprite, column 0 only, at a chosen X: how far outside the screen
+    // do pixels count for the collision flag
+    static const int xs[] = {255, 256, 257, 258, 260, 264,  270,
+                             280, 300, 340, 383, 384, -1,   -2,
+                             -8,  -9,  -16, -32, -64, -100, -128};
+    v.sprites = {{xs[id - 100], 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  }
+  case 130:
+  case 131:
+  case 132:
+  case 133:
+  case 134:
+  case 135:
+    // column 7 only, at X 248 to 253: pixels 255 to 260
+    v.sprites = {{248 + static_cast<int>(id - 130), 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 140:
+  case 141:
+  case 142:
+  case 143:
+  case 144:
+  case 145:
+    // column 0 only, at X -3 to -8
+    v.sprites = {{-3 - static_cast<int>(id - 140), 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 150: // 131 with planes
+    v.sprites = {{249, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.poll_status = true;
+    break;
+  case 151: // 16 without planes
+    v.count = 4;
+    v.fixed_w = 1;
+    v.fixed_h = 1;
+    v.dense = true;
+    v.poll_status = true;
+    v.planes = false;
+    v.seed = 16;
+    break;
+  case 152: // 131 with a second sprite on the same lines
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 153: // 131 with a second sprite before it
+    v.sprites = {{100, 40, 1, 1, 0x7F}, {249, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 154:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x0F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 155:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 100, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 156:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 48, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 157:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 40, 2, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 158:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {300, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 159:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {-4, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 160:
+    v.sprites = {{249, 40, 1, 1, 0x7F}, {100, 44, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 161:
+    v.sprites = {{252, 40, 1, 1, 0x087F}, {100, 40, 1, 1, 0x7F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 162:
+    v.sprites = {{100, 40, 1, 1, 0x7F}, {252, 40, 1, 1, 0x087F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 163:
+    v.sprites = {{252, 40, 1, 1, 0x087F}, {252, 50, 1, 1, 0x087F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 164:
+    v.sprites = {{249, 40, 1, 1, 0x087F}, {100, 40, 1, 1, 0x7F}};
+    v.custom_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 165:
+    v.sprites = {{250, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 166:
+    v.sprites = {{251, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 167:
+    v.sprites = {{252, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col7_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 170:
+    v.sprites = {{-1, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 171:
+    v.sprites = {{-2, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 172:
+    v.sprites = {{-3, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 173:
+    v.sprites = {{-4, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 174:
+    v.sprites = {{-5, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 175:
+    v.sprites = {{-6, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 176:
+    v.sprites = {{-7, 40, 1, 1, 0x7F}, {100, 40, 1, 1, 0x7F}};
+    v.col0_tile = true;
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 180:
+    v.sprites = {
+        {0, 40, 1, 1, 0x0F}, {50, 40, 1, 1, 0x1F}, {90, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 181:
+    v.sprites = {{20, 40, 1, 1, 0x0F},
+                 {0, 40, 1, 1, 0x1F},
+                 {90, 40, 1, 1, 0x2F},
+                 {130, 44, 1, 1, 0x3F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 182:
+    v.sprites = {
+        {20, 40, 1, 1, 0x0F}, {0, 100, 1, 1, 0x1F}, {90, 100, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 183:
+    v.sprites = {
+        {-100, 40, 1, 1, 0x0F}, {0, 40, 1, 1, 0x1F}, {90, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 184:
+    v.sprites = {
+        {20, 40, 1, 1, 0x0F}, {-128, 40, 1, 1, 0x1F}, {90, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 185:
+    v.sprites = {{20, 40, 1, 1, 0x0F},
+                 {0, 40, 1, 1, 0x1F},
+                 {0, 40, 1, 1, 0x2F},
+                 {90, 40, 1, 1, 0x3F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 186:
+    v.sprites = {
+        {300, 40, 1, 1, 0x0F}, {300, 40, 1, 1, 0x10}, {300, 40, 1, 1, 0x11},
+        {300, 40, 1, 1, 0x12}, {300, 40, 1, 1, 0x13}, {300, 40, 1, 1, 0x14},
+        {300, 40, 1, 1, 0x15}, {300, 40, 1, 1, 0x16}, {300, 40, 1, 1, 0x17},
+        {300, 40, 1, 1, 0x18}, {300, 40, 1, 1, 0x19}, {300, 40, 1, 1, 0x1A},
+        {300, 40, 1, 1, 0x1B}, {300, 40, 1, 1, 0x1C}, {300, 40, 1, 1, 0x1D},
+        {300, 40, 1, 1, 0x1E}, {20, 40, 1, 1, 0x1F},  {40, 40, 1, 1, 0x2F},
+        {60, 40, 1, 1, 0x3F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 187:
+    v.sprites = {{300, 40, 4, 1, 0x0F}, {300, 40, 4, 1, 0x10},
+                 {300, 40, 4, 1, 0x11}, {300, 40, 4, 1, 0x12},
+                 {300, 40, 4, 1, 0x13}, {300, 40, 4, 1, 0x14},
+                 {300, 40, 4, 1, 0x15}, {300, 40, 4, 1, 0x16},
+                 {20, 40, 2, 1, 0x1F},  {80, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 188:
+    v.sprites = {
+        {20, 40, 1, 1, 0x0F}, {20, 40, 1, 1, 0x10}, {20, 40, 1, 1, 0x11},
+        {20, 40, 1, 1, 0x12}, {20, 40, 1, 1, 0x13}, {20, 40, 1, 1, 0x14},
+        {20, 40, 1, 1, 0x15}, {20, 40, 1, 1, 0x16}, {20, 40, 1, 1, 0x17},
+        {20, 40, 1, 1, 0x18}, {20, 40, 1, 1, 0x19}, {20, 40, 1, 1, 0x1A},
+        {20, 40, 1, 1, 0x1B}, {20, 40, 1, 1, 0x1C}, {20, 40, 1, 1, 0x1D},
+        {60, 40, 1, 1, 0x1F}, {70, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
     break;
   default:
     break;

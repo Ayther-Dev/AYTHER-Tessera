@@ -205,6 +205,104 @@ void Renderer::window_line(const Vdp &vdp, std::uint32_t line,
   }
 }
 
+void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
+                           std::span<Pixel> out) {
+  const bool h40 = out.size() == 320U;
+  const unsigned max_frame = h40 ? 80U : 64U;
+  const unsigned max_line = h40 ? 20U : 16U;
+  const unsigned max_pixels = h40 ? 320U : 256U;
+  const std::uint32_t table = std::uint32_t{vdp.reg(5) & (h40 ? 0x7CU : 0x7EU)}
+                              << 9;
+  const auto &vram = vdp.vram();
+  const auto byte = [&](std::uint32_t at) { return vram[at & 0xFFFFU]; };
+  // Measured on gpgx (sprite_limits 17 to 25, 101 to 176): pixels a sprite
+  // leaves outside the screen are kept from line to line and collide with
+  // later ones, from column width + 1 on. When the list holds one sprite
+  // (the first link is 0) the column just past the edge and the whole left
+  // margin are kept too.
+  const bool lone_sprite = (byte(table + 3U) & 0x7FU) == 0;
+  unsigned index = 0;
+  unsigned on_line = 0;
+  bool seen_x_nonzero = false;
+  unsigned pixels = 0;
+  for (unsigned walked = 0; walked < max_frame; ++walked) {
+    const std::uint32_t at = table + index * 8U;
+    const int y =
+        static_cast<int>(((byte(at) << 8) | byte(at + 1U)) & 0x3FFU) - 128;
+    const unsigned size = byte(at + 2U) & 0x0FU;
+    const unsigned link = byte(at + 3U) & 0x7FU;
+    const unsigned rows = (size & 3U) + 1U;
+    const unsigned cols = ((size >> 2) & 3U) + 1U;
+    const int row = static_cast<int>(line) - y;
+    if (row >= 0 && row < static_cast<int>(rows * 8U)) {
+      if (on_line >= max_line) {
+        flags_.overflow = true;
+        break;
+      }
+      ++on_line;
+      const std::uint16_t attr =
+          static_cast<std::uint16_t>((byte(at + 4U) << 8) | byte(at + 5U));
+      const int x =
+          static_cast<int>(((byte(at + 6U) << 8) | byte(at + 7U)) & 0x1FFU) -
+          128;
+      // X = 0 masks the sprites after it once a sprite with another X has
+      // been met on the line.
+      if (x == -128) {
+        if (seen_x_nonzero)
+          break;
+      } else {
+        seen_x_nonzero = true;
+      }
+      const unsigned width = cols * 8U;
+      unsigned drawn = std::min(width, max_pixels - pixels);
+      pixels += drawn;
+      // A sprite wholly outside the screen draws nothing, not even into the
+      // columns kept outside it (measured: sprite_limits 101 to 111, 145).
+      if (x + static_cast<int>(width) <= 0 || x >= static_cast<int>(out.size()))
+        drawn = 0;
+      unsigned sy = static_cast<unsigned>(row);
+      if (attr & 0x1000U)
+        sy = rows * 8U - 1U - sy;
+      for (unsigned sx = 0; sx < drawn; ++sx) {
+        const int column = x + static_cast<int>(sx);
+        if (column < -128 || column >= 384)
+          continue;
+        unsigned tx = sx;
+        if (attr & 0x0800U)
+          tx = width - 1U - tx;
+        const std::uint32_t tile = (attr & 0x7FFU) + (tx / 8U) * rows + sy / 8U;
+        const std::uint8_t b =
+            byte(tile * 32U + (sy & 7U) * 4U + (tx & 7U) / 2U);
+        const unsigned colour = ((tx & 1U) ? b : (b >> 4)) & 0x0FU;
+        if (colour == 0)
+          continue;
+        if (column < 0 || column >= static_cast<int>(out.size())) {
+          const bool kept =
+              lone_sprite || column > static_cast<int>(out.size());
+          if (!kept)
+            continue;
+          bool &seen = offscreen_[static_cast<unsigned>(column + 128)];
+          flags_.collision |= seen;
+          seen = true;
+          continue;
+        }
+        Pixel &pixel = out[static_cast<unsigned>(column)];
+        if (pixel.opaque) {
+          flags_.collision = true;
+          continue;
+        }
+        pixel.opaque = true;
+        pixel.high = (attr & 0x8000U) != 0;
+        pixel.index =
+            static_cast<std::uint8_t>(((attr >> 13) & 3U) * 16U + colour);
+      }
+    }
+    if (link == 0 || link >= max_frame)
+      break;
+    index = link;
+  }
+}
+
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (line >= size_.height ||
       frame_.size() < std::size_t{size_.width} * size_.height)
@@ -228,7 +326,8 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (!display_on) {
     std::fill(row.begin(), row.end(), cram_colour(backdrop_index, false));
   } else {
-    std::vector<Pixel> a(width), b(width);
+    std::vector<Pixel> a(width), b(width), sp(width);
+    sprite_line(vdp, line, sp);
     plane_line(vdp, 0, line, a);
     plane_line(vdp, 1, line, b);
     window_line(vdp, line, a);
@@ -239,10 +338,15 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       // Shadow when neither plane has the priority bit set in its tile, even
       // where the pixel is transparent (measured on gpgx, modes_sweep 13).
       const bool high = pa.high || pb.high;
-      if (pa.opaque && pa.high) {
+      const Pixel &ps = sp[x];
+      if (ps.opaque && ps.high) {
+        index = ps.index;
+      } else if (pa.opaque && pa.high) {
         index = pa.index;
       } else if (pb.opaque && pb.high) {
         index = pb.index;
+      } else if (ps.opaque) {
+        index = ps.index;
       } else if (pa.opaque) {
         index = pa.index;
       } else if (pb.opaque) {
