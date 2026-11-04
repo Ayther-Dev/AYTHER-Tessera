@@ -65,6 +65,8 @@ std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept {
 
 void Renderer::begin_frame(const Vdp &vdp) {
   size_ = frame_size(vdp);
+  field_ ^= 1U;
+  double_res_ = (vdp.reg(12) & 0x06U) == 0x06U;
   frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
 }
 
@@ -109,7 +111,10 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
   const unsigned hscroll = hscroll_value(vdp, plane, line);
   const bool two_cell_v = (vdp.reg(11) & 0x04U) != 0;
   const unsigned pixels_x = cells_x * 8U;
-  const unsigned pixels_y = cells_y * 8U;
+  const unsigned cell_h = double_res_ ? 16U : 8U;
+  const unsigned pixels_y = cells_y * cell_h;
+  const unsigned dline = double_res_ ? line * 2U + field_ : line;
+  const unsigned vmask = double_res_ ? 0x7FFU : 0x3FFU;
   for (unsigned x = 0; x < columns * 8U; ++x) {
     // The 2-cell vertical scroll columns are 16 pixel bands whose phase
     // follows the horizontal scroll (measured on gpgx): band edges sit at
@@ -117,16 +122,15 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
     const unsigned phase = hscroll & 15U;
     unsigned vscroll = 0;
     if (!two_cell_v) {
-      vscroll = vdp.vsram()[plane] & 0x3FFU;
+      vscroll = vdp.vsram()[plane] & vmask;
     } else {
       // The partial band left of the first edge scrolls by 0 in H32 and by
       // the AND of the last pair in H40 (measured).
       const int pair = static_cast<int>((x + 16U - phase) / 16U) - 1;
       if (pair >= 0 && pair < 20)
-        vscroll =
-            vdp.vsram()[static_cast<unsigned>(pair) * 2U + plane] & 0x3FFU;
+        vscroll = vdp.vsram()[static_cast<unsigned>(pair) * 2U + plane] & vmask;
       else if (pair < 0 && columns == 40U)
-        vscroll = (vdp.vsram()[38] & vdp.vsram()[39]) & 0x3FFU;
+        vscroll = (vdp.vsram()[38] & vdp.vsram()[39]) & vmask;
     }
     // Left window: for the first (hscroll & 15) pixels after the boundary
     // plane A shows the tiles two columns on (measured on gpgx).
@@ -138,21 +142,22 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
         skew = 16U;
     }
     const unsigned px = (x + skew + pixels_x - (hscroll % pixels_x)) % pixels_x;
-    const unsigned py = (line + vscroll) % pixels_y;
+    const unsigned py = (dline + vscroll) % pixels_y;
     const unsigned cell_x = px / 8U;
-    const unsigned cell_y = py / 8U;
+    const unsigned cell_y = py / cell_h;
     const std::uint32_t entry_at =
         (table + (cell_y * cells_x + cell_x) * 2U) & 0xFFFFU;
     const std::uint16_t entry = static_cast<std::uint16_t>(
         (std::uint32_t{vram[entry_at]} << 8) | vram[entry_at + 1U]);
     unsigned tile_x = px & 7U;
-    unsigned tile_y = py & 7U;
+    unsigned tile_y = py % cell_h;
     if (entry & 0x0800U)
       tile_x = 7U - tile_x;
     if (entry & 0x1000U)
-      tile_y = 7U - tile_y;
+      tile_y = cell_h - 1U - tile_y;
     const std::uint32_t tile_at =
-        ((std::uint32_t{entry & 0x7FFU} * 32U) + tile_y * 4U + tile_x / 2U) &
+        ((std::uint32_t{entry & 0x7FFU} * cell_h * 4U) + tile_y * 4U +
+         tile_x / 2U) &
         0xFFFFU;
     const std::uint8_t byte = vram[tile_at];
     const unsigned colour = (tile_x & 1U) ? (byte & 0x0FU) : (byte >> 4);
@@ -187,13 +192,15 @@ void Renderer::window_line(const Vdp &vdp, std::uint32_t line,
     const std::uint16_t entry = static_cast<std::uint16_t>(
         (std::uint32_t{vram[entry_at]} << 8) | vram[entry_at + 1U]);
     unsigned tile_x = x & 7U;
-    unsigned tile_y = line & 7U;
+    const unsigned cell_h = double_res_ ? 16U : 8U;
+    unsigned tile_y = (double_res_ ? line * 2U + field_ : line) % cell_h;
     if (entry & 0x0800U)
       tile_x = 7U - tile_x;
     if (entry & 0x1000U)
-      tile_y = 7U - tile_y;
+      tile_y = cell_h - 1U - tile_y;
     const std::uint32_t tile_at =
-        ((std::uint32_t{entry & 0x7FFU} * 32U) + tile_y * 4U + tile_x / 2U) &
+        ((std::uint32_t{entry & 0x7FFU} * cell_h * 4U) + tile_y * 4U +
+         tile_x / 2U) &
         0xFFFFU;
     const std::uint8_t byte = vram[tile_at];
     const unsigned colour = (tile_x & 1U) ? (byte & 0x0FU) : (byte >> 4);
@@ -227,14 +234,17 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
   unsigned pixels = 0;
   for (unsigned walked = 0; walked < max_frame; ++walked) {
     const std::uint32_t at = table + index * 8U;
-    const int y =
-        static_cast<int>(((byte(at) << 8) | byte(at + 1U)) & 0x3FFU) - 128;
+    const int y = static_cast<int>(((byte(at) << 8) | byte(at + 1U)) &
+                                   (double_res_ ? 0x7FFU : 0x3FFU)) -
+                  (double_res_ ? 256 : 128);
     const unsigned size = byte(at + 2U) & 0x0FU;
     const unsigned link = byte(at + 3U) & 0x7FU;
     const unsigned rows = (size & 3U) + 1U;
     const unsigned cols = ((size >> 2) & 3U) + 1U;
-    const int row = static_cast<int>(line) - y;
-    if (row >= 0 && row < static_cast<int>(rows * 8U)) {
+    const unsigned cell_h = double_res_ ? 16U : 8U;
+    const int row =
+        static_cast<int>(double_res_ ? line * 2U + field_ : line) - y;
+    if (row >= 0 && row < static_cast<int>(rows * cell_h)) {
       if (on_line >= max_line) {
         flags_.overflow = true;
         break;
@@ -262,7 +272,7 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
         drawn = 0;
       unsigned sy = static_cast<unsigned>(row);
       if (attr & 0x1000U)
-        sy = rows * 8U - 1U - sy;
+        sy = rows * cell_h - 1U - sy;
       for (unsigned sx = 0; sx < drawn; ++sx) {
         const int column = x + static_cast<int>(sx);
         if (column < -128 || column >= 384)
@@ -270,9 +280,10 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
         unsigned tx = sx;
         if (attr & 0x0800U)
           tx = width - 1U - tx;
-        const std::uint32_t tile = (attr & 0x7FFU) + (tx / 8U) * rows + sy / 8U;
+        const std::uint32_t tile =
+            (attr & 0x7FFU) + (tx / 8U) * rows + sy / cell_h;
         const std::uint8_t b =
-            byte(tile * 32U + (sy & 7U) * 4U + (tx & 7U) / 2U);
+            byte(tile * cell_h * 4U + (sy % cell_h) * 4U + (tx & 7U) / 2U);
         const unsigned colour = ((tx & 1U) ? b : (b >> 4)) & 0x0FU;
         if (colour == 0)
           continue;
@@ -343,7 +354,8 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       Shade shade = shadow_mode && !high ? Shade::shadow : Shade::normal;
       // Shadow/highlight operators: palette 3 colours 14 and 15 of a sprite
       // are not drawn, they change the brightness of what lies below.
-      if (shadow_mode && ps.opaque && (ps.index == 0x3EU || ps.index == 0x3FU)) {
+      if (shadow_mode && ps.opaque &&
+          (ps.index == 0x3EU || ps.index == 0x3FU)) {
         // An operator under a high priority plane pixel has no effect
         // (measured on gpgx, sprite_limits 210).
         const bool covered =
@@ -359,7 +371,7 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
         // gpgx quirk (sprite_limits 211): colour 14 of a low priority sprite
         // is not shadowed, in any palette.
         shade = high || ps.high || (ps.index & 15U) == 14U ? Shade::normal
-                                                            : Shade::shadow;
+                                                           : Shade::shadow;
       }
       if (ps.opaque && ps.high) {
         index = ps.index;
@@ -379,7 +391,7 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
     if ((vdp.reg(0) & 0x20U) != 0) // left column blank: backdrop
       for (unsigned x = 0; x < 8U && x < width; ++x)
         row[x] = cram_colour(backdrop_index,
-                               shadow_mode ? Shade::shadow : Shade::normal);
+                             shadow_mode ? Shade::shadow : Shade::normal);
   }
   if (hook_)
     hook_(line, row);

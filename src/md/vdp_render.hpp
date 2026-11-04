@@ -39,6 +39,9 @@ public:
   void set_line_hook(LineHook hook) { hook_ = std::move(hook); }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
+  /// Field drawn in interlace mode 2 (0 even double-resolution lines, 1 odd);
+  /// it alternates every frame.
+  unsigned field() const noexcept { return field_; }
   /// Draws `line` (0 based). Lines outside the active display are ignored.
   void render_line(const Vdp &vdp, std::uint32_t line);
 
@@ -79,6 +82,10 @@ private:
   FrameSize size_;
   LineHook hook_;
   SpriteFlags flags_;
+  unsigned field_ = 0;
+  /// Double resolution (interlace mode 2): cells are 8x16, the line that
+  /// planes and sprites draw is 2 * line + field.
+  bool double_res_ = false;
   /// Sprite pixels left outside the visible columns (x from -128 to 383):
   /// gpgx never clears them, so a later opaque sprite pixel on the same
   /// column counts as a collision (measured, sprite_limits 17 to 25).

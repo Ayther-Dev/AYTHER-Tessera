@@ -166,7 +166,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(block RANGE 0 8)
             list(APPEND frame_roms palette-sweep-${block})
         endforeach()
-        foreach(variant RANGE 0 21)
+        foreach(variant RANGE 0 27)
             list(APPEND frame_roms modes-sweep-${variant})
         endforeach()
         # sprite_limits (TP-105.5, TP-105.6): sprite table, per line limits,
@@ -177,7 +177,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # sprite_variant() in tests/support/md_testrom.hpp.
         set(sprite_variants)
         foreach(range IN ITEMS "0;25" "100;120" "130;135" "140;145" "150;167"
-                               "170;176" "180;188" "200;211")
+                               "170;176" "180;188" "200;211" "220;223")
             list(GET range 0 first)
             list(GET range 1 last)
             foreach(variant RANGE ${first} ${last})

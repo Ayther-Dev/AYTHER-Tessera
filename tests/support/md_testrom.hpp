@@ -792,6 +792,30 @@ inline ModesVariant modes_variant(unsigned id) {
     v.limited_palette = true;
     v.reg12 = 0x08;
     break;
+  case 22: // interlace mode 1
+    v.reg12 = 0x02;
+    break;
+  case 23: // interlace mode 2 (double resolution)
+    v.reg12 = 0x06;
+    break;
+  case 24: // interlace mode 2, H40, line scroll
+    v.reg12 = 0x87;
+    v.reg11 = 0x03;
+    break;
+  case 25: // interlace mode 2 with 2 cell vertical scroll
+    v.reg12 = 0x06;
+    v.reg11 = 0x04;
+    break;
+  case 26: // interlace mode 2 with the window
+    v.reg12 = 0x06;
+    v.reg17 = 0x05;
+    v.reg18 = 0x03;
+    break;
+  case 27: // interlace mode 2, window right and below, shadow
+    v.reg12 = 0x0E;
+    v.reg17 = 0x85;
+    v.reg18 = 0x84;
+    break;
   default:
     break;
   }
@@ -913,9 +937,9 @@ inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
     for (const unsigned sprite_attr_kind : {0U, 1U, 2U, 3U}) // see below
       for (const unsigned sprite_prio : {0U, 1U})
         for (const unsigned plane_prio : {0U, 1U}) {
-          const unsigned tile = sprite_attr_kind == 0   ? 124U // pal 0 col 5
-                                : sprite_attr_kind == 1 ? 124U // pal 3 col 5
-                                : sprite_attr_kind == 2 ? 125U // pal 3 col 14
+          const unsigned tile = sprite_attr_kind == 0   ? 124U  // pal 0 col 5
+                                : sprite_attr_kind == 1 ? 124U  // pal 3 col 5
+                                : sprite_attr_kind == 2 ? 125U  // pal 3 col 14
                                                         : 126U; // col 15
           const unsigned pal = sprite_attr_kind == 0 ? 0U : 3U;
           cells[5 * 32 + 2 * i] =
@@ -936,10 +960,10 @@ inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
         for (unsigned tile = 124; tile <= 126; ++tile)
           for (unsigned prio = 0; prio < 2; ++prio, ++k)
             pv.sprites.push_back(
-                {static_cast<int>(16 * (k % 12)), static_cast<int>(40 + 40 * (k / 12)),
-                 1, 1,
-                 static_cast<std::uint16_t>((prio ? 0x8000U : 0U) | (pal << 13) |
-                                            tile)});
+                {static_cast<int>(16 * (k % 12)),
+                 static_cast<int>(40 + 40 * (k / 12)), 1, 1,
+                 static_cast<std::uint16_t>((prio ? 0x8000U : 0U) |
+                                            (pal << 13) | tile)});
     }
     scene.vram.emplace_back(0xC000, cells);
   }
@@ -1464,6 +1488,34 @@ inline SpriteVariant sprite_variant(unsigned id) {
     v.shade_probe = 2;
     v.reg12 = 0x08;
     v.planes = false;
+    v.poll_status = true;
+    break;
+  case 220: // interlace
+    v.count = 10;
+    v.max_cells = 2;
+    v.reg12 = 0x06;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 221: // interlace
+    v.count = 12;
+    v.max_cells = 3;
+    v.reg12 = 0x87;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 222: // interlace
+    v.count = 12;
+    v.max_cells = 2;
+    v.reg12 = 0x0E;
+    v.seed = id;
+    v.poll_status = true;
+    break;
+  case 223: // interlace
+    v.count = 10;
+    v.max_cells = 2;
+    v.reg12 = 0x02;
+    v.seed = id;
     v.poll_status = true;
     break;
   default:
