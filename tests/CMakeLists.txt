@@ -88,6 +88,13 @@ tessera_copy_diagnostic_runtime(tessera_md_vdp_reads_test)
 add_test(NAME unit.md_vdp_reads COMMAND tessera_md_vdp_reads_test)
 set_tests_properties(unit.md_vdp_reads PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 
+add_executable(tessera_md_vdp_render_test unit/md_vdp_render_test.cpp)
+target_include_directories(tessera_md_vdp_render_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_md_vdp_render_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_vdp_render_test)
+add_test(NAME unit.md_vdp_render COMMAND tessera_md_vdp_render_test)
+set_tests_properties(unit.md_vdp_render PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+
 add_test(NAME unit.md_bus COMMAND tessera_md_bus_test)
 set_tests_properties(unit.md_bus PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 
