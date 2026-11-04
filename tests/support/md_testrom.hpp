@@ -322,3 +322,44 @@ inline std::vector<std::uint8_t> hv_probe_rom(std::uint8_t reg1_extra,
 }
 
 } // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `hv_probe` (H counter part, TP-106.1): samples the H counter ($C00009) in a
+// tight loop and sets byte `$FF0100 + value` for every value seen, so after a
+// few frames the table lists which H values exist in the mode (the jump of the
+// counter), whatever the CPU timing. `reg12` selects H32 (0) or H40 ($81).
+inline std::vector<std::uint8_t> hv_h_probe_rom(std::uint8_t reg12) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER H PROBE  ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  const std::uint16_t code[] = {
+      0x33FC, 0x8104,
+      0x00C0, 0x0004, // mode 5
+      0x33FC, static_cast<std::uint16_t>(0x8C00 | reg12),
+      0x00C0, 0x0004,
+      0x41F9, 0x00C0,
+      0x0008, // lea $C00008,a0
+      0x45F9, 0x00FF,
+      0x0100,         // lea $FF0100,a2
+      0x7201,         // moveq #1,d1
+      0x3010,         // loop: move.w (a0),d0
+      0x0240, 0x00FF, //       andi.w #$FF,d0
+      0x1581, 0x0000, //       move.b d1,(a2,d0.w)
+      0x4E71,         //       nop (44 cycle loop: samples every phase)
+      0x60F2,         //       bra loop
+  };
+  std::size_t at = 0x200;
+  for (const auto word : code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom

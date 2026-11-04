@@ -30,6 +30,10 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_probe_rom(0x00, 0x81);
   else if (std::strcmp(argv[1], "hv-v30-h32") == 0)
     rom = tessera::testrom::hv_probe_rom(0x08, 0x00);
+  else if (std::strcmp(argv[1], "hv-h32-h") == 0)
+    rom = tessera::testrom::hv_h_probe_rom(0x00);
+  else if (std::strcmp(argv[1], "hv-h40-h") == 0)
+    rom = tessera::testrom::hv_h_probe_rom(0x81);
   else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else

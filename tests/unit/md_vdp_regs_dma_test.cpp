@@ -384,3 +384,23 @@ TEST_CASE("the V counter jump depends on the standard and on V28/V30") {
   CHECK(v_of(Standard::pal, 1, 0x10A) == 0x0A);
   CHECK(v_of(Standard::pal, 1, 0x10B) == 0xD3);
 }
+
+// TP-106.1 (RF-2.2): the H counter steps through 171 (H32) or 211 (H40) values
+// per line and skips a range, as seen by gpgx (bench: hv-h32-h / hv-h40-h).
+TEST_CASE("the H counter values per line and its jump in H32 and H40") {
+  const auto seen = [](std::uint8_t reg12) {
+    Vdp v(Standard::ntsc);
+    reg(v, 1, 0x04);
+    reg(v, 12, reg12);
+    std::vector<bool> set(256, false);
+    for (std::uint32_t c = 0; c < 3420; ++c)
+      set[v.read_hv(c) & 0xFF] = true;
+    return set;
+  };
+  const auto h32 = seen(0x00);
+  const auto h40 = seen(0x81);
+  for (unsigned h = 0; h < 256; ++h) {
+    CHECK(h32[h] == (h <= 0x93 || h >= 0xE9));
+    CHECK(h40[h] == (h <= 0xB6 || h >= 0xE4));
+  }
+}
