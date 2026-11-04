@@ -28,7 +28,7 @@ find_package(Tessera ${TESSERA_TEST_FIND_VERSION} CONFIG REQUIRED
 if(NOT TARGET Tessera::core)
     message(FATAL_ERROR "PACKAGE_TARGET_MISSING: falta Tessera::core.")
 endif()
-if(NOT Tessera_ABI_MAJOR EQUAL 1 OR NOT Tessera_ABI_MINOR EQUAL 0 OR
+if(NOT Tessera_ABI_MAJOR EQUAL 1 OR NOT Tessera_ABI_MINOR EQUAL 1 OR
         NOT Tessera_POINTER_BYTES EQUAL 8 OR
         NOT Tessera_MSVC_RUNTIME STREQUAL "MultiThreadedDLL" OR
         NOT Tessera_VERSION VERSION_EQUAL "0.1.0")

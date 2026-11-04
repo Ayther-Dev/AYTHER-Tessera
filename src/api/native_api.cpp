@@ -126,11 +126,11 @@ tessera_status TESSERA_CALL tessera_api_query_v1(std::uint16_t major,
                                                  tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_VALIDATE, [&](Call &c) {
     c.object(out);
-    require(major == 1 && minor == 0, TESSERA_ABI_INCOMPATIBLE);
+    require(major == 1 && minor <= 1, TESSERA_ABI_INCOMPATIBLE);
     c.start();
     auto v = initialized<tessera_api_info_v1>();
     v.major = 1;
-    v.minor = 0;
+    v.minor = 1;
     v.capabilities = complete_caps;
     v.pointer_bytes = 8;
     v.max_alignment = 8;

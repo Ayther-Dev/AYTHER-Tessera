@@ -26,7 +26,7 @@ int main() {
   auto context = initialized<tessera_context_v1>();
   auto info = initialized<tessera_api_info_v1>();
   if (installed_c_query(&info, &context) != TESSERA_OK || info.major != 1 ||
-      info.minor != 0 || info.pointer_bytes != 8 || info.max_alignment != 8)
+      info.minor != 1 || info.pointer_bytes != 8 || info.max_alignment != 8)
     return 1;
   auto limits = initialized<tessera_limits_v1>();
   if (tessera_limits_query_v1(0, &limits, &context) != TESSERA_OK ||

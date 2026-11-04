@@ -201,7 +201,7 @@ ABI_OFFSET(tessera_snapshot_region_v1, bank, 56);
 ABI_OFFSET(tessera_snapshot_region_v1, flags, 60);
 
 static_assert(TESSERA_ABI_MAJOR == 1);
-static_assert(TESSERA_ABI_MINOR == 0);
+static_assert(TESSERA_ABI_MINOR == 1);
 static_assert(TESSERA_OK == 0);
 static_assert(TESSERA_END_OF_TRACE == 1);
 static_assert(TESSERA_INVALID_ARGUMENT == -1);
@@ -521,7 +521,7 @@ TEST_CASE("ABI 1.0 negotiates from both C and C++ translation units") {
   CHECK(context.os_domain == TESSERA_OS_NONE);
   CHECK(context.cancel_reason == TESSERA_CANCEL_NONE);
   CHECK(api.major == 1);
-  CHECK(api.minor == 0);
+  CHECK(api.minor == 1);
   CHECK(api.pointer_bytes == 8);
   CHECK(api.max_alignment == 8);
   CHECK(api.reserved == 0);
@@ -535,7 +535,7 @@ TEST_CASE("ABI 1.0 negotiates from both C and C++ translation units") {
 TEST_CASE("ABI rejects incompatible versions and insufficient prefixes without "
           "partial output") {
   for (const auto version :
-       std::array<std::array<std::uint16_t, 2>, 3>{{{0, 0}, {2, 0}, {1, 1}}}) {
+       std::array<std::array<std::uint16_t, 2>, 3>{{{0, 0}, {2, 0}, {1, 2}}}) {
     auto api = initialized<tessera_api_info_v1>();
     api.capabilities = UINT64_C(0x123456789);
     const auto before = object_bytes(api);

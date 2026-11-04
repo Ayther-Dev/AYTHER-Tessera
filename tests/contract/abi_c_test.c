@@ -188,8 +188,8 @@ ABI_OFFSET(tessera_snapshot_region_v1, flags, 60);
 
 _Static_assert(TESSERA_ABI_MAJOR == 1,
                "TESSERA_ABI_MAJOR has its ABI 1.0 value.");
-_Static_assert(TESSERA_ABI_MINOR == 0,
-               "TESSERA_ABI_MINOR has its ABI 1.0 value.");
+_Static_assert(TESSERA_ABI_MINOR == 1,
+               "TESSERA_ABI_MINOR has its ABI 1.1 value.");
 _Static_assert(TESSERA_OK == 0, "TESSERA_OK has its ABI 1.0 value.");
 _Static_assert(TESSERA_END_OF_TRACE == 1,
                "TESSERA_END_OF_TRACE has its ABI 1.0 value.");

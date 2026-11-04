@@ -2,7 +2,7 @@
 
 set(Tessera_VERSION "@PROJECT_VERSION@")
 set(Tessera_ABI_MAJOR 1)
-set(Tessera_ABI_MINOR 0)
+set(Tessera_ABI_MINOR 1)
 set(Tessera_POINTER_BYTES 8)
 set(Tessera_MSVC_RUNTIME MultiThreadedDLL)
 set(Tessera_DIAGNOSTICS @TESSERA_ENABLE_DIAGNOSTICS@)

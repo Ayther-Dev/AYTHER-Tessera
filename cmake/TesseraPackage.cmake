@@ -55,6 +55,7 @@ install(TARGETS tessera_core EXPORT TesseraTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(TARGETS tessera_cli RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${PROJECT_SOURCE_DIR}/include/tessera/tessera.h"
+          "${PROJECT_SOURCE_DIR}/include/tessera/tessera_observation.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/tessera")
 
 set(tessera_diagnostics_json false)
