@@ -51,6 +51,16 @@ function Test-Format {
     if ($LASTEXITCODE -ne 0) { throw 'FORMAT_VIOLATION: ejecuta clang-format -i sobre los archivos indicados.' }
 }
 
+function Test-Tidy {
+    $tidy = Join-Path ([IO.Path]::GetDirectoryName($compilerPath)) 'clang-tidy.exe'
+    if (-not (Test-Path -LiteralPath $tidy)) { $tidy = (Get-Command clang-tidy.exe -ErrorAction Stop).Source }
+    $files = @(git ls-files 'src/*.cpp' 'tools/*.cpp') |
+        Where-Object { $_ -notmatch 'clown_state_codec|backend_probe' -and ($Preset -eq 'windows-clown-reference' -or $_ -notmatch 'backends/megadrive') -and (Test-Path -LiteralPath $_) }
+    $db = Join-Path $repoRoot "build/$Preset"
+    & $tidy -p $db --quiet @files
+    if ($LASTEXITCODE -ne 0) { throw 'TIDY_VIOLATION: clang-tidy encontró problemas.' }
+}
+
 Push-Location $repoRoot
 try {
     & (Join-Path $PSScriptRoot 'bootstrap-dependencies.ps1') -Offline
@@ -59,6 +69,7 @@ try {
         Test-Format
         $configureArguments = @('--preset', $Preset, "-DCMAKE_C_COMPILER=$compilerPath", "-DCMAKE_CXX_COMPILER=$compilerPath") + $CMakeArgs
         Invoke-Checked 'cmake' $configureArguments
+        Test-Tidy
     }
     if ($Stage -in @('All', 'Build')) {
         Invoke-Checked 'cmake' @('--build', '--preset', $Preset, '--parallel', $Jobs.ToString())

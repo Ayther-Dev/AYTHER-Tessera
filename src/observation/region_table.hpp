@@ -6,7 +6,8 @@
 namespace tessera::observation {
 
 struct RegionRow {
-  std::uint32_t id, element_size, capacity, byte_size, access_flags, data_version, legacy_id;
+  std::uint32_t id, element_size, capacity, byte_size, access_flags,
+      data_version, legacy_id;
 };
 
 inline constexpr RegionRow kRegions[] = {
@@ -38,6 +39,7 @@ inline constexpr RegionRow kRegions[] = {
     {26, 1, 8192, 8192, 11, 1, 271u},
 };
 
-inline constexpr std::uint32_t kRegionCount = sizeof(kRegions) / sizeof(kRegions[0]);
+inline constexpr std::uint32_t kRegionCount =
+    sizeof(kRegions) / sizeof(kRegions[0]);
 
 } // namespace tessera::observation

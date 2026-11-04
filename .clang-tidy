@@ -1,0 +1,3 @@
+Checks: '-*,bugprone-use-after-move,bugprone-infinite-loop,bugprone-undefined-memory-manipulation,bugprone-sizeof-expression,bugprone-dangling-handle'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '^$'
