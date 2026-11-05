@@ -363,6 +363,61 @@ inline std::vector<std::uint8_t> dma_timing_rom(unsigned target, bool display,
   return rom;
 }
 
+// `dma_fill_timing`: VRAM fill (or copy) of 2, 4 ... 2048 bytes; the 68000
+// is not held, so it polls the busy bit (status bit 1) and then stores the HV
+// counter at $FF0000 + 2 * n: the words are the durations of the fills.
+inline std::vector<std::uint8_t> dma_fill_timing_rom(bool copy, bool display,
+                                                     bool h40) {
+  std::vector<std::uint8_t> rom(0x800, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER FILL TIM ", 16);
+  put32(rom, 0x1A4, 0x7FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, 0x43F9, 0x00C0, 0x0004,
+      0x47F9, 0x00C0, 0x0008, 0x45F9, 0x00FF, 0x0000,
+      0x32BC, 0x8154, 0x32BC, 0x8F02,
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  const auto wait_status = [&](bool until_set) {
+    c.insert(c.end(), {0x3011, 0x0240, 0x0008,
+                       static_cast<std::uint16_t>(until_set ? 0x67F8 : 0x66F8)});
+  };
+  for (unsigned n = 0; n < 11; ++n) {
+    c.insert(c.end(), {0x32BC, std::uint16_t{0x8154}});
+    wait_status(true);
+    wait_status(false);
+    c.insert(c.end(), {0x32BC, static_cast<std::uint16_t>(display ? 0x8154 : 0x8114)});
+    const std::uint16_t length = static_cast<std::uint16_t>(2U << n);
+    for (const std::uint16_t w :
+         {static_cast<std::uint16_t>(0x9300 | (length & 0xFF)),
+          static_cast<std::uint16_t>(0x9400 | (length >> 8)),
+          std::uint16_t{0x9500}, std::uint16_t{0x9600},
+          static_cast<std::uint16_t>(copy ? 0x97C0 : 0x9780)}) {
+      c.push_back(0x32BC);
+      c.push_back(w);
+    }
+    if (copy) {
+      c.insert(c.end(), {0x22BC, 0x0000, 0x00C0});
+    } else {
+      c.insert(c.end(), {0x22BC, 0x4000, 0x0080});
+      c.insert(c.end(), {0x30BC, 0x1234});
+    }
+    c.insert(c.end(), {0x3011, 0x0240, 0x0002, 0x66F8}); // while busy
+    c.insert(c.end(), {0x34D3});
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `z80_busreq` (TP-103.3): requests the Z80 bus, counts the polls of $A11100
 // until it is granted and stores the count at $FF0000 + 2 * n, 16 times with
 // a growing delay before each request; also reads the status after the

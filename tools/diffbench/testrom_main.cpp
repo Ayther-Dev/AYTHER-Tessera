@@ -59,6 +59,10 @@ int main(int argc, char **argv) {
     const char *v = argv[1] + 11; // <target>-<d|b>-<h32|h40>-<a|v>
     rom = tessera::testrom::dma_timing_rom(static_cast<unsigned>(v[0] - '0'),
                                            v[2] == 'd', v[5] == '4', v[8] == 'v');
+  } else if (std::strncmp(argv[1], "dmafill-timing-", 15) == 0) {
+    const char *v = argv[1] + 15; // <f|c>-<d|b>-<h32|h40>
+    rom = tessera::testrom::dma_fill_timing_rom(v[0] == 'c', v[2] == 'd',
+                                                v[5] == '4');
   } else if (std::strcmp(argv[1], "cpu-z80area") == 0)
     rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_z80area_groups());
   else if (std::strcmp(argv[1], "cpu-drift-long") == 0)
