@@ -565,4 +565,48 @@ inline std::vector<std::uint8_t> z80_contention_rom(unsigned variant) {
   return detail::z80_rom_image("AYTHER Z80 CONT", a.code, p);
 }
 
+// `z80_int` (TP-106.3): the Z80 runs a counter in HL (inc hl ; jr, 18 T-states
+// per pass) in interrupt mode 1; its handler (at $0038) logs HL at every entry
+// into the Z80 RAM from $1000 on (index at $1F02). The entries per frame and
+// their spacing give the INT pulse and its alignment. With `enable_ie` the VDP
+// vertical interrupt is not enabled on the 68000 side (its vectors are empty).
+inline std::vector<std::uint8_t> z80_int_rom(unsigned variant) {
+  Z80Asm a;
+  a.ld_sp(0x1FFF);
+  a.ld_de(0x1000);
+  a.db({0xED, 0x53, 0x02, 0x1F}); // ld ($1F02),de
+  a.db({0xED, 0x56});             // im 1
+  a.db({0xFB});                   // ei
+  a.ld_hl(0);
+  const std::size_t loop = a.here();
+  a.inc_hl();
+  a.jr_to(loop);
+  a.org(0x38);
+  a.ld_mem_hl(0x1F10);
+  a.db({0xF5, 0xD5});                         // push af ; push de
+  a.db({0xED, 0x5B, 0x02, 0x1F});             // ld de,($1F02)
+  a.db({0x7D, 0x12, 0x13, 0x7C, 0x12, 0x13}); // ld a,l ; ld (de),a ; inc de ; ld a,h ; ld (de),a ; inc de
+  a.db({0xED, 0x53, 0x02, 0x1F});             // ld ($1F02),de
+  a.db({0xD1, 0xF1, 0xFB, 0xED, 0x4D});       // pop de ; pop af ; ei ; reti
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  detail::M68kProgram p;
+  p.prologue();
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(a.code.size()));
+  p.reset_pin(0x0000);
+  p.reset_pin(0x0100);
+  p.request(0x0000);
+  if (variant == 1) { // display and the Z80 interrupt with mode 5 on
+    p.w(0x4DF9);
+    p.l(0x00C00004);
+    p.w(0x3CBC);
+    p.w(0x8144);
+  }
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER Z80 INT", a.code, p);
+}
+
 } // namespace tessera::testrom

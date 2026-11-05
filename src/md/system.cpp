@@ -8,6 +8,8 @@ std::uint16_t dup(std::uint8_t v) {
 }
 // Extra Z80 T-states of an access to the 68000 bus through the bank window.
 constexpr unsigned kZ80RomWait = 3;
+// How far the Z80 INT leads the vertical interrupt of the 68000, in master cycles.
+constexpr std::uint64_t kZ80IntLead = 1620;
 } // namespace
 
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
@@ -46,6 +48,7 @@ void System::reset() {
   z80_.reset();
   z80_bank_ = 0;
   z80_master_ = 0;
+  z80_int_end_ = 0;
   io_data_ = {0x00, 0x00, 0x00};
   io_ctrl_ = {0x00, 0x00, 0x00};
   frame_ = 0;
@@ -118,11 +121,22 @@ void System::run_frame() {
       // (gpgx), so a horizontal interrupt of that same line is served first.
       run_cpu_until(static_cast<moira::i64>(
           (line_start_master_ + vdp_.vint_cycle()) / kDivider68k));
+      // The VDP holds the Z80 INT line for one scanline from the vertical
+      // interrupt, whether or not the 68000 enables it (gpgx z80_int probe).
       vdp_.raise_vint();
       update_irq();
     }
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     run_cpu_until(static_cast<moira::i64>(end_master / kDivider68k));
+    if (index + 1 == lines) {
+      // The Z80 INT of the next vertical interrupt starts kZ80IntLead master
+      // cycles before the 68000 sees it (gpgx z80_int probe) and lasts one
+      // scanline, whether or not the 68000 enables the interrupt.
+      const std::uint64_t int_start =
+          end_master + vdp_.vint_cycle() - kZ80IntLead;
+      z80_sync(int_start);
+      z80_int_end_ = int_start + kCyclesPerLine;
+    }
     z80_sync(end_master);
     renderer_.render_line(vdp_, line);
     const auto flags = renderer_.take_sprite_flags();
@@ -349,6 +363,7 @@ void System::z80_sync(std::uint64_t master) {
     return;
   }
   while (z80_master_ + kDividerZ80 <= master) {
+    z80_.set_int(z80_master_ < z80_int_end_);
     z80_.tick();
     z80_master_ += kDividerZ80;
   }

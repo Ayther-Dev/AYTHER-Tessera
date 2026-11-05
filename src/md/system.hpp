@@ -113,6 +113,7 @@ private:
   Z80 z80_{z80_port_};
   std::uint64_t z80_master_ = 0; ///< master cycle the Z80 has run up to
   std::uint16_t z80_bank_ = 0;
+  std::uint64_t z80_int_end_ = 0; ///< master cycle the INT pulse ends
   Renderer renderer_;
   std::uint64_t frame_ = 0;
   std::uint32_t current_line_ = 0;

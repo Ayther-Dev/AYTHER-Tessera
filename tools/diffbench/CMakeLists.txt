@@ -216,4 +216,24 @@ if(TESSERA_BUILD_MEGADRIVE)
                 PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region
+        # (26) against gpgx after the request / reset sequences, the 68000 view
+        # of the Z80 area and the bank window.
+        foreach(mode IN ITEMS z80-busreq z80-map z80-bank-0 z80-bank-1 z80-bank-2 z80-bank-3 z80-bank-4)
+            add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
+                "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
+            set_tests_properties(integration.md_${mode}_rom PROPERTIES
+                FIXTURES_SETUP md_${mode}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+            add_test(NAME integration.md_${mode} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_z80.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}")
+            set_tests_properties(integration.md_${mode} PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0.*z80_ram bytes=8192 differing=0"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+    endif()
 endif()
