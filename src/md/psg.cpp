@@ -45,11 +45,11 @@ void Psg::write(std::uint8_t value, std::uint64_t master) {
     noise_ctl_ = value & 7U;
     lfsr_ = 0x8000; // any write to the noise register restarts the register
   } else if (latch_byte) {
-    tone_[channel] = static_cast<std::uint16_t>((tone_[channel] & 0x3F0U) |
-                                                (value & 0x0FU));
+    tone_[channel] =
+        static_cast<std::uint16_t>((tone_[channel] & 0x3F0U) | (value & 0x0FU));
   } else {
-    tone_[channel] = static_cast<std::uint16_t>(
-        (tone_[channel] & 0x00FU) | ((value & 0x3FU) << 4));
+    tone_[channel] = static_cast<std::uint16_t>((tone_[channel] & 0x00FU) |
+                                                ((value & 0x3FU) << 4));
   }
 }
 

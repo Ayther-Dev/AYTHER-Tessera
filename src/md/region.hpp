@@ -52,8 +52,8 @@ constexpr std::uint8_t header_mask(std::span<const std::uint8_t> rom) noexcept {
 /// Region declared by the header of a plain (header-less, de-interleaved) ROM
 /// image. Several regions: Americas, then Japan NTSC, then Europe, then Japan
 /// PAL. No recognised region (or an image too short for the field): Americas.
-constexpr MachineConfig region_from_header(
-    std::span<const std::uint8_t> rom) noexcept {
+constexpr MachineConfig
+region_from_header(std::span<const std::uint8_t> rom) noexcept {
   using namespace region_detail;
   const std::uint8_t mask = rom.size() >= 0x1F4 ? header_mask(rom) : 0;
   if (mask & kAmericas || mask == 0)

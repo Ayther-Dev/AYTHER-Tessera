@@ -51,12 +51,12 @@ TEST_CASE("letters: Americas wins over Japan, Japan over Europe") {
     std::uint8_t version;
     unsigned lines;
   } table[] = {
-      {"J", kJapan, 262},    {"U", kUsa, 262},      {"E", kEurope, 313},
-      {"JU", kUsa, 262},     {"JE", kJapan, 262},   {"UE", kUsa, 262},
-      {"EJ", kJapan, 262},   {"JUE", kUsa, 262},    {"EUJ", kUsa, 262},
-      {"j", kJapan, 262},    {"u", kUsa, 262},      {"e", kEurope, 313},
+      {"J", kJapan, 262},    {"U", kUsa, 262},       {"E", kEurope, 313},
+      {"JU", kUsa, 262},     {"JE", kJapan, 262},    {"UE", kUsa, 262},
+      {"EJ", kJapan, 262},   {"JUE", kUsa, 262},     {"EUJ", kUsa, 262},
+      {"j", kJapan, 262},    {"u", kUsa, 262},       {"e", kEurope, 313},
       {"  E", kEurope, 313}, {"   E", kEurope, 313}, {"    E", kUsa, 262},
-      {"JX", kJapan, 262},   {"XE", kEurope, 313},  {"X", kUsa, 262},
+      {"JX", kJapan, 262},   {"XE", kEurope, 313},   {"X", kUsa, 262},
       {"", kUsa, 262},
   };
   for (const auto &row : table) {
@@ -74,11 +74,11 @@ TEST_CASE("hex digit: bit 0 Japan, bit 1 Japan PAL, bit 2 Americas, bit 3 "
     std::uint8_t version;
     unsigned lines;
   } table[] = {
-      {"0", kUsa, 262},   {"1", kJapan, 262},    {"2", kJapanPal, 313},
-      {"3", kJapan, 262}, {"4", kUsa, 262},      {"8", kEurope, 313},
-      {"9", kJapan, 262}, {"A", kEurope, 313},   {"B", kJapan, 262},
-      {"C", kUsa, 262},   {"D", kUsa, 262},      {"F", kUsa, 262},
-      {"a", kEurope, 313}, {"b", kJapan, 262},   {"2 U", kUsa, 262},
+      {"0", kUsa, 262},     {"1", kJapan, 262},  {"2", kJapanPal, 313},
+      {"3", kJapan, 262},   {"4", kUsa, 262},    {"8", kEurope, 313},
+      {"9", kJapan, 262},   {"A", kEurope, 313}, {"B", kJapan, 262},
+      {"C", kUsa, 262},     {"D", kUsa, 262},    {"F", kUsa, 262},
+      {"a", kEurope, 313},  {"b", kJapan, 262},  {"2 U", kUsa, 262},
       {"2E", kEurope, 313}, {"1E", kJapan, 262}, {"8U", kUsa, 262},
       {"    2", kUsa, 262},
   };

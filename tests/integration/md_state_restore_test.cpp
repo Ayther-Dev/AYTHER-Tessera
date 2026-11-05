@@ -76,11 +76,11 @@ struct Native {
     std::array<tessera_input_assignment_v1, 24> assignments{};
     for (std::uint16_t port = 0; port < 2; ++port)
       for (std::uint16_t control = 0; control < 12; ++control) {
-        const auto key = static_cast<unsigned>(now.frame_id.frame * 7 +
-                                               control * 3 + port);
+        const auto key =
+            static_cast<unsigned>(now.frame_id.frame * 7 + control * 3 + port);
         // up/down and left/right never together: those are the first four
-        const bool pressed = control < 4 ? (control % 2 == 0 && key % 5 == 0)
-                                         : (key % 4 == 0);
+        const bool pressed =
+            control < 4 ? (control % 2 == 0 && key % 5 == 0) : (key % 4 == 0);
         assignments[port * 12 + control] = {port, control, pressed ? 1 : 0};
       }
     auto input = initial<tessera_input_frame_v1>();
@@ -121,7 +121,8 @@ Bytes rom_a() { return tessera::testrom::pad_frames_rom(); }
 Bytes rom_b() { return tessera::testrom::fm_psg_sweep_rom(5); }
 } // namespace
 
-TEST_CASE("a native checkpoint resumes exactly, in place and in a new session") {
+TEST_CASE(
+    "a native checkpoint resumes exactly, in place and in a new session") {
   Native source(rom_a());
   source.step(20);
   const auto at_k = source.checkpoint();
@@ -147,7 +148,8 @@ TEST_CASE("a native checkpoint resumes exactly, in place and in a new session") 
   CHECK(target.original() == expected_frame);
 }
 
-TEST_CASE("another ROM, another codec or damage is refused and changes nothing") {
+TEST_CASE(
+    "another ROM, another codec or damage is refused and changes nothing") {
   Native source(rom_a());
   source.step(12);
   const auto checkpoint = source.checkpoint();
@@ -166,7 +168,8 @@ TEST_CASE("another ROM, another codec or damage is refused and changes nothing")
   auto corrupt = checkpoint;
   corrupt.back() ^= 1;
   CHECK(victim.restore(corrupt) == TESSERA_CHECKPOINT_INVALID);
-  const Bytes truncated(checkpoint.begin(), checkpoint.begin() + checkpoint.size() / 2);
+  const Bytes truncated(checkpoint.begin(),
+                        checkpoint.begin() + checkpoint.size() / 2);
   CHECK(victim.restore(truncated) != TESSERA_OK);
   CHECK(victim.restore({}) != TESSERA_OK);
   CHECK(victim.checkpoint() == victim_before);
@@ -174,7 +177,8 @@ TEST_CASE("another ROM, another codec or damage is refused and changes nothing")
   victim.step(); // and it still runs
 }
 
-TEST_CASE("the Clown and synthetic codecs are refused, the native one accepted") {
+TEST_CASE(
+    "the Clown and synthetic codecs are refused, the native one accepted") {
   using namespace tessera;
   const Bytes sha(32, 0x11), build(32, 0x22), config(32, 0x33);
   const auto make = [&](std::string_view codec, std::string_view machine_tag) {
@@ -242,14 +246,15 @@ TEST_CASE("malformed traces are refused by the native session") {
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
   std::uint32_t required{};
   REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
-                                        &required, &session.context) ==
-          TESSERA_OK);
+                                        &required,
+                                        &session.context) == TESSERA_OK);
   const tessera_backend_info_v1 *native = nullptr;
   for (std::uint32_t i = 0; i < required && i < backends.size(); ++i)
     if (std::string_view(backends[i].id) == "megadrive")
       native = &backends[i];
   REQUIRE(native != nullptr);
-  const auto config = wire::configuration("megadrive", native->build_id, cfg_memory);
+  const auto config =
+      wire::configuration("megadrive", native->build_id, cfg_memory);
 
   Bytes trace = wire::text("TSTRACE1");
   wire::field(trace, 1, 5, wire::sha(session.rom));
@@ -280,7 +285,8 @@ TEST_CASE("malformed traces are refused by the native session") {
   // Every truncation and a sweep of single-byte corruptions: never OK for a
   // damaged trace, never a crash.
   for (std::size_t cut = 0; cut < trace.size(); cut += 37) {
-    const Bytes part(trace.begin(), trace.begin() + static_cast<std::ptrdiff_t>(cut));
+    const Bytes part(trace.begin(),
+                     trace.begin() + static_cast<std::ptrdiff_t>(cut));
     CHECK(bind(part) != TESSERA_OK);
   }
   for (std::size_t at = 0; at < trace.size(); at += 53) {
@@ -297,7 +303,8 @@ TEST_CASE("malformed traces are refused by the native session") {
 
   // The undamaged trace is valid and binds to a fresh session.
   Native fresh(rom_a());
-  CHECK(tessera_session_bind_trace_v1(fresh.handle, {trace.data(), trace.size()},
+  CHECK(tessera_session_bind_trace_v1(fresh.handle,
+                                      {trace.data(), trace.size()},
                                       &fresh.context) == TESSERA_OK);
 }
 

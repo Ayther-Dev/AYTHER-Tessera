@@ -186,8 +186,9 @@ public:
     auto creation = init<tessera_session_create_info_v1>();
     const auto id_bytes = text_bytes(id);
     creation.backend_id = view(id_bytes);
-    creation.system_override =
-        id == "clownmdemu" || id == "megadrive" ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE;
+    creation.system_override = id == "clownmdemu" || id == "megadrive"
+                                   ? TESSERA_SYSTEM_MEGA_DRIVE
+                                   : TESSERA_SYSTEM_NONE;
     creation.content = view(content);
     creation.config = view(config);
     creation.initial_persistent_memory = view(memory);

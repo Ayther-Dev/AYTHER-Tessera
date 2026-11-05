@@ -83,7 +83,7 @@ TEST_CASE("timer A overflows after (1024 - N) samples") {
   std::uint64_t now = 0;
   reg(ym, now, 0, 0x24, 1000 >> 2);
   reg(ym, now, 0, 0x25, 1000 & 3);
-  reg(ym, now, 0, 0x27, 0x15); // load A, enable A flag, reset A
+  reg(ym, now, 0, 0x27, 0x15);             // load A, enable A flag, reset A
   const std::uint64_t armed = now - kStep; // the data write loaded the timer
   const std::uint64_t period = (1024 - 1000) * 144ULL * 7ULL;
   CHECK((ym.status(armed + period - 7 * 4) & 1U) == 0);

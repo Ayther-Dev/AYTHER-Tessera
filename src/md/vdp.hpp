@@ -106,8 +106,9 @@ private:
   /// Master cycle of the first external slot after `after` (display drawn).
   std::uint64_t next_slot(std::uint64_t after, bool vram) const noexcept;
   std::uint64_t slots_end(std::uint64_t start, std::uint64_t slots,
-                         bool colour_ram = false) const noexcept;
-  std::uint64_t slot_service(std::uint64_t start, unsigned slots) const noexcept;
+                          bool colour_ram = false) const noexcept;
+  std::uint64_t slot_service(std::uint64_t start,
+                             unsigned slots) const noexcept;
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
   bool display_blank() const noexcept;
   /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).

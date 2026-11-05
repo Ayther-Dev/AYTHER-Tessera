@@ -36,7 +36,7 @@ public:
   void jr_self() { db({0x18, 0xFE}); }
   void jr_to(std::size_t target) {
     db({0x18, static_cast<std::uint8_t>(static_cast<int>(target) -
-                                         static_cast<int>(here() + 2))});
+                                        static_cast<int>(here() + 2))});
   }
   std::vector<std::uint8_t> code;
 
@@ -51,16 +51,17 @@ private:
 
 // Bank register routine: HL = address written, DE = 9 bit bank (bit 0 first).
 inline void z80_setbank_routine(Z80Asm &a) {
-  a.db({0x06, 0x09});   // ld b,9
-  a.db({0x73});         // l: ld (hl),e
-  a.db({0xCB, 0x3A});   //    srl d
-  a.db({0xCB, 0x1B});   //    rr e
-  a.db({0x10, 0xF9});   //    djnz l
+  a.db({0x06, 0x09}); // ld b,9
+  a.db({0x73});       // l: ld (hl),e
+  a.db({0xCB, 0x3A}); //    srl d
+  a.db({0xCB, 0x1B}); //    rr e
+  a.db({0x10, 0xF9}); //    djnz l
   a.ret();
 }
 
 inline constexpr std::uint16_t kZ80SetBank = 0x0300;
-inline constexpr std::uint32_t kPayloadAt = 0x800; // in the ROM, past the 68000 code
+inline constexpr std::uint32_t kPayloadAt =
+    0x800; // in the ROM, past the 68000 code
 
 // The payload of `z80_bank`: results at $1000-$10FF of the Z80 RAM, a start
 // counter at $1FF1 and the end flag $D0 at $1FF0.
@@ -272,9 +273,9 @@ struct M68kProgram {
   }
 };
 
-inline std::vector<std::uint8_t> z80_rom_image(const char *name,
-                                               const std::vector<std::uint8_t> &payload,
-                                               const detail::M68kProgram &p) {
+inline std::vector<std::uint8_t>
+z80_rom_image(const char *name, const std::vector<std::uint8_t> &payload,
+              const detail::M68kProgram &p) {
   std::vector<std::uint8_t> rom(0x1000, 0);
   put32(rom, 0, 0xFFFE00);
   put32(rom, 4, 0x200);
@@ -423,22 +424,25 @@ inline std::vector<std::uint8_t> z80_clock_rom(bool bank_reads) {
 inline std::vector<std::uint8_t> z80_map_rom() {
   detail::M68kProgram p;
   p.prologue();
-  const auto wb = [&](std::uint32_t addr, std::uint8_t v) { // move.b #v,(addr).l
+  const auto wb = [&](std::uint32_t addr,
+                      std::uint8_t v) { // move.b #v,(addr).l
     p.w(0x13FC);
     p.w(v);
     p.l(addr);
   };
-  const auto ww = [&](std::uint32_t addr, std::uint16_t v) { // move.w #v,(addr).l
+  const auto ww = [&](std::uint32_t addr,
+                      std::uint16_t v) { // move.w #v,(addr).l
     p.w(0x33FC);
     p.w(v);
     p.l(addr);
   };
-  const auto rb = [&](std::uint32_t addr) { // moveq #0,d1 ; move.b (addr).l,d1 ; log
-    p.w(0x7200);
-    p.w(0x1239);
-    p.l(addr);
-    p.w(0x34C1);
-  };
+  const auto rb =
+      [&](std::uint32_t addr) { // moveq #0,d1 ; move.b (addr).l,d1 ; log
+        p.w(0x7200);
+        p.w(0x1239);
+        p.l(addr);
+        p.w(0x34C1);
+      };
   const auto rw = [&](std::uint32_t addr) { // move.w (addr).l,d1 ; log
     p.w(0x3239);
     p.l(addr);
@@ -512,8 +516,8 @@ inline std::vector<std::uint8_t> z80_map_rom() {
 }
 
 // `z80_contention`: the Z80 loops in one of three ways (0 in place, 1 reading
-// the ROM through the window, 2 reading its own RAM) while the 68000 samples the
-// HV counter between long delays: any 68000 time lost to the Z80 shows up.
+// the ROM through the window, 2 reading its own RAM) while the 68000 samples
+// the HV counter between long delays: any 68000 time lost to the Z80 shows up.
 inline std::vector<std::uint8_t> z80_contention_rom(unsigned variant) {
   Z80Asm a;
   a.ld_sp(0x1FFF);
@@ -583,11 +587,12 @@ inline std::vector<std::uint8_t> z80_int_rom(unsigned variant) {
   a.jr_to(loop);
   a.org(0x38);
   a.ld_mem_hl(0x1F10);
-  a.db({0xF5, 0xD5});                         // push af ; push de
-  a.db({0xED, 0x5B, 0x02, 0x1F});             // ld de,($1F02)
-  a.db({0x7D, 0x12, 0x13, 0x7C, 0x12, 0x13}); // ld a,l ; ld (de),a ; inc de ; ld a,h ; ld (de),a ; inc de
-  a.db({0xED, 0x53, 0x02, 0x1F});             // ld ($1F02),de
-  a.db({0xD1, 0xF1, 0xFB, 0xED, 0x4D});       // pop de ; pop af ; ei ; reti
+  a.db({0xF5, 0xD5});             // push af ; push de
+  a.db({0xED, 0x5B, 0x02, 0x1F}); // ld de,($1F02)
+  a.db({0x7D, 0x12, 0x13, 0x7C, 0x12,
+        0x13}); // ld a,l ; ld (de),a ; inc de ; ld a,h ; ld (de),a ; inc de
+  a.db({0xED, 0x53, 0x02, 0x1F});       // ld ($1F02),de
+  a.db({0xD1, 0xF1, 0xFB, 0xED, 0x4D}); // pop de ; pop af ; ei ; reti
   a.org(kZ80SetBank);
   z80_setbank_routine(a);
   detail::M68kProgram p;
@@ -618,17 +623,26 @@ inline std::vector<std::uint8_t> fm_psg_z80_payload() {
     a.ld_a(value);
     a.ld_mem_a(address);
   };
-  put(0x4000, 0x22); put(0x4001, 0x08);
-  put(0x4000, 0x28); put(0x4001, 0xF0);
-  put(0x4002, 0x1A); put(0x4003, 0x77);
-  put(0x4000, 0x2B); put(0x4001, 0x80);
-  a.ld_mem_a(0x4001);                      // data again, no address
-  put(0x4004, 0x2A); put(0x4005, 0x81);    // a mirror of the ports
+  put(0x4000, 0x22);
+  put(0x4001, 0x08);
+  put(0x4000, 0x28);
+  put(0x4001, 0xF0);
+  put(0x4002, 0x1A);
+  put(0x4003, 0x77);
+  put(0x4000, 0x2B);
+  put(0x4001, 0x80);
+  a.ld_mem_a(0x4001); // data again, no address
+  put(0x4004, 0x2A);
+  put(0x4005, 0x81); // a mirror of the ports
   put(0x4003, 0x66);
-  put(0x7F11, 0x9F); put(0x7F13, 0x8F);
-  put(0x7F15, 0xE4); put(0x7F17, 0xBF);
-  put(0x7F10, 0x85); put(0x7F12, 0x86);    // even addresses
-  put(0x7F19, 0x87); put(0x7F1F, 0x88);    // past the PSG ports
+  put(0x7F11, 0x9F);
+  put(0x7F13, 0x8F);
+  put(0x7F15, 0xE4);
+  put(0x7F17, 0xBF);
+  put(0x7F10, 0x85);
+  put(0x7F12, 0x86); // even addresses
+  put(0x7F19, 0x87);
+  put(0x7F1F, 0x88); // past the PSG ports
   put(0x7F11, 0x91);
   a.jr_self();
   return a.code;
@@ -657,13 +671,13 @@ inline std::vector<std::uint8_t> fm_busy_z80_payload(unsigned pad = 0) {
   a.ld_hl(0x4000);
   const auto wait_ready = [&] {
     const auto at = a.here();
-    a.db({0xCB, 0x7E});  // bit 7,(hl)
+    a.db({0xCB, 0x7E}); // bit 7,(hl)
     a.db({0x20, static_cast<std::uint8_t>(static_cast<int>(at) -
                                           static_cast<int>(a.here() + 2))});
   };
   const auto write = [&](std::uint8_t reg, std::uint8_t value) {
     wait_ready();
-    a.db({0x36, reg});   // ld (hl),n: address
+    a.db({0x36, reg}); // ld (hl),n: address
     a.inc_hl();
     a.db({0x36, value}); // data
     a.db({0x2B});        // dec hl
@@ -716,13 +730,13 @@ inline std::vector<std::uint8_t> fm_rom_z80_payload(unsigned reads) {
     for (unsigned k = 0; k < reads; ++k)
       a.db({0x1A, 0x13}); // ld a,(de); inc de
     const auto at = a.here();
-    a.db({0xCB, 0x7E});   // bit 7,(hl)
+    a.db({0xCB, 0x7E}); // bit 7,(hl)
     a.db({0x20, static_cast<std::uint8_t>(static_cast<int>(at) -
                                           static_cast<int>(a.here() + 2))});
     a.db({0x36, static_cast<std::uint8_t>(0x30 + i)});
     a.inc_hl();
-    a.db({0x77});         // ld (hl),a
-    a.db({0x2B});         // dec hl
+    a.db({0x77}); // ld (hl),a
+    a.db({0x2B}); // dec hl
   }
   a.jr_self();
   return a.code;

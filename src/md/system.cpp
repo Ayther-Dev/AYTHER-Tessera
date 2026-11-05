@@ -1,6 +1,5 @@
 #include "md/system.hpp"
 
-
 namespace tessera::md {
 namespace {
 std::uint16_t dup(std::uint8_t v) {
@@ -21,7 +20,8 @@ constexpr std::uint64_t kPad6Timeout = 12'700ULL * 7ULL;
 // the pad sees the pull-up (gpgx pad_latch-5: a read 20 cycles after the write
 // still sees the old half, one 24 cycles after sees the new one).
 constexpr std::uint64_t kPad6PullUp = 24ULL * 7ULL;
-// How far the Z80 INT leads the vertical interrupt of the 68000, in master cycles.
+// How far the Z80 INT leads the vertical interrupt of the 68000, in master
+// cycles.
 constexpr std::uint64_t kZ80IntLead = 1620;
 // YM2612 busy time after a data write, master cycles (probe ym-busy-N)
 constexpr std::uint64_t kYmBusy = 1325;
@@ -244,9 +244,9 @@ std::uint8_t System::io_read(std::uint32_t offset) noexcept {
     } else if (six && !th && phase >= 2 && phase <= 3) {
       // start A and, in place of the directions, the ID of the six-button pad
       // (0000) in the second low half and 1111 in the third
-      in = static_cast<std::uint8_t>(
-          (phase == 2 ? 0x00 : 0x0F) | ((pressed & kPadA) ? 0 : 0x10) |
-          ((pressed & kPadStart) ? 0 : 0x20));
+      in = static_cast<std::uint8_t>((phase == 2 ? 0x00 : 0x0F) |
+                                     ((pressed & kPadA) ? 0 : 0x10) |
+                                     ((pressed & kPadStart) ? 0 : 0x20));
     } else if (th) { // C B right left down up
       in = static_cast<std::uint8_t>(
           ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
@@ -444,7 +444,8 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
       z80_sync_now();
       const bool request = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
       if (request && z80_running())
-        z80_.finish_instruction(); // the Z80 grants the bus between instructions
+        z80_.finish_instruction(); // the Z80 grants the bus between
+                                   // instructions
       if (!z80_running() && !request && z80_reset_released_)
         z80_master_ = cpu_.getClock() * kDivider68k + kZ80ResetDelay; // resumes
       z80_bus_requested_ = request;
@@ -520,14 +521,14 @@ std::uint8_t System::ym_status(std::uint64_t now) {
                                    ym_.status(now));
 }
 
-void System::log_audio(std::uint16_t addr, std::uint8_t data,
-                       std::uint8_t chip, std::uint64_t now) {
+void System::log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
+                       std::uint64_t now) {
   if (audio_log_.size() >= kAudioWriteCapacity) {
     ++audio_dropped_;
     return;
   }
-  audio_log_.push_back({static_cast<std::uint32_t>(now - log_origin_), addr,
-                        data, chip});
+  audio_log_.push_back(
+      {static_cast<std::uint32_t>(now - log_origin_), addr, data, chip});
 }
 
 void System::psg_write(std::uint8_t value, std::uint64_t now) {
@@ -555,9 +556,8 @@ void System::ym_write(std::uint32_t address, std::uint8_t value,
 }
 
 void System::z80_bank_write(std::uint8_t value) noexcept {
-  z80_bank_ = static_cast<std::uint16_t>(((z80_bank_ >> 1) |
-                                           ((value & 1U) << 8)) &
-                                          0x1FFU);
+  z80_bank_ = static_cast<std::uint16_t>(
+      ((z80_bank_ >> 1) | ((value & 1U) << 8)) & 0x1FFU);
 }
 
 std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
@@ -594,7 +594,8 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
       // counted before the write is stamped (gpgx fm_psg_z80).
       wait = kZ80VdpWait;
       if ((address & 0xFFF9U) == 0x7F11U)
-        psg_write(value, z80_master_ + std::uint64_t{kZ80VdpWait} * kDividerZ80);
+        psg_write(value,
+                  z80_master_ + std::uint64_t{kZ80VdpWait} * kDividerZ80);
     }
   } else {
     const std::uint32_t a =
@@ -681,7 +682,8 @@ bool System::read_state(std::span<const std::uint8_t> state) {
       standard != static_cast<std::uint8_t>(config_.standard) ||
       pad0 != static_cast<std::uint8_t>(config_.pads[0]) ||
       pad1 != static_cast<std::uint8_t>(config_.pads[1]) ||
-      tmss != config_.tmss || mapper != static_cast<std::uint8_t>(config_.mapper))
+      tmss != config_.tmss ||
+      mapper != static_cast<std::uint8_t>(config_.mapper))
     return false;
 
   frame_ = r.u64();
@@ -707,7 +709,8 @@ bool System::read_state(std::span<const std::uint8_t> state) {
   ym_addr_ = r.u16();
   ym_busy_until_ = r.u64();
   if (current_line_ >= lines_per_frame(config_.standard) ||
-      frame_start_line_ >= lines_per_frame(config_.standard) || z80_bank_ > 0x1FF)
+      frame_start_line_ >= lines_per_frame(config_.standard) ||
+      z80_bank_ > 0x1FF)
     return false;
 
   cpu_.load(r);

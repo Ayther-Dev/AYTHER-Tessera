@@ -34,14 +34,14 @@ struct FlatBus : Z80Bus {
 
 // Sum loop: stores 10, 19, 27, ... 55 at $0100..$0109, then HALT.
 void load_sum_loop(FlatBus &bus) {
-  bus.load(0x0000, {0x21, 0x00, 0x01,  // ld hl,$0100
-                    0x06, 0x0A,        // ld b,10
-                    0xAF,              // xor a
-                    0x80,              // loop: add a,b
-                    0x77,              // ld (hl),a
-                    0x23,              // inc hl
-                    0x10, 0xFB,        // djnz loop
-                    0x76});            // halt
+  bus.load(0x0000, {0x21, 0x00, 0x01, // ld hl,$0100
+                    0x06, 0x0A,       // ld b,10
+                    0xAF,             // xor a
+                    0x80,             // loop: add a,b
+                    0x77,             // ld (hl),a
+                    0x23,             // inc hl
+                    0x10, 0xFB,       // djnz loop
+                    0x76});           // halt
 }
 
 unsigned run_until_halt(Z80 &cpu, unsigned limit = 4000) {
@@ -97,12 +97,12 @@ TEST_CASE("wait states from the bus stretch every access") {
 
 TEST_CASE("INT in mode 1 jumps to $0038 once interrupts are enabled") {
   FlatBus bus;
-  bus.load(0x0000, {0xED, 0x56,  // im 1
-                    0xFB,        // ei
-                    0x76});      // halt
-  bus.load(0x0038, {0x3E, 0x77,        // ld a,$77
-                    0x32, 0x00, 0x02,  // ld ($0200),a
-                    0x76});            // halt
+  bus.load(0x0000, {0xED, 0x56,       // im 1
+                    0xFB,             // ei
+                    0x76});           // halt
+  bus.load(0x0038, {0x3E, 0x77,       // ld a,$77
+                    0x32, 0x00, 0x02, // ld ($0200),a
+                    0x76});           // halt
   Z80 cpu(bus);
   for (unsigned i = 0; i < 40; ++i)
     cpu.tick();

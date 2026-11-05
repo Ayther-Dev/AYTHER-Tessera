@@ -95,10 +95,11 @@ public:
   /// configuration. On false (wrong magic, version, ROM, configuration, size or
   /// contents) the machine is left exactly as it was (RF-4.5).
   bool load_state(std::span<const std::uint8_t> state);
+
 private:
   bool read_state(std::span<const std::uint8_t> state);
-public:
 
+public:
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
   /// The 68000 owns the Z80 bus: requested, and the Z80 out of reset.
@@ -109,7 +110,9 @@ public:
   const Ym2612 &ym() const noexcept { return ym_; }
   const Psg &psg() const noexcept { return psg_; }
   /// Audio of the last frame run: interleaved S16 stereo at 48 kHz (TP-107.4).
-  std::span<const std::int16_t> audio() const noexcept { return mixer_.output(); }
+  std::span<const std::int16_t> audio() const noexcept {
+    return mixer_.output();
+  }
   /// `AUDIO_MUTE` (RF-3.7): 18 bits, FM 0-5, PSG 6-9 (tones 0-2, noise), PCM
   /// 10-17 (none on this console). It acts on the mix only: not in the state,
   /// not in the savestate, and it survives reset and restore.
@@ -125,9 +128,7 @@ public:
   std::span<const AudioWrite> audio_writes() const noexcept {
     return audio_log_;
   }
-  std::uint32_t audio_writes_dropped() const noexcept {
-    return audio_dropped_;
-  }
+  std::uint32_t audio_writes_dropped() const noexcept { return audio_dropped_; }
   /// Nine bit bank register: A23-A15 of the Z80 window at $8000.
   std::uint16_t z80_bank() const noexcept { return z80_bank_; }
 
@@ -162,10 +163,11 @@ private:
   struct PadPort {
     bool th = true;
     std::uint8_t phase = 0;
-    std::uint64_t edge_at = 0; ///< master cycle of the last change of TH
+    std::uint64_t edge_at = 0;    ///< master cycle of the last change of TH
     std::uint64_t pull_up_at = 0; ///< pending pull-up of TH (0 = none)
   };
-  void pad_notify(unsigned port, bool control_write, std::uint64_t now) noexcept;
+  void pad_notify(unsigned port, bool control_write,
+                  std::uint64_t now) noexcept;
   void pad_settle(unsigned port, std::uint64_t now) noexcept;
   std::array<PadPort, 2> pad_port_{};
   bool th2() const noexcept;
@@ -204,7 +206,8 @@ private:
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from
-  std::uint16_t ym_addr_ = 0; ///< latch: (part << 8) | register of the last address write
+  std::uint16_t ym_addr_ =
+      0; ///< latch: (part << 8) | register of the last address write
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
   void psg_write(std::uint8_t value, std::uint64_t now);

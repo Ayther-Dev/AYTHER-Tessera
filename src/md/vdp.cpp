@@ -153,14 +153,15 @@ std::uint64_t Vdp::next_slot(std::uint64_t after, bool vram) const noexcept {
   const std::uint32_t last_low = h40 ? 0xB6U : 0x93U;
   const std::uint32_t first_high = h40 ? 0xE4U : 0xE9U;
   const std::uint32_t zero = h40 ? 780U : 760U;
-  const std::uint8_t *table = vram ? (h40 ? kVramH40 : kVramH32)
-                                   : (h40 ? kCramH40 : kCramH32);
+  const std::uint8_t *table =
+      vram ? (h40 ? kVramH40 : kVramH32) : (h40 ? kCramH40 : kCramH32);
   const unsigned count = vram ? (h40 ? 9U : 8U) : (h40 ? 18U : 16U);
   // Slots repeat every line from the line the HV counter starts at.
-  const std::int64_t rel = static_cast<std::int64_t>(after) -
-                           static_cast<std::int64_t>(line_start_);
+  const std::int64_t rel =
+      static_cast<std::int64_t>(after) - static_cast<std::int64_t>(line_start_);
   const std::int64_t k0 =
-      (rel >= 0 ? rel / kCyclesPerLine : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine));
+      (rel >= 0 ? rel / kCyclesPerLine
+                : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine));
   std::uint64_t best = ~std::uint64_t{0};
   for (std::int64_t lines = k0 - 1; lines <= k0 + 2; ++lines) {
     const std::int64_t base =
@@ -203,9 +204,8 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
     const std::int64_t wrapped =
         ((static_cast<std::int64_t>(line_) + k) % total_lines + total_lines) %
         total_lines;
-    const std::uint64_t line_end =
-        static_cast<std::uint64_t>(static_cast<std::int64_t>(line_start_) +
-                                   (k + 1) * kCyclesPerLine);
+    const std::uint64_t line_end = static_cast<std::uint64_t>(
+        static_cast<std::int64_t>(line_start_) + (k + 1) * kCyclesPerLine);
     if (!enabled || wrapped >= active) { // blanking: evenly spread slots
       const std::uint64_t avail = (line_end - t) * per_line / kCyclesPerLine;
       if (slots <= avail || avail == 0 || true) {
@@ -218,7 +218,8 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
       t = line_end;
       continue;
     }
-    const std::uint64_t lines_left = active - 1U - static_cast<std::uint64_t>(wrapped);
+    const std::uint64_t lines_left =
+        active - 1U - static_cast<std::uint64_t>(wrapped);
     if (slots > 2ULL * active_per_line && lines_left > 1) {
       std::uint64_t m = (slots - 1U) / active_per_line;
       if (m > lines_left - 1)
@@ -304,8 +305,8 @@ void Vdp::run_dma(std::uint16_t first_data) {
       put(dma_reader_ ? dma_reader_(at) : std::uint16_t{0xFFFF});
     // A VRAM word takes two external slots, a CRAM or VSRAM word one.
     cpu_stall_ += slots_end(now_, (code_ & 0x0FU) == 1 ? 2ULL * length : length,
-                         (code_ & 0x0FU) != 1) -
-                 now_;
+                            (code_ & 0x0FU) != 1) -
+                  now_;
     finish_dma(length, true);
     return;
   }

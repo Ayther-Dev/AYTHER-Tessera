@@ -11,7 +11,8 @@ namespace tessera::persistence {
 /// a restore into a backend with another codec is refused as incompatible
 /// (TESSERA_CHECKPOINT_INCOMPATIBLE): the Clown record (`TSCLOWN1`) and the
 /// native one are not interchangeable (RF-4.1).
-[[nodiscard]] constexpr std::string_view codec_id(std::string_view backend) noexcept {
+[[nodiscard]] constexpr std::string_view
+codec_id(std::string_view backend) noexcept {
   if (backend == "clownmdemu")
     return "tessera.megadrive.clown";
   if (backend == "megadrive")

@@ -1,10 +1,11 @@
 // Audio mixer of the native Mega Drive (spec 008, TP-107.4): the YM2612
 // (one stereo sample per 1008 master cycles) and the PSG (one mono sample per
-// 240) are integrated over exact 48 kHz output intervals (box filter) and summed
-// into interleaved signed 16 bit stereo. Interval boundaries are rational
-// (k * master_hz / 48000) and kept in integers, so the output depends only on the
-// source samples and carries no drift between frames: NTSC and PAL give
-// 48000/fps samples per frame on average, with the fraction carried across frames.
+// 240) are integrated over exact 48 kHz output intervals (box filter) and
+// summed into interleaved signed 16 bit stereo. Interval boundaries are
+// rational (k * master_hz / 48000) and kept in integers, so the output depends
+// only on the source samples and carries no drift between frames: NTSC and PAL
+// give 48000/fps samples per frame on average, with the fraction carried across
+// frames.
 #pragma once
 #include "md/machine.hpp"
 #include "md/psg.hpp"
@@ -128,7 +129,8 @@ private:
            static_cast<std::int64_t>(master_);
   }
   static std::int16_t clamp16(std::int64_t v) noexcept {
-    return static_cast<std::int16_t>(std::clamp<std::int64_t>(v, -32768, 32767));
+    return static_cast<std::int16_t>(
+        std::clamp<std::int64_t>(v, -32768, 32767));
   }
   /// Overlap of source sample `index` (length `len`) with [t0, t1).
   static std::int64_t overlap(std::uint64_t index, std::uint64_t len,
@@ -146,7 +148,8 @@ private:
       right += std::int64_t{s.right} * o;
     }
   }
-  std::int64_t integrate_psg(std::uint64_t t0, std::uint64_t t1) const noexcept {
+  std::int64_t integrate_psg(std::uint64_t t0,
+                             std::uint64_t t1) const noexcept {
     std::int64_t sum = 0;
     for (auto i = std::max(t0 / kPsgLen, psg_base_); i * kPsgLen < t1; ++i)
       sum += std::int64_t{psg_[i - psg_base_]} * overlap(i, kPsgLen, t0, t1);
@@ -173,8 +176,9 @@ private:
   std::vector<std::int16_t> psg_;
   std::vector<YmSample> ym_raw_;
   std::vector<std::int16_t> psg_raw_;
-  std::uint64_t ym_base_ = 0, psg_base_ = 0; ///< index of the first stored sample
-  std::uint64_t next_ = 0;                   ///< next output sample
+  std::uint64_t ym_base_ = 0,
+                psg_base_ = 0; ///< index of the first stored sample
+  std::uint64_t next_ = 0;     ///< next output sample
   std::vector<std::int16_t> out_;
 };
 

@@ -54,7 +54,8 @@ TEST_CASE("a malformed ROM builds and runs without crashing") {
   roms.push_back(Rom(0x400, 0xFF));
   for (const std::size_t cut : {std::size_t{0x1FF}, std::size_t{0x201},
                                 std::size_t{0x203}, good.size() - 1})
-    roms.emplace_back(good.begin(), good.begin() + static_cast<std::ptrdiff_t>(cut));
+    roms.emplace_back(good.begin(),
+                      good.begin() + static_cast<std::ptrdiff_t>(cut));
   Rng rng{0x7E55E4A01ULL};
   for (int n = 0; n < 12; ++n) {
     Rom random(0x200 + rng.next() % 0x8000);
@@ -126,7 +127,8 @@ TEST_CASE("a refused savestate leaves the machine running as before") {
   for (int n = 0; n < 200; ++n) {
     auto bad = state;
     for (int k = 0, flips = 1 + rng.next() % 4; k < flips; ++k)
-      bad[rng.next() % bad.size()] ^= static_cast<std::uint8_t>(1 + rng.next() % 255);
+      bad[rng.next() % bad.size()] ^=
+          static_cast<std::uint8_t>(1 + rng.next() % 255);
     const bool ok = subject->load_state(bad);
     if (!ok) {
       ++refused;

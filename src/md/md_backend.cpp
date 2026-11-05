@@ -66,7 +66,9 @@ public:
   [[nodiscard]] InputLayout input_layout() const noexcept override {
     return kPadsInputLayout;
   }
-  [[nodiscard]] const Bytes &pixels() const noexcept override { return pixels_; }
+  [[nodiscard]] const Bytes &pixels() const noexcept override {
+    return pixels_;
+  }
   [[nodiscard]] const Bytes &pcm() const noexcept override { return pcm_; }
   [[nodiscard]] bool original_available() const noexcept override {
     return frame_ != 0 && !pixels_.empty();
@@ -164,9 +166,8 @@ std::unique_ptr<IEmulatedSystem> make_backend(std::string_view id,
   return std::make_unique<NativeBackend>(content, memory, choice);
 }
 
-std::unique_ptr<IEmulatedSystem> make_backend(std::string_view id,
-                                              wire::View content,
-                                              wire::View memory) {
+std::unique_ptr<IEmulatedSystem>
+make_backend(std::string_view id, wire::View content, wire::View memory) {
   return make_backend(id, content, memory, RegionChoice::automatic);
 }
 

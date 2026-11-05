@@ -1,5 +1,6 @@
 // TP-110.4 (RF-4.4): hard and soft reset of the native Mega Drive.
-//  - Hard reset: a machine that ran and was reset behaves exactly like a new one.
+//  - Hard reset: a machine that ran and was reset behaves exactly like a new
+//  one.
 //  - Soft reset (the RESET button): the 68000 starts again from its vectors and
 //    the Z80 bus is released, while work RAM, the VDP and the clock are kept.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -33,9 +34,11 @@ void put32(Rom &rom, std::size_t at, std::uint32_t v) {
 Rom boot_counter_rom() {
   const std::vector<std::uint16_t> code = {
       0x52B9, 0x00FF, 0x0100, // addq.l #1,$FF0100
-      0x33FC, 0x0100, 0x00A1, 0x1200, // move.w #$100,$A11200: Z80 reset released
-      0x33FC, 0x0100, 0x00A1, 0x1100, // move.w #$100,$A11100: bus request
-      0x60FE,                 // bra *
+      0x33FC, 0x0100, 0x00A1,
+      0x1200, // move.w #$100,$A11200: Z80 reset released
+      0x33FC, 0x0100, 0x00A1,
+      0x1100, // move.w #$100,$A11100: bus request
+      0x60FE, // bra *
   };
   Rom rom(0x200 + code.size() * 2 + 2, 0);
   put32(rom, 0, 0xFFFE00);
@@ -73,7 +76,7 @@ std::vector<std::uint64_t> frames(System &s, unsigned n) {
 
 TEST_CASE("a hard reset gives a machine like a new one") {
   using namespace tessera::testrom;
-  const std::vector<Rom> roms = {vint_counter_rom(), pad_frames_rom(),
+  const std::vector<Rom> roms = {vint_counter_rom(),  pad_frames_rom(),
                                  fm_psg_sweep_rom(5), dma_fifo_rom(),
                                  hint_counter_rom(9), boot_counter_rom()};
   for (const auto &rom : roms) {
@@ -140,8 +143,8 @@ TEST_CASE("a soft reset keeps the VDP, the PSG and the sound mute") {
   auto s = make(fm_psg_sweep_rom(5));
   s->reset();
   frames(*s, 8);
-  const auto vram = std::vector<std::uint8_t>(s->vdp().vram().begin(),
-                                              s->vdp().vram().end());
+  const auto vram =
+      std::vector<std::uint8_t>(s->vdp().vram().begin(), s->vdp().vram().end());
   const auto attenuation = s->psg().attenuation(0);
   s->set_audio_mute(0x41);
   s->soft_reset();

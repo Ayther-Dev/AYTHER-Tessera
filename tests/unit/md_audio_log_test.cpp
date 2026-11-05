@@ -1,9 +1,9 @@
 // TP-107.2 (RF-3.7, RNF-5): the sound chip write log of the native machine.
 // The expected lists are the ones gpgx publishes for the same synthetic ROMs
-// (integration.md_fm-psg-*): address writes are not logged, a data write carries
-// the register and part of the last address write, the PSG has address 0, words
-// reach the FM through their high byte and the PSG through their low byte, and
-// the log holds the writes of the last frame only, up to 8 192.
+// (integration.md_fm-psg-*): address writes are not logged, a data write
+// carries the register and part of the last address write, the PSG has address
+// 0, words reach the FM through their high byte and the PSG through their low
+// byte, and the log holds the writes of the last frame only, up to 8 192.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "md/system.hpp"
 #include "support/md_testrom.hpp"
@@ -87,15 +87,18 @@ TEST_CASE("the log holds the last frame only") {
   // The list is longer than the frame: the rest comes in the next one, and the
   // log has been emptied in between.
   system.run_frame();
-  const std::vector<Entry> rest = {{0x028, 0x00, 0}, {0x021, 0x01, 0},
-                                   {0x024, 0x80, 0}, {0x025, 0x02, 0},
+  const std::vector<Entry> rest = {{0x028, 0x00, 0},
+                                   {0x021, 0x01, 0},
+                                   {0x024, 0x80, 0},
+                                   {0x025, 0x02, 0},
                                    {0x027, 0x15, 0}};
   CHECK(log_of(system) == rest);
   system.run_frame(); // the 68000 idles
   CHECK(system.audio_writes().empty());
 }
 
-TEST_CASE("past 8 192 writes in a frame the first ones stay and the rest count") {
+TEST_CASE(
+    "past 8 192 writes in a frame the first ones stay and the rest count") {
   auto system = make(tessera::testrom::fm_psg_sweep_rom(4));
   for (int i = 0; i < 8; ++i)
     system.run_frame();
@@ -111,12 +114,13 @@ TEST_CASE("past 8 192 writes in a frame the first ones stay and the rest count")
   }
 }
 
-TEST_CASE("the chips keep their own time: one YM sample per 1008 master cycles") {
+TEST_CASE(
+    "the chips keep their own time: one YM sample per 1008 master cycles") {
   auto system = make(tessera::testrom::fm_psg_sweep_rom(0, true));
   for (int i = 0; i < 10; ++i)
     system.run_frame();
-  CHECK(system.ym().sample_count() == 10ULL * cycles_per_frame(Standard::ntsc) /
-                                          Ym2612::kMasterPerSample);
+  CHECK(system.ym().sample_count() ==
+        10ULL * cycles_per_frame(Standard::ntsc) / Ym2612::kMasterPerSample);
   CHECK(system.psg().sample_count() ==
         10ULL * cycles_per_frame(Standard::ntsc) / Psg::kMasterPerSample);
 }

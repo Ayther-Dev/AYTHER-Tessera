@@ -15,8 +15,9 @@ namespace {
 using Machine = std::unique_ptr<System>;
 
 Machine run(std::uint32_t mask, unsigned frames) {
-  auto system = std::make_unique<System>(
-      tessera::testrom::fm_psg_sweep_rom(5), MachineConfig::for_region(Region::usa));
+  auto system =
+      std::make_unique<System>(tessera::testrom::fm_psg_sweep_rom(5),
+                               MachineConfig::for_region(Region::usa));
   system->reset();
   system->set_audio_mute(mask);
   for (unsigned i = 0; i < frames; ++i)

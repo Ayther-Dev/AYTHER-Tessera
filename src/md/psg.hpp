@@ -54,15 +54,15 @@ private:
   void step() noexcept;
   std::int16_t mix(std::uint8_t mute) const noexcept;
 
-  std::array<std::uint16_t, 3> tone_{};      ///< 10 bit periods
+  std::array<std::uint16_t, 3> tone_{}; ///< 10 bit periods
   std::array<std::uint16_t, 3> counter_{};
-  std::array<std::uint8_t, 3> flip_{};       ///< tone output levels
-  std::array<std::uint8_t, 4> atten_{};      ///< 0 loudest, 15 off
-  std::uint8_t noise_ctl_ = 0;               ///< bit 2 white, bits 1-0 rate
+  std::array<std::uint8_t, 3> flip_{};  ///< tone output levels
+  std::array<std::uint8_t, 4> atten_{}; ///< 0 loudest, 15 off
+  std::uint8_t noise_ctl_ = 0;          ///< bit 2 white, bits 1-0 rate
   std::uint16_t noise_counter_ = 0;
   std::uint16_t lfsr_ = 0x8000;
   std::uint8_t noise_out_ = 0;
-  std::uint8_t latch_ = 0;                   ///< channel (bits 2-1) and type (bit 0)
+  std::uint8_t latch_ = 0; ///< channel (bits 2-1) and type (bit 0)
   std::uint64_t produced_ = 0;
   std::uint8_t mute_ = 0;
   std::vector<std::int16_t> out_;
