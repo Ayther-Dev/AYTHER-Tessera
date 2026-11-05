@@ -77,6 +77,9 @@ int main(int argc, char **argv) {
         static_cast<unsigned>(std::strtoul(argv[1] + 9, nullptr, 10)));
   else if (std::strcmp(argv[1], "z80-map") == 0)
     rom = tessera::testrom::z80_map_rom();
+  else if (std::strncmp(argv[1], "z80-contention-", 15) == 0)
+    rom = tessera::testrom::z80_contention_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 15, nullptr, 10)));
   else if (std::strcmp(argv[1], "z80-clock") == 0)
     rom = tessera::testrom::z80_clock_rom(false);
   else if (std::strcmp(argv[1], "z80-clock-bank") == 0)

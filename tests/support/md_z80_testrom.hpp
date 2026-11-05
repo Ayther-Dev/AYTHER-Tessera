@@ -511,4 +511,58 @@ inline std::vector<std::uint8_t> z80_map_rom() {
   return detail::z80_rom_image("AYTHER Z80 MAP", {0}, p);
 }
 
+// `z80_contention`: the Z80 loops in one of three ways (0 in place, 1 reading
+// the ROM through the window, 2 reading its own RAM) while the 68000 samples the
+// HV counter between long delays: any 68000 time lost to the Z80 shows up.
+inline std::vector<std::uint8_t> z80_contention_rom(unsigned variant) {
+  Z80Asm a;
+  a.ld_sp(0x1FFF);
+  if (variant == 1) {
+    a.ld_hl(0x6000);
+    a.ld_de(0x0000);
+    a.call(kZ80SetBank);
+  }
+  const std::size_t loop = a.here();
+  if (variant == 1)
+    a.ld_a_mem(0x8000);
+  else if (variant == 2)
+    a.ld_a_mem(0x1000);
+  a.jr_to(loop);
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  detail::M68kProgram p;
+  p.prologue();
+  p.w(0x4DF9); // lea $C00004,a6
+  p.l(0x00C00004);
+  p.w(0x47F9); // lea $C00008,a3
+  p.l(0x00C00008);
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(a.code.size()));
+  p.reset_pin(0x0000);
+  if (variant != 3) { // 3: the Z80 stays in reset
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+  }
+  p.w(0x3CBC); // move.w #..,(a6): mode 5, display on
+  p.w(0x8144);
+  p.w(0x3CBC); // H40
+  p.w(0x8C81);
+  for (unsigned n = 1; n <= 6; ++n) {
+    p.w(0x3016); // move.w (a6),d0: wait for blanking, then for its end
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x67F8);
+    p.w(0x3016);
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x66F8);
+    p.delay(static_cast<std::uint16_t>(4000 * n));
+    p.w(0x34D3); // move.w (a3),(a2)+
+  }
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER Z80 CONT", a.code, p);
+}
+
 } // namespace tessera::testrom
