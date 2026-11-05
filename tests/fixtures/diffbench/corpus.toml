@@ -1,0 +1,6 @@
+[[entry]]
+id = "fx-02"
+sha256 = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+system = "megadrive"
+region = "overseas"
+segments = [[0, 600]]

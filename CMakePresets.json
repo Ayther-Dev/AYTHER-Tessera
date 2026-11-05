@@ -55,6 +55,40 @@
       "cacheVariables": {
         "TESSERA_RUNTIME_INTEGRATION": "ON"
       }
+    },
+    {
+      "name": "windows-clown-reference",
+      "displayName": "ClownMDEmu reference backend (AGPL-3.0, local only, never installed)",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "TESSERA_BUILD_CLOWN_REFERENCE": "ON"
+      }
+    },
+    {
+      "name": "linux-dev",
+      "displayName": "Linux x64 development (synthetic core and Mega Drive core)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux"},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_TESTING": "ON",
+        "TESSERA_PORTABLE_TOOLCHAIN": "ON",
+        "TESSERA_BUILD_MEGADRIVE": "ON",
+        "TESSERA_ENABLE_DIAGNOSTICS": "OFF",
+        "TESSERA_ENGINE_INTEGRATION": "OFF",
+        "TESSERA_RUNTIME_INTEGRATION": "OFF",
+        "TESSERA_BUILD_BACKEND_PROBES": "OFF"
+      }
+    },
+    {
+      "name": "windows-md-dev",
+      "displayName": "Windows x64 development with the differential bench",
+      "inherits": "windows-dev",
+      "cacheVariables": {
+        "TESSERA_BUILD_DIFFBENCH": "ON",
+        "TESSERA_BUILD_MEGADRIVE": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -81,6 +115,16 @@
     {
       "name": "windows-runtime-integration",
       "configurePreset": "windows-runtime-integration",
+      "jobs": 2
+    },
+    {
+      "name": "windows-clown-reference",
+      "configurePreset": "windows-clown-reference",
+      "jobs": 2
+    },
+    {
+      "name": "windows-md-dev",
+      "configurePreset": "windows-md-dev",
       "jobs": 2
     }
   ],
@@ -136,6 +180,30 @@
     {
       "name": "windows-runtime-integration",
       "configurePreset": "windows-runtime-integration",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-clown-reference",
+      "configurePreset": "windows-clown-reference",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2,
+        "noTestsAction": "error",
+        "timeout": 60
+      }
+    },
+    {
+      "name": "windows-md-dev",
+      "configurePreset": "windows-md-dev",
       "output": {
         "outputOnFailure": true
       },

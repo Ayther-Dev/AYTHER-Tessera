@@ -9,6 +9,7 @@ _Static_assert(offsetof(tessera_context_v1, frame_id) == 24,
                "Context frame identity offset.");
 
 tessera_status TESSERA_CALL installed_c_query(tessera_api_info_v1 *out,
-                                             tessera_context_v1 *context) {
-  return tessera_api_query_v1(TESSERA_ABI_MAJOR, TESSERA_ABI_MINOR, out, context);
+                                              tessera_context_v1 *context) {
+  return tessera_api_query_v1(TESSERA_ABI_MAJOR, TESSERA_ABI_MINOR, out,
+                              context);
 }

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('windows-dev', 'windows-release', 'windows-diagnostics', 'windows-engine-integration', 'windows-runtime-integration')]
+    [ValidateSet('windows-dev', 'windows-release', 'windows-diagnostics', 'windows-engine-integration', 'windows-runtime-integration', 'windows-clown-reference', 'windows-md-dev')]
     [string]$Preset = 'windows-dev',
     [ValidateSet('All', 'Configure', 'Build', 'Test')]
     [string]$Stage = 'All',
@@ -42,13 +42,37 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "CHECK_COMMAND_FAILED: $Program terminó con código $LASTEXITCODE." }
 }
 
+function Test-Format {
+    $clangFormat = Join-Path ([IO.Path]::GetDirectoryName($compilerPath)) 'clang-format.exe'
+    if (-not (Test-Path -LiteralPath $clangFormat)) { $clangFormat = (Get-Command clang-format.exe -ErrorAction Stop).Source }
+    $files = @(git ls-files 'src/*.cpp' 'src/*.hpp' 'include/*.h' 'tests/*.cpp' 'tests/*.hpp' 'tests/*.c') |
+        Where-Object { $_ -notmatch 'fixtures|backend_probe|tessera_observation\.h|clown_state_codec' -and (Test-Path -LiteralPath $_) }
+    & $clangFormat --dry-run --Werror @files
+    if ($LASTEXITCODE -ne 0) { throw 'FORMAT_VIOLATION: ejecuta clang-format -i sobre los archivos indicados.' }
+}
+
+function Test-Tidy {
+    $tidy = Join-Path ([IO.Path]::GetDirectoryName($compilerPath)) 'clang-tidy.exe'
+    if (-not (Test-Path -LiteralPath $tidy)) { $tidy = (Get-Command clang-tidy.exe -ErrorAction Stop).Source }
+    $files = @(git ls-files 'src/*.cpp' 'tools/*.cpp') |
+        Where-Object { $_ -notmatch 'clown_state_codec|backend_probe' -and ($Preset -eq 'windows-clown-reference' -or $_ -notmatch 'backends/megadrive') -and (Test-Path -LiteralPath $_) }
+    $db = Join-Path $repoRoot "build/$Preset"
+    # Solo los archivos presentes en la base de compilacion del preset.
+    $commands = (Get-Content -Raw (Join-Path $db 'compile_commands.json')) -replace '\\', '/'
+    $files = @($files | Where-Object { $commands.Contains($_) })
+    & $tidy -p $db --quiet @files
+    if ($LASTEXITCODE -ne 0) { throw 'TIDY_VIOLATION: clang-tidy encontró problemas.' }
+}
+
 Push-Location $repoRoot
 try {
     & (Join-Path $PSScriptRoot 'bootstrap-dependencies.ps1') -Offline
     Write-Output "Check local: $Preset; etapa $Stage; paralelismo $Jobs."
     if ($Stage -in @('All', 'Configure')) {
+        Test-Format
         $configureArguments = @('--preset', $Preset, "-DCMAKE_C_COMPILER=$compilerPath", "-DCMAKE_CXX_COMPILER=$compilerPath") + $CMakeArgs
         Invoke-Checked 'cmake' $configureArguments
+        Test-Tidy
     }
     if ($Stage -in @('All', 'Build')) {
         Invoke-Checked 'cmake' @('--build', '--preset', $Preset, '--parallel', $Jobs.ToString())

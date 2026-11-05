@@ -1,5 +1,6 @@
 #include "session/session.hpp"
 #include "api/call.hpp"
+#include "persistence/state_format.hpp"
 #include <algorithm>
 
 namespace tessera {
@@ -36,7 +37,7 @@ tessera_session_info_v1 Session::info() const {
 }
 Bytes Session::state() const {
   Bytes b = text("TSSTATE1");
-  field(b, 1, 6, text(machine->system() ? "tessera.megadrive.clown" : "tessera.synthetic"));
+  field(b, 1, 6, text(persistence::codec_id(backend)));
   scalar(b, 2, 1, 1);
   scalar(b, 3, 1, 0);
   field(b, 4, 5, content_sha);
@@ -44,7 +45,7 @@ Bytes Session::state() const {
   field(b, 6, 5, config_sha);
   scalar(b, 7, 3, machine->frame());
   scalar(b, 8, 3, machine->tick());
-  field(b, 9, 8, inputs(machine->latched_inputs()));
+  field(b, 9, 8, inputs(machine->latched_inputs(), machine->input_layout()));
   field(b, 65536, 11, machine->machine_record());
   return b;
 }
@@ -56,17 +57,21 @@ void Session::validate_target(std::uint64_t e, std::uint64_t f) const {
 }
 InputState Session::validate_inputs(
     std::span<const tessera_input_assignment_v1> assignments) const {
+  const auto layout = machine->input_layout();
   InputState state{};
-  std::array<bool, 8> seen{};
+  std::array<bool, kInputStateSize> seen{};
   for (const auto &a : assignments) {
-    require(a.port == 0 && a.control < 8 && a.value >= 0 && a.value <= 1);
-    if (seen[a.control])
-      throw Failure{state[a.control] == a.value ? TESSERA_INPUT_DUPLICATE
-                                                : TESSERA_INPUT_CONTRADICTORY};
-    seen[a.control] = true;
-    state[a.control] = a.value;
+    require(a.port < layout.ports && a.control < layout.controls &&
+            a.value >= 0 && a.value <= 1);
+    const std::size_t slot = a.port * layout.controls + a.control;
+    if (seen[slot])
+      throw Failure{state[slot] == a.value ? TESSERA_INPUT_DUPLICATE
+                                           : TESSERA_INPUT_CONTRADICTORY};
+    seen[slot] = true;
+    state[slot] = a.value;
   }
-  require(std::all_of(seen.begin(), seen.end(), [](bool b) { return b; }),
+  require(std::all_of(seen.begin(), seen.begin() + layout.count(),
+                      [](bool b) { return b; }),
           TESSERA_INPUT_INCOMPLETE);
   return state;
 }

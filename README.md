@@ -49,6 +49,15 @@ una caché de dependencias fijadas por hash. Desde la raíz, con la caché dispo
 ./tools/check.ps1 -Preset windows-dev -Jobs 1
 ```
 
+Ese preset construye lo que se distribuye, sin ClownMDEmu, y solo ejecuta las
+pruebas con los backends sintéticos. Para las pruebas de Mega Drive y el banco
+diferencial se usa el árbol de referencia, que requiere preparar las fuentes
+fijadas del backend con `./tools/bootstrap-backends.ps1` y no es instalable:
+
+```powershell
+./tools/check.ps1 -Preset windows-clown-reference -Jobs 1
+```
+
 Estos comandos ejecutan unidad, contratos C/C++, CLI y replay sintético.
 Las descargas requieren `-Download` explícito. La [guía de validación](specs/001-mvp-core/quickstart.md)
 incluye diagnósticos, SDK Engine y probes. Mantener una compilación activa;
@@ -59,6 +68,7 @@ los candidatos se construyen con un trabajo para limitar memoria.
 ./build/windows-dev/src/tessera.exe demo --backend synthetic.complete --scenario action --frames 3000 --observer two-readers
 ```
 
+La [hoja de ruta](docs/roadmap.md) resume las decisiones de alcance, las fases y las puertas.
 La [guía de CLI](docs/cli.md) describe trazas, generación de fixtures e informes.
 Mega Drive se reconoce por bytes, pero su implementación de producto corresponde
 a T019. Los perfiles TEST no anuncian checkpoint; su implementación sigue T022/T023.
@@ -77,12 +87,20 @@ a T019. Los perfiles TEST no anuncian checkpoint; su implementación sigue T022/
 ## Licencias y contribuciones
 
 El código y la documentación originales de Tessera se ofrecen bajo
-[MIT](LICENSE), que permite uso comercial conforme a sus condiciones.
+[MPL-2.0](LICENSE), la misma licencia que Engine, Runtime y Play CE. Los
+paquetes `v0.1.0-mvp.1` y `v0.1.0-mvp.2` se publicaron antes del cambio y
+conservan MIT para el código propio.
 Los componentes externos conservan sus licencias y obligaciones: consultar el
 [inventario](legal/DEPENDENCIES.csv) y los
 [avisos de terceros](legal/THIRD_PARTY_NOTICES.md).
-El ejecutable de evaluación que combina ClownMDEmu y sus CPU se trata bajo
-AGPLv3. Su selección no elimina las obligaciones de una futura distribución combinada.
+
+ClownMDEmu, clown68000 y clownz80 (AGPL-3.0) ya no forman parte de lo que se
+instala ni se publica: el backend Mega Drive basado en ellos es una referencia
+local para el banco diferencial. Se compila solo con
+`-DTESSERA_BUILD_CLOWN_REFERENCE=ON` (preset `windows-clown-reference`), en un
+árbol separado que no se puede instalar, y ningún artefacto distribuido contiene
+código AGPL. El paquete distribuido no incluye un backend de producto de Mega
+Drive hasta que lo aporte el núcleo propio.
 
 No incorporar código restringido de Genesis Plus GX sin permisos adicionales
 suficientes. La disponibilidad de fuentes no concede por sí sola derechos

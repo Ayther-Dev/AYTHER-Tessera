@@ -23,7 +23,8 @@ std::vector<std::uint8_t> load(const char *path) {
 }
 } // namespace
 
-TEST_CASE("The copied Mega Drive ROM executes through the native product backend") {
+TEST_CASE(
+    "The copied Mega Drive ROM executes through the native product backend") {
   const auto rom = load(TESSERA_ORIGINAL_ROM);
   REQUIRE(rom.size() == 32768);
   CHECK(picosha2::hash256_hex_string(rom.begin(), rom.end()) ==
@@ -46,8 +47,8 @@ TEST_CASE("The copied Mega Drive ROM executes through the native product backend
   REQUIRE(std::string_view(backends[0].id) == "clownmdemu");
   CHECK(backends[0].kind == TESSERA_BACKEND_PRODUCT);
   const std::vector<std::uint8_t> memory(65536, 0);
-  const auto configuration = tessera::wire::configuration(
-      "clownmdemu", backends[0].build_id, memory);
+  const auto configuration =
+      tessera::wire::configuration("clownmdemu", backends[0].build_id, memory);
   auto create = initial<tessera_session_create_info_v1>();
   create.content = {rom.data(), rom.size()};
   create.config = {configuration.data(), configuration.size()};
@@ -84,33 +85,33 @@ TEST_CASE("The copied Mega Drive ROM executes through the native product backend
   CHECK(original.tick_end - original.tick_begin == 895780);
   std::uint64_t state_bytes{};
   CHECK(tessera_state_export_canonical_v1(session, {nullptr, 0}, &state_bytes,
-                                          &context) == TESSERA_BUFFER_TOO_SMALL);
+                                          &context) ==
+        TESSERA_BUFFER_TOO_SMALL);
   CHECK(state_bytes > 1000000);
   std::vector<std::uint8_t> before(static_cast<std::size_t>(state_bytes));
-  REQUIRE(tessera_state_export_canonical_v1(
-              session, {before.data(), before.size()}, &state_bytes,
-              &context) == TESSERA_OK);
+  REQUIRE(
+      tessera_state_export_canonical_v1(session, {before.data(), before.size()},
+                                        &state_bytes, &context) == TESSERA_OK);
   std::uint64_t checkpoint_bytes{};
-  REQUIRE(tessera_checkpoint_export_v1(session, {nullptr, 0},
-                                       &checkpoint_bytes, &context) ==
-          TESSERA_BUFFER_TOO_SMALL);
+  REQUIRE(tessera_checkpoint_export_v1(session, {nullptr, 0}, &checkpoint_bytes,
+                                       &context) == TESSERA_BUFFER_TOO_SMALL);
   std::vector<std::uint8_t> checkpoint(
       static_cast<std::size_t>(checkpoint_bytes));
   REQUIRE(tessera_checkpoint_export_v1(
               session, {checkpoint.data(), checkpoint.size()},
               &checkpoint_bytes, &context) == TESSERA_OK);
-  const auto outer = tessera::wire::record(
-      tessera::wire::View(checkpoint).subspan(64));
+  const auto outer =
+      tessera::wire::record(tessera::wire::View(checkpoint).subspan(64));
   const auto state = tessera::wire::get(outer, 0, 1, TESSERA_ENCODING_BYTES);
   const auto fields = tessera::wire::record(state.subspan(8));
-  const auto machine = tessera::wire::get(
-      fields, 9, 65536, TESSERA_ENCODING_RECORD);
+  const auto machine =
+      tessera::wire::get(fields, 9, 65536, TESSERA_ENCODING_RECORD);
   REQUIRE(machine.size() > 16);
-  const auto machine_offset = static_cast<std::size_t>(
-      machine.data() - checkpoint.data());
+  const auto machine_offset =
+      static_cast<std::size_t>(machine.data() - checkpoint.data());
   checkpoint[machine_offset] = 0; // Invalid first nested machine-record tag.
-  const auto digest = tessera::wire::sha(
-      tessera::wire::View(checkpoint).subspan(64));
+  const auto digest =
+      tessera::wire::sha(tessera::wire::View(checkpoint).subspan(64));
   std::copy(digest.begin(), digest.end(), checkpoint.begin() + 24);
   CHECK(tessera_checkpoint_restore_v1(
             session, {checkpoint.data(), checkpoint.size()}, {nullptr, 0},

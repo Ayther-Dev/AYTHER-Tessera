@@ -79,25 +79,26 @@ foreach(negative IN ITEMS version runtime architecture toolset)
 endforeach()
 
 foreach(path IN ITEMS include/tessera/tessera.h lib/tessera_core.lib bin/tessera.exe
-        lib/tessera-backend/clownmdemu-core.lib
-        lib/tessera-backend/clown68000-interpreter.lib
-        lib/tessera-backend/clown68000-common.lib
-        lib/tessera-backend/clownz80-interpreter.lib
-        lib/tessera-backend/clownz80-common.lib
         share/tessera/package-metadata.json share/tessera/dependencies.lock.json
         share/tessera/SOURCE_AVAILABILITY.md
         share/tessera/THIRD_PARTY_NOTICES.md share/tessera/DEPENDENCIES.csv
         share/tessera/licenses/LICENSE share/tessera/licenses/picosha2-1.0.1/LICENSE
-        share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT
-        share/tessera/licenses/clownmdemu-core-88ef45a/LICENCE.txt
-        share/tessera/licenses/clown68000-bb19838/LICENCE.txt
-        share/tessera/licenses/clownz80-aa4cae3/LICENCE.txt
-        share/tessera/licenses/clowncommon-ecee31f/licence.txt
-        share/tessera/licenses/clowncommon-ddeff17/licence.txt)
+        share/tessera/licenses/nlohmann-json-3.12.0/LICENSE.MIT)
     if(NOT EXISTS "${relocated}/${path}")
         message(FATAL_ERROR "PACKAGE_FILE_MISSING: ${path}")
     endif()
 endforeach()
+# RF-1.4: no AGPL component and no Mega Drive reference backend may travel in the package.
+file(GLOB_RECURSE packaged_files RELATIVE "${relocated}" "${relocated}/*")
+foreach(packaged IN LISTS packaged_files)
+    if(packaged MATCHES "(^|/)(tessera-backend|clownmdemu|clown68000|clownz80|clowncommon)")
+        message(FATAL_ERROR "PACKAGE_AGPL_REFERENCE_LEAK: ${packaged}")
+    endif()
+endforeach()
+file(READ "${relocated}/share/tessera/licenses/LICENSE" package_license)
+if(NOT package_license MATCHES "Mozilla Public License Version 2.0")
+    message(FATAL_ERROR "PACKAGE_LICENSE_NOT_MPL: LICENSE no es MPL-2.0.")
+endif()
 file(READ "${relocated}/share/tessera/package-metadata.json" metadata)
 string(JSON package_version GET "${metadata}" version)
 string(JSON package_abi GET "${metadata}" abi major)
@@ -116,9 +117,9 @@ if(NOT source_revision_length EQUAL 40 OR
 endif()
 file(READ "${relocated}/share/tessera/SOURCE_AVAILABILITY.md" source_offer)
 if(NOT source_offer MATCHES "${source_revision}" OR
-        NOT source_offer MATCHES "third_party/backends/sources.lock.json" OR
-        NOT source_offer MATCHES "cmake/patches/clownmdemu-provenance.patch")
-    message(FATAL_ERROR "PACKAGE_SOURCE_OFFER_INCOMPLETE: fuente o parche no identificados.")
+        NOT source_offer MATCHES "MPL-2.0" OR
+        NOT source_offer MATCHES "TESSERA_BUILD_CLOWN_REFERENCE")
+    message(FATAL_ERROR "PACKAGE_SOURCE_OFFER_INCOMPLETE: fuente, licencia o aviso de referencia no identificados.")
 endif()
 run_checked(PACKAGE_CLI_FAILED "${relocated}/bin/tessera.exe" backend list)
 message(STATUS "Paquete reubicado consumido sin dependencias privadas; negativos de versión, CRT, arquitectura y toolset rechazados.")

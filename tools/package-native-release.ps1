@@ -44,10 +44,11 @@ if ($files.Count -eq 0) { throw 'Installed package is empty.' }
 $forbidden = @($files | Where-Object {
     $_ -match '(?i)(^|/)(roms?|packs?|native-fixtures)(/|$)' -or
     $_ -match '(?i)(^|/)(trust\.toml|make_test_pack\.exe)$' -or
+    $_ -match '(?i)(^|/)(tessera-backend|clownmdemu[^/]*|clown68000[^/]*|clownz80[^/]*|clowncommon[^/]*)(/|$)' -or
     $_ -match '(?i)\.(md|ay|rom)$' -and $_ -notmatch '(?i)(SOURCE_AVAILABILITY|THIRD_PARTY_NOTICES|upstream-license)\.md$'
 })
 if ($forbidden.Count -ne 0) {
-    throw "Forbidden fixture content in package: $($forbidden -join ', ')"
+    throw "Forbidden fixture or AGPL reference content in package: $($forbidden -join ', ')"
 }
 
 $outputDirectory = Split-Path -Parent $outputPath

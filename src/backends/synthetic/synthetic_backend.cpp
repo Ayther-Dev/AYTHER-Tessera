@@ -59,7 +59,7 @@ void append_integer_field(Bytes &out, std::uint32_t tag, std::uint32_t encoding,
 
 std::uint32_t input_mask(const InputState &inputs) noexcept {
   std::uint32_t mask = 0;
-  for (unsigned bit = 0; bit < inputs.size(); ++bit) {
+  for (unsigned bit = 0; bit < kLegacyControls; ++bit) {
     mask |= static_cast<std::uint32_t>(inputs[bit]) << bit;
   }
   return mask;
@@ -139,9 +139,10 @@ const Bytes &SyntheticBackend::pixels() const noexcept { return pixels_; }
 const Bytes &SyntheticBackend::pcm() const noexcept { return pcm_; }
 
 void SyntheticBackend::step(const InputState &inputs) {
-  for (const auto value : inputs) {
-    require(value == 0 || value == 1, TESSERA_INVALID_ARGUMENT,
-            TESSERA_PHASE_STEP);
+  for (std::size_t index = 0; index < inputs.size(); ++index) {
+    const auto value = inputs[index];
+    require(value == 0 || (value == 1 && index < kLegacyControls),
+            TESSERA_INVALID_ARGUMENT, TESSERA_PHASE_STEP);
   }
   require(frame_ < std::numeric_limits<std::uint64_t>::max() / ticks_per_frame,
           TESSERA_BACKEND_FAILURE, TESSERA_PHASE_STEP);
@@ -152,7 +153,7 @@ void SyntheticBackend::step(const InputState &inputs) {
   for (std::size_t index = 0; index < next_persistent.size(); ++index) {
     next_persistent[index] = static_cast<std::uint8_t>(
         static_cast<std::uint32_t>(next_persistent[index]) + 1 +
-        static_cast<std::uint32_t>(inputs[index % inputs.size()]));
+        static_cast<std::uint32_t>(inputs[index % kLegacyControls]));
   }
 
   Bytes next_pixels(width * height * 4);
@@ -204,23 +205,27 @@ Bytes SyntheticBackend::machine_record() const {
 void SyntheticBackend::restore_record(std::span<const std::uint8_t> encoded,
                                       std::uint64_t frame,
                                       const InputState &inputs) {
-  const auto fields = wire::record(encoded, TESSERA_CHECKPOINT_INVALID,
-                                   TESSERA_PHASE_RESTORE);
+  const auto fields =
+      wire::record(encoded, TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
   require(fields.size() == 3, TESSERA_CHECKPOINT_INVALID);
   const auto accumulator = static_cast<std::uint32_t>(
       wire::read(wire::get(fields, 0, 1, TESSERA_ENCODING_U32, 4,
                            TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
                  0, 4));
-  const auto persistent = wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES, 16,
-                                    TESSERA_CHECKPOINT_INVALID,
-                                    TESSERA_PHASE_RESTORE);
-  const auto phase = wire::read(
-      wire::get(fields, 2, 3, TESSERA_ENCODING_U32, 4,
-                TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
-      0, 4);
+  const auto persistent =
+      wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES, 16,
+                TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+  const auto phase =
+      wire::read(wire::get(fields, 2, 3, TESSERA_ENCODING_U32, 4,
+                           TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE),
+                 0, 4);
   require(phase < 256 && frame < UINT64_MAX / ticks_per_frame &&
-              std::all_of(inputs.begin(), inputs.end(),
-                          [](auto value) { return value == 0 || value == 1; }),
+              std::all_of(
+                  inputs.begin(), inputs.begin() + kLegacyControls,
+                  [](auto value) { return value == 0 || value == 1; }) &&
+              std::all_of(
+                  inputs.begin() + kLegacyControls, inputs.end(),
+                  [](auto value) { return value == 0; }),
           TESSERA_CHECKPOINT_INVALID);
   accumulator_ = accumulator;
   std::copy(persistent.begin(), persistent.end(), persistent_.begin());

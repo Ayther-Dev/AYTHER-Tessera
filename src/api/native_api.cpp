@@ -1,5 +1,6 @@
 #include "api/call.hpp"
 #include "build_identity.hpp"
+#include "observation/region_table.hpp"
 #include "session/session.hpp"
 #include "systems/system_detector.hpp"
 #include "systems/system_registry.hpp"
@@ -38,8 +39,8 @@ tessera_limits_v1 limits() {
   v.snapshot_bytes = 8 * 1024 * 1024;
   return v;
 }
-std::array<tessera_backend_info_v1, 3> backends() {
-  std::array<tessera_backend_info_v1, 3> values{};
+std::array<tessera_backend_info_v1, kRegistrationCount> backends() {
+  std::array<tessera_backend_info_v1, kRegistrationCount> values{};
   const auto registrations = SystemRegistry::registrations();
   const auto hash = build_identity();
   for (std::size_t i = 0; i < values.size(); ++i) {
@@ -126,14 +127,33 @@ tessera_status TESSERA_CALL tessera_api_query_v1(std::uint16_t major,
                                                  tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_VALIDATE, [&](Call &c) {
     c.object(out);
-    require(major == 1 && minor == 0, TESSERA_ABI_INCOMPATIBLE);
+    require(major == 1 && minor <= 1, TESSERA_ABI_INCOMPATIBLE);
     c.start();
     auto v = initialized<tessera_api_info_v1>();
     v.major = 1;
-    v.minor = 0;
+    v.minor = 1;
     v.capabilities = complete_caps;
     v.pointer_bytes = 8;
     v.max_alignment = 8;
+    publish(out, v);
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_limits_query_v1(
+    tessera_session session, tessera_observation_limits_v1 *out,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    c.object(out);
+    c.start();
+    if (session)
+      (void)sessions.get(session);
+    auto v = initialized<tessera_observation_limits_v1>();
+    v.header.minor = 1;
+    v.max_rom_bytes = UINT64_C(16) * 1024 * 1024;
+    v.max_state_bytes = UINT64_C(2) * 1024 * 1024;
+    v.max_journal_events = TESSERA_OBS_JOURNAL_MAX_EVENTS;
+    v.max_audio_writes = 8192;
+    v.max_parsed_sprites = 128;
     publish(out, v);
     return TESSERA_OK;
   });
@@ -155,17 +175,18 @@ tessera_status TESSERA_CALL tessera_backends_enumerate_v1(
     std::uint32_t *required, tessera_context_v1 *ctx) {
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
     c.object(required);
-    std::array<tessera_backend_info_v1 *, 3> slots{};
+    constexpr auto count = static_cast<std::uint32_t>(kRegistrationCount);
+    std::array<tessera_backend_info_v1 *, kRegistrationCount> slots{};
     auto cursor = reinterpret_cast<std::uintptr_t>(out);
-    for (std::uint32_t i = 0; i < std::min(capacity, 3U); ++i) {
+    for (std::uint32_t i = 0; i < std::min(capacity, count); ++i) {
       auto *slot = reinterpret_cast<tessera_backend_info_v1 *>(cursor);
       c.object(slot);
       slots[i] = slot;
       cursor += slot->header.size;
     }
-    if (capacity < 3) {
+    if (capacity < count) {
       c.start();
-      *required = 3;
+      *required = count;
       return TESSERA_BUFFER_TOO_SMALL;
     }
     // Validate every prefix before publishing the first array element.
@@ -173,7 +194,7 @@ tessera_status TESSERA_CALL tessera_backends_enumerate_v1(
     const auto values = backends();
     for (std::size_t i = 0; i < values.size(); ++i)
       publish(slots[i], values[i]);
-    *required = 3;
+    *required = count;
     return TESSERA_OK;
   });
 }
@@ -307,7 +328,8 @@ tessera_status TESSERA_CALL tessera_session_bind_trace_v1(
     auto candidate =
         wire::trace({trace.data, static_cast<std::size_t>(trace.bytes)});
     require(candidate.content_sha == s->content_sha &&
-                candidate.config_sha == s->config_sha,
+                candidate.config_sha == s->config_sha &&
+                candidate.layout == s->machine->input_layout(),
             TESSERA_INVALID_TRACE);
     require(s->machine->frame() == 0, TESSERA_WRONG_STATE);
     Bytes raw(trace.data, trace.data + trace.bytes);
@@ -527,7 +549,8 @@ tessera_checkpoint_restore_v1(tessera_session h, tessera_bytes_v1 checkpoint,
     require(s->machine->capabilities() & TESSERA_CAP_CHECKPOINT,
             TESSERA_UNSUPPORTED_CAPABILITY);
     s->restore({checkpoint.data, static_cast<std::size_t>(checkpoint.bytes)},
-               {trace.data, static_cast<std::size_t>(trace.bytes)}, c.context());
+               {trace.data, static_cast<std::size_t>(trace.bytes)},
+               c.context());
     return TESSERA_OK;
   });
 }
@@ -554,6 +577,84 @@ tessera_status_format_v1(const tessera_context_v1 *in, tessera_buffer_v1 out,
     return copy_bytes({reinterpret_cast<const std::uint8_t *>(message.data()),
                        message.size()},
                       out, required);
+  });
+}
+}
+namespace {
+// Solo synthetic.complete sirve observación por ahora (TP-006.5); los demás
+// backends la anuncian cuando la implementen.
+std::shared_ptr<Session> observed_session(tessera_session handle) {
+  auto s = sessions.get(handle);
+  require(s->backend == "synthetic.complete", TESSERA_UNSUPPORTED_CAPABILITY);
+  return s;
+}
+const observation::RegionRow &region_row(std::uint32_t id) {
+  require(id >= 1 && id <= observation::kRegionCount);
+  return observation::kRegions[id - 1];
+}
+} // namespace
+extern "C" {
+tessera_status TESSERA_CALL tessera_observation_region_query_v1(
+    tessera_session session, std::uint32_t region_id,
+    tessera_obs_region_info_v1 *out, std::uint32_t out_size,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    require(out && out_size >= sizeof(*out));
+    const auto &r = region_row(region_id);
+    c.start();
+    tessera_obs_region_info_v1 info{};
+    info.struct_size = sizeof(info);
+    info.region_id = r.id;
+    info.data_version = r.data_version;
+    info.element_size = r.element_size;
+    info.capacity = r.capacity;
+    info.byte_size = r.byte_size;
+    info.access_flags = r.access_flags;
+    info.legacy_memory_id = r.legacy_id;
+    *out = info;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_region_read_v1(
+    tessera_session session, std::uint32_t region_id, std::uint32_t offset,
+    void *out, std::uint32_t byte_count, std::uint64_t expected_generation,
+    std::uint64_t *actual_generation, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    const auto &r = region_row(region_id);
+    require(out && (byte_count == 0 || offset < r.byte_size) &&
+            std::uint64_t{offset} + byte_count <= r.byte_size);
+    require(expected_generation == UINT64_MAX ||
+                expected_generation == s->generation,
+            TESSERA_STALE_EPOCH);
+    c.start();
+    std::memset(out, 0, byte_count); // regiones fijas: contenido nulo
+    if (actual_generation)
+      *actual_generation = s->generation;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_write_control_v1(
+    tessera_session session, std::uint32_t region_id, std::uint32_t offset,
+    const void *data, std::uint32_t byte_count,
+    std::uint64_t expected_generation, std::uint64_t *new_generation,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_WRITE, [&](Call &c) {
+    auto s = observed_session(session);
+    const auto &r = region_row(region_id);
+    // Canales de supresión del core: fuera del contrato (PQ-1).
+    require(region_id < 6 || region_id > 9, TESSERA_UNSUPPORTED_CAPABILITY);
+    require((r.access_flags & TESSERA_OBS_REGION_ACCESS_CONTROL_WRITE) != 0);
+    require(data && byte_count != 0 && offset < r.byte_size &&
+            std::uint64_t{offset} + byte_count <= r.byte_size);
+    require(expected_generation == UINT64_MAX ||
+                expected_generation == s->generation,
+            TESSERA_STALE_EPOCH);
+    c.start();
+    if (new_generation)
+      *new_generation = s->generation;
+    return TESSERA_OK;
   });
 }
 }

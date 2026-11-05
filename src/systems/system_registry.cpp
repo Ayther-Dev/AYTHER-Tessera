@@ -1,16 +1,27 @@
 #include "systems/system_registry.hpp"
 #include "backends/synthetic/synthetic_backend.hpp"
+#if TESSERA_CLOWN_REFERENCE
 #include "backends/megadrive/megadrive_backend.hpp"
+#endif
+#if TESSERA_MEGADRIVE
+#include "md/md_backend.hpp"
+#endif
 #include "systems/system_detector.hpp"
 namespace tessera {
 std::span<const SystemRegistration> SystemRegistry::registrations() {
-  static const std::array<SystemRegistration, 3> entries{
-      {{"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE,
-        0x1FFF, make_megadrive_backend},
-       {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
-        make_synthetic_backend},
-       {"synthetic.complete", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x1FFF,
-        make_synthetic_backend}}};
+  static const std::array<SystemRegistration, kRegistrationCount> entries{{
+#if TESSERA_CLOWN_REFERENCE
+      {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
+       make_megadrive_backend},
+#endif
+#if TESSERA_MEGADRIVE
+      {"megadrive", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
+       md::make_backend},
+#endif
+      {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
+       make_synthetic_backend},
+      {"synthetic.complete", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x1FFF,
+       make_synthetic_backend}}};
   return entries;
 }
 std::unique_ptr<IEmulatedSystem> SystemRegistry::create(std::string_view id,

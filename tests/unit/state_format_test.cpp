@@ -11,14 +11,15 @@ fx01::Bytes checkpoint(fx01::Session &session) {
                                      &session.context) ==
         TESSERA_BUFFER_TOO_SMALL);
   fx01::Bytes result(static_cast<std::size_t>(required));
-  fx01::expect(tessera_checkpoint_export_v1(
-      session.handle, {result.data(), result.size()}, &required,
-      &session.context));
+  fx01::expect(tessera_checkpoint_export_v1(session.handle,
+                                            {result.data(), result.size()},
+                                            &required, &session.context));
   return result;
 }
 } // namespace
 
-TEST_CASE("Versioned checkpoint round trips explicit state and excludes pending controls") {
+TEST_CASE("Versioned checkpoint round trips explicit state and excludes "
+          "pending controls") {
   fx01::Session session;
   fx01::expect(session.step());
   fx01::expect(session.observe(44));
@@ -40,7 +41,8 @@ TEST_CASE("Versioned checkpoint round trips explicit state and excludes pending 
   CHECK(state.machine.size() > 0);
 }
 
-TEST_CASE("Checkpoint rejects truncated, mutated and incompatible headers before state use") {
+TEST_CASE("Checkpoint rejects truncated, mutated and incompatible headers "
+          "before state use") {
   fx01::Session session;
   fx01::expect(session.step());
   const auto before = session.state();
@@ -65,8 +67,7 @@ TEST_CASE("Checkpoint rejects truncated, mutated and incompatible headers before
   reject(damaged, TESSERA_CHECKPOINT_INVALID);
   damaged = bytes;
   damaged[64] = 0; // The first TLV tag is invalid despite a valid outer SHA.
-  const auto payload_hash = fx01::sha(
-      fx01::View(damaged).subspan(64));
+  const auto payload_hash = fx01::sha(fx01::View(damaged).subspan(64));
   std::copy(payload_hash.begin(), payload_hash.end(), damaged.begin() + 24);
   reject(damaged, TESSERA_CHECKPOINT_INVALID);
   damaged = bytes;

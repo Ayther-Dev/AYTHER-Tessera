@@ -12,9 +12,9 @@ fx01::Bytes export_checkpoint(fx01::Session &session) {
                                      &session.context) ==
         TESSERA_BUFFER_TOO_SMALL);
   fx01::Bytes result(static_cast<std::size_t>(required));
-  fx01::expect(tessera_checkpoint_export_v1(
-      session.handle, {result.data(), result.size()}, &required,
-      &session.context));
+  fx01::expect(tessera_checkpoint_export_v1(session.handle,
+                                            {result.data(), result.size()},
+                                            &required, &session.context));
   return result;
 }
 tessera_status restore(fx01::Session &session, fx01::View checkpoint,
@@ -26,11 +26,12 @@ struct Held {
   tessera_snapshot handle{};
   fx01::Session &owner;
   explicit Held(fx01::Session &session) : owner(session) {
-    fx01::expect(tessera_snapshot_acquire_v1(owner.handle, &handle,
-                                            &owner.context));
+    fx01::expect(
+        tessera_snapshot_acquire_v1(owner.handle, &handle, &owner.context));
   }
   ~Held() {
-    if (handle) tessera_snapshot_release_v1(handle, &owner.context);
+    if (handle)
+      tessera_snapshot_release_v1(handle, &owner.context);
   }
   tessera_snapshot_info_v1 info() const {
     auto result = fx01::init<tessera_snapshot_info_v1>();
@@ -56,8 +57,8 @@ TEST_CASE("FX-01 restore commits only after validation and resumes at K+1") {
   fx01::expect(tessera_session_replay_next_v1(source.handle, &source.context));
   const auto next_state = source.state();
   const auto next_video = source.original();
-  const fx01::Bytes next_pixels(next_video.pixels.data,
-                                next_video.pixels.data + next_video.pixels.bytes);
+  const fx01::Bytes next_pixels(
+      next_video.pixels.data, next_video.pixels.data + next_video.pixels.bytes);
   const fx01::Bytes next_pcm(next_video.pcm.data,
                              next_video.pcm.data + next_video.pcm.bytes);
 
@@ -99,10 +100,9 @@ TEST_CASE("FX-01 restore commits only after validation and resumes at K+1") {
   CHECK(retained.info().frame_id.frame == historical.frame_id.frame);
   auto unavailable = fx01::init<tessera_original_frame_v1>();
   CHECK(tessera_original_frame_query_v1(target.handle, &unavailable,
-                                         &target.context) ==
+                                        &target.context) ==
         TESSERA_WRONG_STATE);
-  fx01::expect(tessera_session_replay_next_v1(target.handle,
-                                              &target.context));
+  fx01::expect(tessera_session_replay_next_v1(target.handle, &target.context));
   CHECK(target.info().frame_id.frame == 3);
   CHECK(target.state() == next_state);
   const auto actual = target.original();
@@ -119,7 +119,7 @@ TEST_CASE("FX-01 restore commits only after validation and resumes at K+1") {
   fx01::Session fresh;
   CHECK(target.state() == fresh.state());
   CHECK(tessera_original_frame_query_v1(target.handle, &unavailable,
-                                         &target.context) ==
+                                        &target.context) ==
         TESSERA_WRONG_STATE);
 }
 

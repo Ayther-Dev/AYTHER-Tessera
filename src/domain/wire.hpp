@@ -100,30 +100,37 @@ inline std::vector<View> elements(View b, std::uint64_t maximum) {
   require(b.empty(), TESSERA_INVALID_TRACE);
   return v;
 }
-inline Bytes inputs(const InputState &input) {
+inline Bytes inputs(const InputState &input,
+                    InputLayout layout = kLegacyInputLayout) {
   std::vector<Bytes> entries;
-  for (std::uint32_t i = 0; i < 8; ++i) {
-    Bytes e;
-    scalar(e, 1, 1, 0);
-    scalar(e, 2, 1, i);
-    scalar(e, 3, 2, static_cast<std::uint32_t>(input[i]));
-    entries.push_back(std::move(e));
-  }
+  for (std::uint32_t p = 0; p < layout.ports; ++p)
+    for (std::uint32_t i = 0; i < layout.controls; ++i) {
+      Bytes e;
+      scalar(e, 1, 1, p);
+      scalar(e, 2, 1, i);
+      scalar(e, 3, 2,
+             static_cast<std::uint32_t>(input[p * layout.controls + i]));
+      entries.push_back(std::move(e));
+    }
   return array(entries);
 }
 inline Bytes configuration(std::string_view id, View build, View memory) {
   Bytes b;
-  const bool megadrive = id == "clownmdemu";
+  const bool clown = id == "clownmdemu";
+  const bool native = id == "megadrive"; // the own core: two pads of twelve
+  const bool megadrive = clown || native;
   scalar(b, 1, 1, megadrive ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE);
   field(b, 2, 6, text(id));
   field(b, 3, 5, build);
   scalar(b, 4, 1, megadrive ? 1 : 0);
   scalar(b, 5, 1, 48000);
   std::vector<Bytes> map;
-  for (std::uint32_t i = 0; i < 8; ++i) {
+  const std::uint32_t ports = native ? kPadPorts : 1;
+  const std::uint32_t controls = native ? kPadControls : kLegacyControls;
+  for (std::uint32_t i = 0; i < ports * controls; ++i) {
     Bytes v;
-    scalar(v, 1, 1, 0);
-    scalar(v, 2, 1, i);
+    scalar(v, 1, 1, i / controls);
+    scalar(v, 2, 1, i % controls);
     scalar(v, 3, 1, 1);
     scalar(v, 4, 2, 0);
     scalar(v, 5, 2, 1);
@@ -131,18 +138,21 @@ inline Bytes configuration(std::string_view id, View build, View memory) {
   }
   field(b, 6, 8, array(map));
   field(b, 7, 5, sha(memory));
-  if (megadrive) {
+  if (clown) {
     scalar(b, 8, 1, 895780);
     scalar(b, 9, 1, 53693175);
     scalar(b, 10, 1, 1);
     scalar(b, 11, 2, 32768);
     scalar(b, 12, 2, 4096);
-    field(b, 13, 6, text("integer-causal-ZOH-v1;CD-disabled-zero-required;zero-initialized-upstream-options"));
+    field(b, 13, 6,
+          text("integer-causal-ZOH-v1;CD-disabled-zero-required;zero-"
+               "initialized-upstream-options"));
   }
   return b;
 }
 struct Trace {
   Bytes content_sha, config_sha;
+  InputLayout layout = kLegacyInputLayout;
   std::vector<InputState> frames;
 };
 inline Trace trace(View b) {
@@ -165,12 +175,18 @@ inline Trace trace(View b) {
     require(r.size() == 2 && read(get(r, 0, 1, 3, 8), 0, 8) == i + 1,
             TESSERA_INVALID_TRACE);
     const auto assignments = elements(get(r, 1, 2, 8), 64);
-    require(assignments.size() == 8, TESSERA_INVALID_TRACE);
+    InputLayout layout{};
+    require(input_layout_from_count(assignments.size(), layout),
+            TESSERA_INVALID_TRACE);
+    // One layout per trace.
+    require(i == 0 || layout == t.layout, TESSERA_INVALID_TRACE);
+    t.layout = layout;
     InputState state{};
-    for (std::size_t k = 0; k < 8; ++k) {
+    for (std::size_t k = 0; k < assignments.size(); ++k) {
       const auto e = record(assignments[k]);
-      require(e.size() == 3 && read(get(e, 0, 1, 1, 4), 0, 4) == 0 &&
-                  read(get(e, 1, 2, 1, 4), 0, 4) == k,
+      require(e.size() == 3 &&
+                  read(get(e, 0, 1, 1, 4), 0, 4) == k / layout.controls &&
+                  read(get(e, 1, 2, 1, 4), 0, 4) == k % layout.controls,
               TESSERA_INVALID_TRACE);
       const auto v = read(get(e, 2, 3, 2, 4), 0, 4);
       require(v <= 1, TESSERA_INVALID_TRACE);

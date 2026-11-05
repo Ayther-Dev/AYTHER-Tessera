@@ -5,7 +5,8 @@
 
 #include <array>
 
-TEST_CASE("Invalid frames and consecutive controls preserve the next valid frame") {
+TEST_CASE(
+    "Invalid frames and consecutive controls preserve the next valid frame") {
   fx01::Session session;
   REQUIRE(session.observe(101) == TESSERA_OK);
   CHECK(session.observe(102) == TESSERA_CONTROL_PENDING);
@@ -38,7 +39,8 @@ TEST_CASE("Malformed replay never advances, and EOF remains stable") {
   auto bad = good;
   bad.pop_back();
   CHECK(tessera_session_bind_trace_v1(session.handle, fx01::view(bad),
-                                      &session.context) == TESSERA_INVALID_TRACE);
+                                      &session.context) ==
+        TESSERA_INVALID_TRACE);
   CHECK(session.info().frame_id.frame == 0);
   REQUIRE(tessera_session_bind_trace_v1(session.handle, fx01::view(good),
                                         &session.context) == TESSERA_OK);
@@ -58,8 +60,8 @@ TEST_CASE("Retained capture survives a saturated producer and session close") {
   REQUIRE(session.observe(201) == TESSERA_OK);
   REQUIRE(session.step() == TESSERA_OK);
   tessera_snapshot held{};
-  REQUIRE(tessera_snapshot_acquire_v1(session.handle, &held, &session.context) ==
-          TESSERA_OK);
+  REQUIRE(tessera_snapshot_acquire_v1(session.handle, &held,
+                                      &session.context) == TESSERA_OK);
   auto historical = fx01::init<tessera_snapshot_info_v1>();
   REQUIRE(tessera_snapshot_query_v1(held, &historical, &session.context) ==
           TESSERA_OK);
@@ -69,7 +71,8 @@ TEST_CASE("Retained capture survives a saturated producer and session close") {
   REQUIRE(tessera_snapshot_query_v1(held, &still_held, &session.context) ==
           TESSERA_OK);
   CHECK(still_held.frame_id.frame == historical.frame_id.frame);
-  REQUIRE(tessera_session_close_v1(session.handle, &session.context) == TESSERA_OK);
+  REQUIRE(tessera_session_close_v1(session.handle, &session.context) ==
+          TESSERA_OK);
   session.handle = 0;
   auto after_close = fx01::init<tessera_snapshot_info_v1>();
   CHECK(tessera_snapshot_query_v1(held, &after_close, &session.context) ==

@@ -13,7 +13,7 @@ if ($dependencyLock.schema_version -ne 1 -or @($dependencyLock.dependencies).Cou
     throw 'DEPENDENCY_LOCK_INVALID: el lock debe contener las tres dependencias aprobadas.'
 }
 $verifiedCount = 0
-foreach ($dependency in $dependencyLock.dependencies) {
+foreach ($dependency in (@($dependencyLock.dependencies) + @($dependencyLock.component_sources))) {
     foreach ($file in $dependency.files) {
         $destination = [IO.Path]::GetFullPath((Join-Path $repoRoot $file.path))
         $allowedRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'third_party')) + [IO.Path]::DirectorySeparatorChar

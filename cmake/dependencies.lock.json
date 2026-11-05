@@ -256,5 +256,298 @@
     "The Catch2 v2.13.10 license copy supplies BSL-1.0 text; doctest does not identify exact source revisions of its embedded Catch/lest fragments.",
     "Fixture generated artifacts require express publication rights or exclusion from public distributions; local authorized work can continue."
   ],
-  "clown_nested_common_gitlink": "ddeff174c2121b40284883e0e1e3520f39d99227"
+  "clown_nested_common_gitlink": "ddeff174c2121b40284883e0e1e3520f39d99227",
+  "component_sources": [
+    {
+      "name": "Moira",
+      "version": "ce28239",
+      "commit": "ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031",
+      "repository": "https://github.com/dirkwhoffmann/Moira",
+      "include_directory": "third_party/cache/moira-ce28239/Moira",
+      "purpose": "68000 CPU of the native Mega Drive core (spec 008, DA-4); MIT",
+      "status": "pinned_source",
+      "files": [
+        {
+          "path": "third_party/licenses/moira-ce28239/LICENSE",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/LICENSE",
+          "sha256": "1a561b630581419de4720e49c5fe5a4133b18ce20e0cd68fd9fce0dce27f0791",
+          "bytes": 1080
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/Moira.cpp",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/Moira.cpp",
+          "sha256": "7487b9cf836f82c62f142aae583e7f0ba3586cbe1f813938384c0f82ab97ff60",
+          "bytes": 21517
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/Moira.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/Moira.h",
+          "sha256": "fce554988c0ea08e46ecec4c7900e563ebaeb5a19ee1523716c2f1c8fc7cbffb",
+          "bytes": 23294
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraALU.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraALU.h",
+          "sha256": "a07d9b16bf75cafc80824dd1e6466fc79bf80175567c6d2a888efc031c4e0679",
+          "bytes": 2978
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraALU_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraALU_cpp.h",
+          "sha256": "eab3f4c533a4cb91f2e161aa0a5e0b0b4f9a44a76ef3c77c35bbaa446fc91a74",
+          "bytes": 34637
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCache.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCache.h",
+          "sha256": "f36245deaed0e9404322699aadfd174c727d2697914d32fba8c95dfeb32c12ca",
+          "bytes": 3403
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCache_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCache_cpp.h",
+          "sha256": "b828dcc363cf8b31542ef668ea6e639041cdb1063f68f57376a246b7a7361370",
+          "bytes": 4031
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraConfig.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraConfig.h",
+          "sha256": "4eaa843676341669f846db4b030c83f8ddc6736af04c02ac7797c023c0cbaefc",
+          "bytes": 3928
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCore68000.cpp",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCore68000.cpp",
+          "sha256": "a8ae969d7a94db67ebaa4d99f0d8f1be0f83c9c1aefbea1a4fa2e0e782a24d70",
+          "bytes": 446
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCore68010.cpp",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCore68010.cpp",
+          "sha256": "ffa0dc6b2133da4b58db2c057ea78e003b68f13d3cf0bf0a86b29d6d50cd5dd0",
+          "bytes": 446
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCore68020.cpp",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCore68020.cpp",
+          "sha256": "f0c68795385db2b03594d2018b67b4aa69355bab2777ae554e8c701bee98e97c",
+          "bytes": 446
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraCore_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraCore_cpp.h",
+          "sha256": "30b4598a530dad7a70eb3f890127a7cc21a3a24bdaa4efa3f21848beda12e8c6",
+          "bytes": 1718
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDasm.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDasm.h",
+          "sha256": "bdf897cf8f5e0a8eb721b9d4b39c12b6ff33034713943f26ace8a6144068ba39",
+          "bytes": 653
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDasmFPU_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDasmFPU_cpp.h",
+          "sha256": "d3e59d4637ee30ede92b85ba8990b52d8b562d6804f2ae44f81511ddd1325359",
+          "bytes": 24025
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDasmMMU_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDasmMMU_cpp.h",
+          "sha256": "7294ee0517bbcfd00f7806331848a2983f2a095b98f302ba3e22827f1f901ef0",
+          "bytes": 7344
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDasm_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDasm_cpp.h",
+          "sha256": "9218d5490796b84168b4bd89a258f63be7323d85f0cc02508360f77cc2115f7c",
+          "bytes": 52586
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDataflow.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDataflow.h",
+          "sha256": "2c965c893df9c3e3113a4eb7f51f36aaa07a17e7a1bb350a40015c77402aecbb",
+          "bytes": 7229
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDataflow_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDataflow_cpp.h",
+          "sha256": "8c7aff3627095e244ba56bc3f8a4bc2b56ff59fd2b8ef3a363761c5112dde42b",
+          "bytes": 25051
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDebugger.cpp",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDebugger.cpp",
+          "sha256": "4934fc605e0a14b3bdf2a323a5eeebb15c0336f7ce64ba91ea6232c5149acbd7",
+          "bytes": 7349
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraDebugger.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraDebugger.h",
+          "sha256": "887e73d956814e8242d7b91a30160763a1dca60988a7e3979036907b55f31bf1",
+          "bytes": 6351
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraExceptions.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraExceptions.h",
+          "sha256": "a8d9eb08120fd7ed0f4d6b35e07894d2361bdc6dc613c1851fb4fcb139de9435",
+          "bytes": 2095
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraExceptions_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraExceptions_cpp.h",
+          "sha256": "16a5cc7d4e5eba41020f944afc47d675853654b290a60d2566b0747fc671d57a",
+          "bytes": 13715
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraExecFPU_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraExecFPU_cpp.h",
+          "sha256": "396847015a54c13bc5612f685cf66c1e78b8f19504d74abc26e8d29a7a6a2a6d",
+          "bytes": 5869
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraExecMMU_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraExecMMU_cpp.h",
+          "sha256": "c767bfd78edebdf19be65446baa025b94e948e0bb0e2be7bc5acba1fd0b91f23",
+          "bytes": 6139
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraExec_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraExec_cpp.h",
+          "sha256": "9a25f5e36de08969bfa0b3b9cc15ff6a82aa0895c34519fbd23814cf447698a2",
+          "bytes": 166518
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraInit.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraInit.h",
+          "sha256": "9456db69eb2b7feada61dc7c35c408b24730fce4d324f363bf15bb2fbb8d4d9e",
+          "bytes": 5346
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraInit_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraInit_cpp.h",
+          "sha256": "5749a4d0bd59f5db7a45152a49c4b7cdcf0d43cd226bd23c6be53222e63b5588",
+          "bytes": 84267
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraMacros.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraMacros.h",
+          "sha256": "ff840354b5e0a6d93ba9462d8b8dcfebbbdd23f63f08f8ce3b65bc7bf0ee489d",
+          "bytes": 6201
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/MoiraTypes.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/MoiraTypes.h",
+          "sha256": "f4f1c01f181c347f5b31fa349483c16c7084ab5e709563c1baac2346f5b6c4f0",
+          "bytes": 19747
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/StrWriter.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/StrWriter.h",
+          "sha256": "d7a6a5392bfde1dd6b0503e7cf3ebc1f154921bbcbd76956345a10bb0f82e9ad",
+          "bytes": 5098
+        },
+        {
+          "path": "third_party/cache/moira-ce28239/Moira/StrWriter_cpp.h",
+          "url": "https://raw.githubusercontent.com/dirkwhoffmann/Moira/ce28239b0507ebfe1bf2ad2b9c9252dc2f2cc031/Moira/StrWriter_cpp.h",
+          "sha256": "97ee6426bc27115e5b515f26f66f5cb3cf0407bd3d799ebb7e44c249fa9f9c51",
+          "bytes": 41590
+        }
+      ]
+    },
+    {
+      "name": "chips-z80",
+      "version": "9e88298",
+      "commit": "9e88298ce56319953ac7a43213a1120359f7a3a6",
+      "repository": "https://github.com/floooh/chips",
+      "include_directory": "third_party/cache/chips-9e88298/chips",
+      "purpose": "Z80 CPU of the native Mega Drive core (spec 008, DA-4); zlib",
+      "status": "pinned_source",
+      "files": [
+        {
+          "path": "third_party/licenses/chips-9e88298/LICENSE",
+          "url": "https://raw.githubusercontent.com/floooh/chips/9e88298ce56319953ac7a43213a1120359f7a3a6/LICENSE",
+          "sha256": "0c692ece632a8ec6d2a566c9234fdabda655644e6abc70027da9ff7c35e48634",
+          "bytes": 893
+        },
+        {
+          "path": "third_party/cache/chips-9e88298/chips/z80.h",
+          "url": "https://raw.githubusercontent.com/floooh/chips/9e88298ce56319953ac7a43213a1120359f7a3a6/chips/z80.h",
+          "sha256": "6ca70ffd91b1bdbaf00f7a41e7092b326145fd1c95dcdd7bb01183370de734f3",
+          "bytes": 138218
+        }
+      ]
+    },
+    {
+      "name": "ymfm",
+      "version": "81aec25",
+      "commit": "81aec25ccbb98f4873a255f7551ac4dadac59b4a",
+      "repository": "https://github.com/aaronsgiles/ymfm",
+      "include_directory": "third_party/cache/ymfm-81aec25/src",
+      "purpose": "YM2612/YM3438 FM chip of the native Mega Drive core (spec 008, DA-4, TP-107.1); BSD-3-Clause",
+      "status": "pinned_source",
+      "files": [
+        {
+          "path": "third_party/licenses/ymfm-81aec25/LICENSE",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/LICENSE",
+          "sha256": "2d2e9213c170a9866c616fa85b6da993a6724e10befc61f468ed9bfb84c4691c",
+          "bytes": 1519
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm.h",
+          "sha256": "f5ab6fed63c8669abab8403e0e93132e1dad0ae4d8e4954e7836ab9e5b228405",
+          "bytes": 18554
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_adpcm.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_adpcm.cpp",
+          "sha256": "74e5ded129ea7e532112e5b637d0a7bd4e127fd83331f1fac32011723051d4e0",
+          "bytes": 22040
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_adpcm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_adpcm.h",
+          "sha256": "5933691971493b853a9be443f6e6fd74f63869aa21225f66dd89fc20de20914d",
+          "bytes": 13752
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_fm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_fm.h",
+          "sha256": "1b27bfb7fa4963d7c54cb06fd9bf659450362d8ed496c6af7d487b068cac45c9",
+          "bytes": 17705
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_fm.ipp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_fm.ipp",
+          "sha256": "4fb7fe59d4494a19e9f9c7888eb644a63d86e109fdefb27a8117bf6a5f6ab4b9",
+          "bytes": 59236
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opn.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.cpp",
+          "sha256": "8734c6d5a6e1bf49a08eeb33d260d39c17cd1d26f5db506e5d0d3e416913b489",
+          "bytes": 67918
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opn.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.h",
+          "sha256": "1950990c3ea0c6d492a20f66a683a372a7367ef39f7830aa65b20a20d1bcbef5",
+          "bytes": 28415
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_ssg.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_ssg.cpp",
+          "sha256": "73a3028a77f13f3769b7705079659eb8325431a67b8164ded25e12f324f42bfd",
+          "bytes": 8421
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_ssg.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_ssg.h",
+          "sha256": "27966b0887fe98f2d06a96be2776c911107e2f2a13a64f9a349e1ffc19cf7584",
+          "bytes": 7752
+        }
+      ]
+    }
+  ]
 }

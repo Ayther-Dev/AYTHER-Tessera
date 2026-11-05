@@ -23,7 +23,8 @@ using Bytes = std::vector<std::uint8_t>;
 Bytes rom() {
   std::ifstream file(TESSERA_ORIGINAL_ROM, std::ios::binary);
   REQUIRE(file.good());
-  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+  return {std::istreambuf_iterator<char>(file),
+          std::istreambuf_iterator<char>()};
 }
 struct Driver {
   Bytes content = rom();
@@ -34,20 +35,20 @@ struct Driver {
   std::uint64_t epoch{};
   Driver() {
     std::array<tessera_backend_info_v1, 3> backends{
-        initial<tessera_backend_info_v1>(),
-        initial<tessera_backend_info_v1>(),
+        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
         initial<tessera_backend_info_v1>()};
     std::uint32_t count{};
     REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
                                           &count, &context) == TESSERA_OK);
-    configuration = tessera::wire::configuration(
-        "clownmdemu", backends[0].build_id, memory);
+    configuration = tessera::wire::configuration("clownmdemu",
+                                                 backends[0].build_id, memory);
     auto create = initial<tessera_session_create_info_v1>();
     create.content = {content.data(), content.size()};
     create.config = {configuration.data(), configuration.size()};
     create.initial_persistent_memory = {memory.data(), memory.size()};
     create.system_override = TESSERA_SYSTEM_MEGA_DRIVE;
-    REQUIRE(tessera_session_create_v1(&create, &session, &context) == TESSERA_OK);
+    REQUIRE(tessera_session_create_v1(&create, &session, &context) ==
+            TESSERA_OK);
     auto info = initial<tessera_session_info_v1>();
     REQUIRE(tessera_session_query_v1(session, &info, &context) == TESSERA_OK);
     epoch = info.frame_id.epoch;
@@ -58,16 +59,17 @@ struct Driver {
       tessera_session_close_v1(session, &context);
   }
   void observe(std::uint64_t frame, std::uint64_t mask = 31) {
-    std::array<tessera_control_item_v1, 2> items{{
-        {TESSERA_CONTROL_OBSERVATION_REGION_MASK, TESSERA_VALUE_MASK64, mask},
-        {TESSERA_CONTROL_OBSERVATION_EVENT_MASK, TESSERA_VALUE_MASK64, 31}}};
+    std::array<tessera_control_item_v1, 2> items{
+        {{TESSERA_CONTROL_OBSERVATION_REGION_MASK, TESSERA_VALUE_MASK64, mask},
+         {TESSERA_CONTROL_OBSERVATION_EVENT_MASK, TESSERA_VALUE_MASK64, 31}}};
     auto controls = initial<tessera_control_transaction_v1>();
     controls.epoch = epoch;
     controls.frame = frame;
     controls.id = frame;
     controls.items = items.data();
     controls.count = items.size();
-    REQUIRE(tessera_controls_submit_v1(session, &controls, &context) == TESSERA_OK);
+    REQUIRE(tessera_controls_submit_v1(session, &controls, &context) ==
+            TESSERA_OK);
   }
   void step(std::uint64_t frame) {
     std::array<tessera_input_assignment_v1, 8> assignments{};
@@ -82,13 +84,13 @@ struct Driver {
   }
   Bytes state() {
     std::uint64_t required{};
-    REQUIRE(tessera_state_export_canonical_v1(session, {nullptr, 0},
-                                               &required, &context) ==
+    REQUIRE(tessera_state_export_canonical_v1(session, {nullptr, 0}, &required,
+                                              &context) ==
             TESSERA_BUFFER_TOO_SMALL);
     Bytes data(static_cast<std::size_t>(required));
-    REQUIRE(tessera_state_export_canonical_v1(
-                session, {data.data(), data.size()}, &required,
-                &context) == TESSERA_OK);
+    REQUIRE(
+        tessera_state_export_canonical_v1(session, {data.data(), data.size()},
+                                          &required, &context) == TESSERA_OK);
     return data;
   }
   std::pair<Bytes, Bytes> original() {
@@ -142,8 +144,7 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
   std::thread other_reader([&] {
     auto context = initial<tessera_context_v1>();
     auto value = initial<tessera_snapshot_info_v1>();
-    const auto read =
-        tessera_snapshot_query_v1(first.id, &value, &context);
+    const auto read = tessera_snapshot_query_v1(first.id, &value, &context);
     other_reader_ok = read == TESSERA_OK && value.frame_id.frame == 1;
     tessera_snapshot_release_v1(first.id, &context);
   });
@@ -160,7 +161,7 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
       {region.data.data, static_cast<std::size_t>(region.data.bytes)});
   REQUIRE(fields.size() == 8);
   CHECK(tessera::wire::read(
-      tessera::wire::get(fields, 0, 1, TESSERA_ENCODING_U32), 0, 4) == 2);
+            tessera::wire::get(fields, 0, 1, TESSERA_ENCODING_U32), 0, 4) == 2);
   const auto width = tessera::wire::read(
       tessera::wire::get(fields, 1, 2, TESSERA_ENCODING_U32), 0, 4);
   const auto height = tessera::wire::read(
@@ -170,7 +171,7 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
   const auto rows = tessera::wire::get(fields, 4, 5, TESSERA_ENCODING_BYTES);
   REQUIRE(rows.size() == height * (width + 512));
   CHECK(tessera::wire::read(
-      tessera::wire::get(fields, 5, 6, TESSERA_ENCODING_U32), 0, 4) == 1);
+            tessera::wire::get(fields, 5, 6, TESSERA_ENCODING_U32), 0, 4) == 1);
   const auto cells = tessera::wire::get(fields, 6, 7, TESSERA_ENCODING_BYTES);
   REQUIRE(cells.size() >= 4 + 16 + 256);
   CHECK(tessera::wire::read(cells, 0, 4) >= 1);
@@ -193,10 +194,8 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
       const auto colour = tessera::wire::read(row, index * 2, 2);
       const auto offset = (y * width + x) * 4;
       exact = exact && original.pixels.data[offset] == (colour & 15) * 17 &&
-              original.pixels.data[offset + 1] ==
-                  ((colour >> 4) & 15) * 17 &&
-              original.pixels.data[offset + 2] ==
-                  ((colour >> 8) & 15) * 17 &&
+              original.pixels.data[offset + 1] == ((colour >> 4) & 15) * 17 &&
+              original.pixels.data[offset + 2] == ((colour >> 8) & 15) * 17 &&
               original.pixels.data[offset + 3] == 255;
     }
   CHECK(exact);
@@ -207,7 +206,8 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
   CHECK(first.info().frame_id.frame == 1);
 }
 
-TEST_CASE("Retained readers cause a bounded loss and the next full capture recovers") {
+TEST_CASE("Retained readers cause a bounded loss and the next full capture "
+          "recovers") {
   Driver driver;
   driver.observe(1);
   std::vector<std::unique_ptr<Retained>> readers;
@@ -224,13 +224,13 @@ TEST_CASE("Retained readers cause a bounded loss and the next full capture recov
   REQUIRE(tessera_losses_query_v1(driver.session, {nullptr, 0}, &required,
                                   &driver.context) == TESSERA_BUFFER_TOO_SMALL);
   Bytes losses(static_cast<std::size_t>(required));
-  REQUIRE(tessera_losses_query_v1(
-              driver.session, {losses.data(), losses.size()}, &required,
-              &driver.context) == TESSERA_OK);
+  REQUIRE(tessera_losses_query_v1(driver.session,
+                                  {losses.data(), losses.size()}, &required,
+                                  &driver.context) == TESSERA_OK);
   const auto loss_fields = tessera::wire::record(losses);
   CHECK(tessera::wire::read(
-            tessera::wire::get(loss_fields, 0, 1, TESSERA_ENCODING_U64),
-            0, 8) > 0);
+            tessera::wire::get(loss_fields, 0, 1, TESSERA_ENCODING_U64), 0, 8) >
+        0);
   readers.clear();
   driver.step(10);
   Retained recovered(driver);

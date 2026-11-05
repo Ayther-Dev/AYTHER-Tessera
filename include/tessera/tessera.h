@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "tessera_observation.h"
+
 /* The initial supported binary platform is Windows x64, little endian, MSVC
    ABI. All layouts use natural alignment. Never apply packing around this
    header. */
@@ -18,7 +20,7 @@ typedef uint64_t tessera_snapshot;
 
 /* Numeric constants do not introduce enum storage into the C ABI. */
 #define TESSERA_ABI_MAJOR UINT16_C(1)
-#define TESSERA_ABI_MINOR UINT16_C(0)
+#define TESSERA_ABI_MINOR UINT16_C(1)
 #define TESSERA_OK INT32_C(0)
 #define TESSERA_END_OF_TRACE INT32_C(1)
 #define TESSERA_INVALID_ARGUMENT (-INT32_C(1))
@@ -61,6 +63,7 @@ typedef uint64_t tessera_snapshot;
 #define TESSERA_PHASE_CLOSE UINT32_C(10)
 #define TESSERA_OS_NONE UINT32_C(0)
 #define TESSERA_OS_WIN32 UINT32_C(1)
+#define TESSERA_OS_POSIX UINT32_C(2)
 #define TESSERA_CANCEL_NONE UINT32_C(0)
 #define TESSERA_CANCEL_RESET UINT32_C(1)
 #define TESSERA_CANCEL_RESTORE UINT32_C(2)
@@ -425,6 +428,70 @@ tessera_status TESSERA_CALL tessera_checkpoint_restore_v1(
 tessera_status TESSERA_CALL
 tessera_status_format_v1(const tessera_context_v1 *context,
                          tessera_buffer_v1 out, uint64_t *required);
+
+/* --- API 1.1: superficie de observación (spec 008, RF-3.0). Las firmas son las
+   de ayther_interface_v1 con el session delante y el contexto al final. Los
+   ids, flags y layouts están en tessera_observation.h. --- */
+tessera_status TESSERA_CALL
+tessera_observation_region_query_v1(tessera_session session, uint32_t region_id,
+                                    tessera_obs_region_info_v1 *out,
+                                    uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_region_read_v1(
+    tessera_session session, uint32_t region_id, uint32_t offset, void *out,
+    uint32_t byte_count, uint64_t expected_generation,
+    uint64_t *actual_generation, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_write_control_v1(
+    tessera_session session, uint32_t region_id, uint32_t offset,
+    const void *data, uint32_t byte_count, uint64_t expected_generation,
+    uint64_t *new_generation, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_snapshot_capture_v1(
+    tessera_session session, tessera_obs_frame_snapshot_v1 *out,
+    uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_recompose_v1(
+    tessera_session session, uint16_t *out_pixels, uint32_t pixel_capacity,
+    uint32_t flags, uint32_t *out_width, uint32_t *out_height,
+    tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_recompose_multilayer_v1(
+    tessera_session session, uint16_t *out_bg_a, uint16_t *out_bg_b,
+    uint16_t *out_window, uint16_t *out_sprites, uint16_t *out_composite,
+    uint32_t pixel_capacity, uint32_t flags, uint32_t *out_width,
+    uint32_t *out_height, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_recompose_stats_v1(
+    tessera_session session, tessera_obs_recompose_stats_v1 *out,
+    uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_audio_events_poll_v1(
+    tessera_session session, void *out, uint32_t event_capacity,
+    uint32_t event_size, uint32_t *out_event_count, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
+    tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
+    uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_subscriptions_get_v1(
+    tessera_session session, tessera_obs_subscription_state_v1 *out,
+    uint32_t out_size, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_subscriptions_set_v1(
+    tessera_session session, uint32_t requested_mask, tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_frame_delta_poll_v1(
+    tessera_session session, tessera_obs_frame_delta_v1 *out, uint32_t out_size,
+    tessera_context_v1 *ctx);
+tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
+    tessera_session session, uint64_t generation_from,
+    tessera_obs_frame_delta_v1 *out, uint32_t out_size,
+    tessera_context_v1 *ctx);
+
+/* API 1.1: límites de la observación y de la ROM (RNF-5). Estructura nueva
+   porque tessera_limits_v1 es de tamaño fijo en ABI 1.0. */
+typedef struct tessera_observation_limits_v1 {
+  tessera_header_v1 header;
+  uint64_t max_rom_bytes;
+  uint64_t max_state_bytes;
+  uint32_t max_journal_events;
+  uint32_t max_audio_writes;
+  uint32_t max_parsed_sprites;
+  uint32_t reserved;
+} tessera_observation_limits_v1;
+tessera_status TESSERA_CALL tessera_observation_limits_query_v1(
+    tessera_session session, tessera_observation_limits_v1 *out,
+    tessera_context_v1 *ctx);
 
 #ifdef __cplusplus
 }

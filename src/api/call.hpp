@@ -22,7 +22,7 @@ inline tessera_status context_valid(const tessera_context_v1 *c) noexcept {
     return TESSERA_INVALID_ARGUMENT;
   if (c->header.size < sizeof(*c))
     return TESSERA_ABI_INCOMPATIBLE;
-  if (c->header.major != 1 || c->header.minor != 0)
+  if (c->header.major != 1 || c->header.minor > 1)
     return TESSERA_ABI_INCOMPATIBLE;
   if (c->header.size > std::numeric_limits<std::uintptr_t>::max() -
                            reinterpret_cast<std::uintptr_t>(c))
@@ -67,7 +67,7 @@ public:
     range(p, sizeof(T), alignof(T));
     if constexpr (requires { p->header; }) {
       require(p->header.size >= sizeof(T) && p->header.major == 1 &&
-                  p->header.minor == 0,
+                  p->header.minor <= 1,
               TESSERA_ABI_INCOMPATIBLE);
       const auto begin = reinterpret_cast<std::uintptr_t>(p);
       require(p->header.size <=
