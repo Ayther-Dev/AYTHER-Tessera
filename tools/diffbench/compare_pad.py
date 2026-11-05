@@ -37,7 +37,7 @@ def main(argv):
          "--pad-type", flags.get("--type", "3")],
         [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
          "--work-ram-out", theirs, "--pad-mask", mask1, "--pad-mask2", mask2]
-        + (["--pad-device", "201"] if flags.get("--type") == "6" else []),
+        + ["--pad-device", "201" if flags.get("--type") == "6" else "101"],
     ]
     for command in runs:
         if subprocess.run(command, capture_output=True).returncode != 0:

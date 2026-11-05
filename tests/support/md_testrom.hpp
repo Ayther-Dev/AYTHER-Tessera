@@ -2276,6 +2276,7 @@ inline std::vector<std::uint8_t> fm_psg_sweep_rom(unsigned variant,
 //   3 forty TH toggles on both ports (the counter wraps)
 //   4 TH changes through the control register (output <-> input)
 //   5 the read after TH becomes an input, 0..11 nops later
+//   6 the start of 240p Test Suite: port 2 probes, then four TH cycles per port
 class PadOps {
 public:
   void wc(unsigned port, unsigned v) { w4(0x13FC, v, 0x00A10009 + 2 * port); }
@@ -2350,6 +2351,17 @@ inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
       o.nops(k);
       o.rd(0);
     }
+    break;
+  case 6:                                  // what 240p Test Suite does at start
+    o.wc(0, 0x40); o.wc(1, 0x7F); o.wd(0, 0x40); o.wd(1, 0x0C); o.rd(0);
+    o.wd(1, 0x7C); o.rd(0);
+    o.wc(0, 0x40); o.wc(1, 0x40); o.wc(2, 0x40);
+    o.wd(0, 0x40); o.wd(1, 0x40); o.wd(2, 0x40);
+    o.rd(0); o.rd(1);
+    for (unsigned port : {0u, 1u})
+      for (unsigned i = 0; i < 4; ++i) {
+        o.wd(port, 0x00); o.rd(port); o.wd(port, 0x40); o.rd(port);
+      }
     break;
   case 4:                                  // reset of the counter by TH writes
     o.wc(0, 0x40);

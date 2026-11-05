@@ -289,7 +289,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # stored by pad_latch-N). Type 3 is the three-button pad (TH latch);
         # type 6 the six-button one (gpgx device 0x201), with two mask pairs.
         # Variant 2 sweeps the wait between TH edges (0..3200 cycles).
-        foreach(variant IN ITEMS 0 1 2 3 4 5)
+        foreach(variant IN ITEMS 0 1 2 3 4 5 6)
             set(pad_rom_args "")
             set(pad_masks fff a5a)
             if(variant EQUAL 2)
@@ -303,7 +303,7 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_SETUP md_pad-latch-${variant}_rom
                 LABELS "integration;phase1;md;local" TIMEOUT 30)
             foreach(type IN ITEMS 3 6)
-                if(type EQUAL 3 AND variant GREATER 1)
+                if(type EQUAL 3 AND variant EQUAL 2)
                     continue()
                 endif()
                 add_test(NAME integration.md_pad-latch-${variant}-t${type} COMMAND

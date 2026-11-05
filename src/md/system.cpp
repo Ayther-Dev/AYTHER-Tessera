@@ -193,10 +193,8 @@ std::uint8_t System::io_read(std::uint32_t offset) noexcept {
     const std::uint8_t ctrl = io_ctrl_[port];
     const std::uint16_t pressed = pads_[port];
     const bool six = config_.pads[port] == PadType::six_button;
-    if (six)
-      pad_settle(port, cpu_.getClock() * kDivider68k);
-    const bool th = six ? pad_port_[port].th
-                        : (out & 0x40U) != 0 || (ctrl & 0x40U) == 0;
+    pad_settle(port, cpu_.getClock() * kDivider68k);
+    const bool th = pad_port_[port].th;
     const unsigned phase = six ? pad_port_[port].phase : 0;
     std::uint8_t in;
     if (six && th && phase == 3) { // C B mode X Y Z
@@ -222,8 +220,7 @@ std::uint8_t System::io_read(std::uint32_t offset) noexcept {
           ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
           ((pressed & kPadA) ? 0 : 0x10) | ((pressed & kPadStart) ? 0 : 0x20));
     }
-    if (six)
-      in |= 0x40; // TH as an input reads high (pull-up), whatever the phase
+    in |= 0x40; // TH as an input reads high (pull-up), whatever the phase
     return static_cast<std::uint8_t>((out & ctrl) | (in & ~ctrl));
   }
   case 0x07:
@@ -296,8 +293,7 @@ void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
   case 0x03:
   case 0x05:
     io_data_[(offset - 3) / 2] = value;
-    if (config_.pads[(offset - 3) / 2] == PadType::six_button)
-      pad_notify((offset - 3) / 2, false, now);
+    pad_notify((offset - 3) / 2, false, now);
     break;
   case 0x07:
     io_data_[2] = value;
@@ -305,8 +301,7 @@ void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
   case 0x09:
   case 0x0B:
     io_ctrl_[(offset - 9) / 2] = value;
-    if (config_.pads[(offset - 9) / 2] == PadType::six_button)
-      pad_notify((offset - 9) / 2, true, now);
+    pad_notify((offset - 9) / 2, true, now);
     break;
   case 0x0D:
     io_ctrl_[2] = value;
