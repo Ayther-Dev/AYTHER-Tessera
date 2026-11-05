@@ -1,8 +1,10 @@
 // Runs a ROM on the native Mega Drive machine and writes its work RAM
 // (spec 008, TP-101.9). The differential bench compares that file with the one
 // gpgx produces (`tessera_diffbench --libretro ... --work-ram-out`).
-//   tessera_md_run --rom <file> [--frames N] [--region j|u|e] --work-ram-out
+//   tessera_md_run --rom <file> [--frames N] [--region a|j|u|e|p] --work-ram-out
 //   <file>
+#include "md/cart.hpp"
+#include "md/region.hpp"
 #include "md/system.hpp"
 
 #include <algorithm>
@@ -20,12 +22,16 @@ int main(int argc, char **argv) {
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
   unsigned frames = 600;
-  tessera::md::Region region = tessera::md::Region::usa;
+  bool print_region = false;
+  // a = from the ROM header (default), j, u, e, p = Japan PAL
+  tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     const bool has_value = i + 1 < argc;
     if (arg == "--rom" && has_value) {
       rom_path = argv[++i];
+    } else if (arg == "--print-region") {
+      print_region = true; // "region=<j|u|e> pal=<0|1>" on stdout
     } else if (arg == "--work-ram-out" && has_value) {
       out_path = argv[++i];
     } else if (arg == "--save-ram-out" && has_value) {
@@ -56,12 +62,14 @@ int main(int argc, char **argv) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
       const char r = argv[++i][0];
-      region = r == 'j'   ? tessera::md::Region::japan
-               : r == 'e' ? tessera::md::Region::europe
-                          : tessera::md::Region::usa;
+      region = r == 'j'   ? tessera::md::RegionChoice::japan
+               : r == 'e' ? tessera::md::RegionChoice::europe
+               : r == 'p' ? tessera::md::RegionChoice::japan_pal
+               : r == 'u' ? tessera::md::RegionChoice::usa
+                          : tessera::md::RegionChoice::automatic;
     } else {
       std::fputs("usage: tessera_md_run --rom <file> [--frames N] "
-                 "[--region j|u|e] --work-ram-out <file>\n",
+                 "[--region a|j|u|e|p] --work-ram-out <file>\n",
                  stderr);
       return 2;
     }
@@ -77,7 +85,18 @@ int main(int argc, char **argv) {
   }
   std::vector<std::uint8_t> rom((std::istreambuf_iterator<char>(in)),
                                 std::istreambuf_iterator<char>());
-  auto config = tessera::md::MachineConfig::for_region(region);
+  std::vector<std::uint8_t> plain;
+  try {
+    plain = tessera::md::load_cart(rom).rom;
+  } catch (...) {
+  }
+  auto config = tessera::md::region_config(region, plain);
+  if (print_region)
+    std::printf("region=%c pal=%d\n",
+                config.region == tessera::md::Region::japan    ? 'j'
+                : config.region == tessera::md::Region::europe ? 'e'
+                                                               : 'u',
+                config.standard == tessera::md::Standard::pal ? 1 : 0);
   config.pads.fill(pad_type == 6 ? tessera::md::PadType::six_button
                                  : tessera::md::PadType::three_button);
   tessera::md::System system(std::move(rom), config);

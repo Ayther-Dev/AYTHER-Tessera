@@ -2,6 +2,7 @@
 // commercial content: a SEGA header and a few hand-assembled 68000 words.
 #pragma once
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <utility>
@@ -2353,6 +2354,49 @@ inline std::vector<std::uint8_t> pad_frames_rom() {
       0x10F9, 0x00A1, 0x0005, // move.b  $A10005,(a0)+
       0x23C8, 0x00FF, 0x000C, // move.l  a0,$FF000C
       0x52B9, 0x00FF, 0x0000, // addq.l  #1,$FF0000
+      0x4E73,                 // rte
+  };
+  at = 0x300;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+// `region_detect` (TP-108.4): the header's country field (16 bytes at $1F0)
+// is set by the caller. The code stores the I/O version register ($A10001) at
+// $FF0004 and, on every V interrupt, the number of V counter changes seen
+// since the previous one (the lines per frame) at $FF0006. The bench compares
+// that RAM with gpgx.
+inline std::vector<std::uint8_t> region_detect_rom(
+    const std::array<std::uint8_t, 16> &country, std::uint16_t checksum = 0) {
+  auto rom = vint_counter_rom();
+  std::memcpy(&rom[0x120], "AYTHER REGION   ", 16);
+  std::memcpy(&rom[0x1F0], country.data(), 16);
+  put16(rom, 0x18E, checksum);
+  const std::uint16_t main_code[] = {
+      0x33FC, 0x8164, 0x00C0, 0x0004,         // move.w #$8164,$C00004
+      0x13F9, 0x00A1, 0x0001, 0x00FF, 0x0004, // move.b $A10001,$FF0004
+      0x4242,                                 // clr.w  d2
+      0x4201,                                 // clr.b  d1
+      0x46FC, 0x2000,                         // move   #$2000,sr
+      0x1039, 0x00C0, 0x0008,                 // loop: move.b $C00008,d0
+      0xB001,                                 // cmp.b  d1,d0
+      0x67F6,                                 // beq.s  loop
+      0x1200,                                 // move.b d0,d1
+      0x5242,                                 // addq.w #1,d2
+      0x60F0,                                 // bra.s  loop
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t handler[] = {
+      0x33C2, 0x00FF, 0x0006, // move.w d2,$FF0006
+      0x4242,                 // clr.w  d2
+      0x52B9, 0x00FF, 0x0000, // addq.l #1,$FF0000
       0x4E73,                 // rte
   };
   at = 0x300;

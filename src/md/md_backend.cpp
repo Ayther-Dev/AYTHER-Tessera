@@ -2,7 +2,9 @@
 
 #include "domain/result.hpp"
 #include "domain/wire.hpp"
+#include "md/cart.hpp"
 #include "md/input.hpp"
+#include "md/region.hpp"
 #include "md/system.hpp"
 
 #include <algorithm>
@@ -18,9 +20,19 @@ constexpr std::uint64_t kCapabilities = 0x20F;
 /// bound keeps `tick()` exact in 64 bits.
 constexpr std::uint64_t kMaxFrames = 1ULL << 40;
 
+/// The ROM image whose header holds the country field: the content itself
+/// when it is plain, the unwrapped one for a copier header or .smd.
+std::vector<std::uint8_t> plain_header_image(wire::View content) {
+  try {
+    return load_cart(content).rom;
+  } catch (const Failure &) {
+    return {}; // the System refuses it; the region falls back to Americas
+  }
+}
+
 class NativeBackend final : public IEmulatedSystem {
 public:
-  NativeBackend(wire::View content, wire::View memory) {
+  NativeBackend(wire::View content, wire::View memory, RegionChoice choice) {
     require(content.size() >= 512 && content.size() % 2 == 0 &&
                 content.size() <= 8U * 1024U * 1024U,
             TESSERA_INVALID_CONTENT, TESSERA_PHASE_CREATE);
@@ -29,8 +41,8 @@ public:
                             [](std::uint8_t byte) { return byte == 0; }),
             TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
     std::vector<std::uint8_t> rom(content.begin(), content.end());
-    // The console region is not read from the header (TP-108.4 reopened).
-    auto config = MachineConfig::for_region(Region::usa);
+    // TP-108.4: the header chooses the console unless the caller fixed it.
+    auto config = region_config(choice, plain_header_image(content));
     config.pads = {PadType::six_button, PadType::six_button};
     standard_ = config.standard;
     system_ = std::make_unique<System>(std::move(rom), config);
@@ -145,10 +157,17 @@ private:
 
 std::unique_ptr<IEmulatedSystem> make_backend(std::string_view id,
                                               wire::View content,
-                                              wire::View memory) {
+                                              wire::View memory,
+                                              RegionChoice choice) {
   require(id == "megadrive", TESSERA_IMPLEMENTATION_UNAVAILABLE,
           TESSERA_PHASE_CREATE);
-  return std::make_unique<NativeBackend>(content, memory);
+  return std::make_unique<NativeBackend>(content, memory, choice);
+}
+
+std::unique_ptr<IEmulatedSystem> make_backend(std::string_view id,
+                                              wire::View content,
+                                              wire::View memory) {
+  return make_backend(id, content, memory, RegionChoice::automatic);
 }
 
 } // namespace tessera::md

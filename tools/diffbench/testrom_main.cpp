@@ -3,6 +3,8 @@
 #include "support/md_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 
+#include <array>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,7 +24,22 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::ssf2_sweep_rom();
   else if (std::strcmp(argv[1], "vint-counter") == 0)
     rom = tessera::testrom::vint_counter_rom();
-  else if (std::strcmp(argv[1], "pad-frames") == 0)
+  else if (std::strncmp(argv[1], "region-detect-", 14) == 0) {
+    // region-detect-<country hex, up to 16 bytes>[-<checksum hex>]; the rest
+    // of the field is spaces.
+    std::array<std::uint8_t, 16> country;
+    country.fill(' ');
+    const char *v = argv[1] + 14;
+    for (std::size_t i = 0; i < 16 && std::isxdigit(v[0]) && std::isxdigit(v[1]);
+         ++i, v += 2) {
+      char pair[3] = {v[0], v[1], 0};
+      country[i] = static_cast<std::uint8_t>(std::strtoul(pair, nullptr, 16));
+    }
+    const auto checksum =
+        *v == '-' ? static_cast<std::uint16_t>(std::strtoul(v + 1, nullptr, 16))
+                  : std::uint16_t{0};
+    rom = tessera::testrom::region_detect_rom(country, checksum);
+  } else if (std::strcmp(argv[1], "pad-frames") == 0)
     rom = tessera::testrom::pad_frames_rom();
   else if (std::strcmp(argv[1], "hint-counter") == 0)
     rom = tessera::testrom::hint_counter_rom(9);
