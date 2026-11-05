@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <string>
 
 int main(int argc, char **argv) {
   if (argc != 3 && argc != 6) {
@@ -22,7 +23,14 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::ssf2_sweep_rom();
   else if (std::strcmp(argv[1], "vint-counter") == 0)
     rom = tessera::testrom::vint_counter_rom();
-  else if (std::strcmp(argv[1], "hint-counter") == 0)
+  else if (std::strncmp(argv[1], "region-detect-", 14) == 0) {
+    // region-detect-<country>: the four characters of the header, '_' = space
+    std::string country(argv[1] + 14);
+    for (auto &c : country)
+      if (c == '_')
+        c = ' ';
+    rom = tessera::testrom::region_detect_rom(country.c_str());
+  } else if (std::strcmp(argv[1], "hint-counter") == 0)
     rom = tessera::testrom::hint_counter_rom(9);
   else if (std::strcmp(argv[1], "hint-every-line") == 0)
     rom = tessera::testrom::hint_counter_rom(0);

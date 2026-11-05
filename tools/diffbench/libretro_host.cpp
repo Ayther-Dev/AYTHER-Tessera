@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <map>
+#include <string>
 
 namespace diffbench {
 namespace {
@@ -62,6 +64,11 @@ uint64_t fnv1a(const uint8_t *p, size_t n, uint64_t h) {
   return h;
 }
 
+std::map<std::string, std::string> &core_options() {
+  static std::map<std::string, std::string> options;
+  return options;
+}
+
 bool __cdecl environment(unsigned cmd, void *data) {
   switch (cmd) {
   case 10: // SET_PIXEL_FORMAT
@@ -78,8 +85,23 @@ bool __cdecl environment(unsigned cmd, void *data) {
   case 52: // GET_CORE_OPTIONS_VERSION
     *static_cast<unsigned *>(data) = 0;
     return true;
+  case 15: { // GET_VARIABLE: solo las opciones fijadas con --core-option
+    struct Variable {
+      const char *key;
+      const char *value;
+    };
+    auto *variable = static_cast<Variable *>(data);
+    if (variable && variable->key) {
+      const auto it = core_options().find(variable->key);
+      if (it != core_options().end()) {
+        variable->value = it->second.c_str();
+        return true;
+      }
+    }
+    return false; // el resto: valores por defecto del core
+  }
   default:
-    return false; // GET_VARIABLE incluido: valores por defecto del core
+    return false;
   }
 }
 
@@ -156,6 +178,9 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 
 unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
+void set_core_option(const std::string &key, const std::string &value) {
+  core_options()[key] = value;
+}
 
 void set_pad_masks(uint32_t port0, uint32_t port1) {
   g_pad_masks[0] = port0;

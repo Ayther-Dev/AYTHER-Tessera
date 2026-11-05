@@ -212,6 +212,15 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
+  if (args.count("--core-option")) {
+    const auto &option = args["--core-option"];
+    const auto eq = option.find('=');
+    if (eq == std::string::npos) {
+      std::cerr << "--core-option espera clave=valor\n";
+      return 2;
+    }
+    diffbench::set_core_option(option.substr(0, eq), option.substr(eq + 1));
+  }
   if (args.count("--pad-device"))
     diffbench::set_pad_device(static_cast<unsigned>(
         std::strtoul(args["--pad-device"].c_str(), nullptr, 16)));

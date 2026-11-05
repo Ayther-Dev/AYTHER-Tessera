@@ -321,6 +321,48 @@ if(TESSERA_BUILD_MEGADRIVE)
             endforeach()
         endforeach()
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-108.4: region from the header and manual selection against gpgx.
+        # The probe stores the version register and counts V-ints and main
+        # loop passes, so identical work RAM means the same region bits and
+        # the same number of lines per frame. Header characters: '_' = space.
+        # "2" is Japan PAL, reachable only through the header (gpgx cannot be
+        # forced to it).
+        foreach(country IN ITEMS U J E UE JE JUE 1 2 4 8 A 0 K _ eur jap usa)
+            string(MAKE_C_IDENTIFIER "${country}" country_id)
+            add_test(NAME integration.md_region-detect-${country_id}_rom
+                COMMAND tessera_md_testrom region-detect-${country}
+                "${CMAKE_CURRENT_BINARY_DIR}/region-detect-${country_id}.bin")
+            set_tests_properties(integration.md_region-detect-${country_id}_rom PROPERTIES
+                FIXTURES_SETUP md_region-detect-${country_id}_rom
+                LABELS "integration;phase1;md;local" TIMEOUT 30)
+            add_test(NAME integration.md_region-detect-${country_id} COMMAND
+                ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/compare_pad.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${CMAKE_CURRENT_BINARY_DIR}/region-detect-${country_id}.bin" 20
+                "${CMAKE_CURRENT_BINARY_DIR}/md-region-${country_id}" 0 0 --bytes 4096)
+            set_tests_properties(integration.md_region-detect-${country_id} PROPERTIES
+                FIXTURES_REQUIRED md_region-detect-${country_id}_rom
+                PASS_REGULAR_EXPRESSION "differing=0[
+]"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+        foreach(forced IN ITEMS u e j)
+            add_test(NAME integration.md_region-forced-${forced} COMMAND
+                ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/compare_pad.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${CMAKE_CURRENT_BINARY_DIR}/region-detect-U.bin" 20
+                "${CMAKE_CURRENT_BINARY_DIR}/md-region-forced-${forced}" 0 0
+                --region ${forced} --bytes 4096)
+            set_tests_properties(integration.md_region-forced-${forced} PROPERTIES
+                FIXTURES_REQUIRED md_region-detect-U_rom
+                PASS_REGULAR_EXPRESSION "differing=0[
+]"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
        AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
         # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.

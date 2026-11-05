@@ -2303,6 +2303,63 @@ private:
   }
 };
 
+// `region_detect` (TP-108.4): a ROM whose header names `country` (the four
+// characters at $1F0) and optionally a product code, checksum and size. It
+// stores the I/O version register ($A10001) at $FF0004 and counts vertical
+// interrupts at $FF0000. A main loop counts the changes of the V counter at
+// $FF0008 and each interrupt stores that count in a table from $FF0010: the
+// differences are the lines of a frame (262 or 313), whatever the speed of
+// the CPU, so work RAM shows the region bits and the video standard.
+inline std::vector<std::uint8_t>
+region_detect_rom(const char *country, const char *product = nullptr,
+                  std::uint16_t checksum = 0, std::size_t size = 0x400) {
+  auto rom = vint_counter_rom();
+  rom.resize(size, 0);
+  std::memcpy(&rom[0x120], "AYTHER REGION   ", 16);
+  std::memset(&rom[0x1F0], ' ', 16);
+  std::memcpy(&rom[0x1F0], country, std::min<std::size_t>(16, std::strlen(country)));
+  if (product) {
+    std::memset(&rom[0x182], ' ', 12);
+    std::memcpy(&rom[0x182], product, std::min<std::size_t>(12, std::strlen(product)));
+  }
+  put16(rom, 0x18E, checksum);
+  const std::uint16_t main_code[] = {
+      0x23FC, 0x00FF, 0x0010, 0x00FF, 0x000C, // move.l #$FF0010,$FF000C
+      0x33FC, 0x8164, 0x00C0, 0x0004,         // move.w #$8164,$C00004
+      0x13F9, 0x00A1, 0x0001, 0x00FF, 0x0004, // move.b $A10001,$FF0004
+      0x43F9, 0x00C0, 0x0008,                 // lea    $C00008,a1
+      0x72FF,                                 // moveq  #-1,d1
+      0x46FC, 0x2000,                         // move   #$2000,sr
+      0x3011,                                 // loop: move.w (a1),d0
+      0xE048,                                 //       lsr.w  #8,d0
+      0xB001,                                 //       cmp.b  d1,d0
+      0x67F8,                                 //       beq.s  loop
+      0x1200,                                 //       move.b d0,d1
+      0x52B9, 0x00FF, 0x0008,                 //       addq.l #1,$FF0008
+      0x60EE,                                 //       bra.s  loop
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  // Level 6 handler: the passes of the main loop at each V-int go to a table
+  // at $FF0010, the frame count at $FF0000 follows.
+  const std::uint16_t handler[] = {
+      0x2079, 0x00FF, 0x000C, // movea.l $FF000C,a0
+      0x20F9, 0x00FF, 0x0008, // move.l  $FF0008,(a0)+
+      0x23C8, 0x00FF, 0x000C, // move.l  a0,$FF000C
+      0x52B9, 0x00FF, 0x0000, // addq.l  #1,$FF0000
+      0x4E73,                 // rte
+  };
+  at = 0x300;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
                                                unsigned first = 0,
                                                unsigned last = 3200,

@@ -7,7 +7,9 @@ bytes the ROM stored in work RAM. gpgx exposes the work RAM with the bytes of
 every 16 bit word swapped, so that dump is swapped back.
 
 usage: compare_pad.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
-       <mask1 hex> <mask2 hex> [--type 3|6] [--show N]
+       <mask1 hex> <mask2 hex> [--type 3|6] [--show N] [--region a|u|e|j] [--bytes N]
+(--region forces the console region on both sides; `a` or none = detect it
+from the ROM header, as both do by default)
 exit:  0 identical, 1 different, 2 a tool failed
 prints: pad_latch bytes=N differing=D
 """
@@ -21,7 +23,7 @@ def main(argv):
     rest = []
     i = 1
     while i < len(argv):
-        if argv[i] in ("--type", "--show") and i + 1 < len(argv):
+        if argv[i] in ("--type", "--show", "--region", "--bytes") and i + 1 < len(argv):
             flags[argv[i]] = argv[i + 1]
             i += 2
         else:
@@ -31,13 +33,17 @@ def main(argv):
     os.makedirs(out_dir, exist_ok=True)
     mine = os.path.join(out_dir, "native.wram")
     theirs = os.path.join(out_dir, "gpgx.wram")
+    region = flags.get("--region", "a")
+    oracle_region = {"u": "ntsc-u", "e": "pal", "j": "ntsc-j"}.get(region)
     runs = [
         [md_run, "--rom", rom, "--frames", frames, "--work-ram-out", mine,
          "--pad-mask", mask1, "--pad-mask2", mask2,
-         "--pad-type", flags.get("--type", "3")],
+         "--pad-type", flags.get("--type", "3"), "--region", region],
         [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
          "--work-ram-out", theirs, "--pad-mask", mask1, "--pad-mask2", mask2]
-        + ["--pad-device", "201" if flags.get("--type") == "6" else "101"],
+        + ["--pad-device", "201" if flags.get("--type") == "6" else "101"]
+        + (["--core-option", "genesis_plus_gx_region_detect=" + oracle_region]
+           if oracle_region else []),
     ]
     for command in runs:
         if subprocess.run(command, capture_output=True).returncode != 0:
@@ -49,7 +55,11 @@ def main(argv):
         b = bytearray(f.read())
     b[0::2], b[1::2] = b[1::2], b[0::2]
     # the ROM stores its reads from $FF0000: compare up to the last used byte
-    used = max((i for i in range(len(a)) if a[i] or b[i]), default=-1) + 1
+    # (--bytes N: only the first N, when the ROM leaves other data such as the
+    # interrupt frames of its stack, which depend on where a V-int lands)
+    limit = int(flags["--bytes"]) if "--bytes" in flags else len(a)
+    used = max((i for i in range(min(len(a), limit)) if a[i] or b[i]),
+               default=-1) + 1
     differing = sum(1 for i in range(used) if a[i] != b[i])
     if "--show" in flags:
         n = int(flags["--show"])

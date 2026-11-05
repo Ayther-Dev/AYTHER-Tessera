@@ -65,6 +65,8 @@ void set_pad_masks(uint32_t port0, uint32_t port1);
 // Dispositivo libretro que se pide para ambos puertos tras cargar el juego
 // (0 = el del core por defecto; 0x101 = mando de 6 botones de gpgx).
 void set_pad_device(unsigned device);
+/// Value the core reads for an option (GET_VARIABLE); the rest keep defaults.
+void set_core_option(const std::string &key, const std::string &value);
 
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,

@@ -1,8 +1,9 @@
 // Runs a ROM on the native Mega Drive machine and writes its work RAM
 // (spec 008, TP-101.9). The differential bench compares that file with the one
 // gpgx produces (`tessera_diffbench --libretro ... --work-ram-out`).
-//   tessera_md_run --rom <file> [--frames N] [--region j|u|e] --work-ram-out
+//   tessera_md_run --rom <file> [--frames N] [--region a|u|e|j|p] --work-ram-out
 //   <file>
+#include "md/region.hpp"
 #include "md/system.hpp"
 
 #include <cstdio>
@@ -19,7 +20,7 @@ int main(int argc, char **argv) {
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
   unsigned frames = 600;
-  tessera::md::Region region = tessera::md::Region::usa;
+  tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     const bool has_value = i + 1 < argc;
@@ -53,9 +54,11 @@ int main(int argc, char **argv) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
       const char r = argv[++i][0];
-      region = r == 'j'   ? tessera::md::Region::japan
-               : r == 'e' ? tessera::md::Region::europe
-                          : tessera::md::Region::usa;
+      region = r == 'j'   ? tessera::md::RegionChoice::japan_ntsc
+               : r == 'p' ? tessera::md::RegionChoice::japan_pal
+               : r == 'e' ? tessera::md::RegionChoice::europe
+               : r == 'u' ? tessera::md::RegionChoice::usa
+                          : tessera::md::RegionChoice::automatic;
     } else {
       std::fputs("usage: tessera_md_run --rom <file> [--frames N] "
                  "[--region j|u|e] --work-ram-out <file>\n",
@@ -74,7 +77,7 @@ int main(int argc, char **argv) {
   }
   std::vector<std::uint8_t> rom((std::istreambuf_iterator<char>(in)),
                                 std::istreambuf_iterator<char>());
-  auto config = tessera::md::MachineConfig::for_region(region);
+  auto config = tessera::md::config_for_rom(rom, region);
   config.pads.fill(pad_type == 6 ? tessera::md::PadType::six_button
                                  : tessera::md::PadType::three_button);
   tessera::md::System system(std::move(rom), config);
