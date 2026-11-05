@@ -9,6 +9,7 @@
 // them (separated by '|'), run with more frames.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "md/system.hpp"
+#include "support/md_digest.hpp"
 #include "support/md_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 #include <doctest/doctest.h>
@@ -22,6 +23,7 @@
 #include <vector>
 
 using namespace tessera::md;
+using tessera::testsupport::digest;
 
 namespace {
 using Rom = std::vector<std::uint8_t>;
@@ -33,44 +35,6 @@ Machine make(const Rom &rom, const MachineConfig &config) {
 bool accepts(const Rom &rom, const MachineConfig &config,
              std::span<const std::uint8_t> bytes) {
   return make(rom, config)->load_state(bytes);
-}
-
-struct Fnv {
-  std::uint64_t h = 14695981039346656037ULL;
-  void add(const void *data, std::size_t n) {
-    const auto *p = static_cast<const std::uint8_t *>(data);
-    for (std::size_t i = 0; i < n; ++i) {
-      h ^= p[i];
-      h *= 1099511628211ULL;
-    }
-  }
-  template <class T> void add(const T &v) { add(&v, sizeof(v)); }
-};
-
-/// Digest of everything a frame produces or leaves behind.
-std::uint64_t digest(const System &system) {
-  Fnv f;
-  const auto ram = system.work_ram();
-  f.add(ram.data(), ram.size());
-  const auto z = system.z80_ram();
-  f.add(z.data(), z.size());
-  f.add(system.vdp().vram().data(), system.vdp().vram().size());
-  f.add(system.vdp().cram().data(), system.vdp().cram().size() * 2);
-  f.add(system.vdp().vsram().data(), system.vdp().vsram().size() * 2);
-  const auto &frame = system.renderer().frame();
-  f.add(frame.data(), frame.size() * sizeof(frame[0]));
-  for (const auto &w : system.audio_writes())
-    f.add(w);
-  f.add(system.audio_writes_dropped());
-  for (const auto &s : system.ym().samples())
-    f.add(s);
-  const auto psg = system.psg().samples();
-  f.add(psg.data(), psg.size() * sizeof(psg[0]));
-  const auto audio = system.audio();
-  f.add(audio.data(), audio.size() * sizeof(audio[0]));
-  f.add(system.cpu().getClock());
-  f.add(system.z80().cycles());
-  return f.h;
 }
 
 MachineConfig config_for(const Rom &rom, bool six_button) {

@@ -403,6 +403,24 @@ if(TESSERA_BUILD_MEGADRIVE)
                 LABELS "integration;phase1;md;local" TIMEOUT 900)
         endif()
     endif()
+    if(TESSERA_DIFFBENCH_CORPUS_DIR)
+        # TP-110.3: two processes, 3 000 frames of the corpus games.
+        set(determinism_roms "")
+        foreach(rom IN ITEMS "Golden Axe (World) (Rev A).md" "Sonic The Hedgehog (USA, Europe).md"
+                "Streets of Rage 2 (USA).md" "Phantasy Star IV (USA).md" "Gunstar Heroes (USA).md")
+            if(EXISTS "${TESSERA_DIFFBENCH_CORPUS_DIR}/${rom}")
+                list(APPEND determinism_roms "${TESSERA_DIFFBENCH_CORPUS_DIR}/${rom}")
+            endif()
+        endforeach()
+        if(determinism_roms)
+            string(REPLACE ";" "|" determinism_roms "${determinism_roms}")
+            add_test(NAME integration.md_determinism_corpus COMMAND tessera_md_determinism_test
+                --test-case=*commercial*)
+            set_tests_properties(integration.md_determinism_corpus PROPERTIES
+                ENVIRONMENT "TESSERA_DETERMINISM_ROMS=${determinism_roms}"
+                LABELS "integration;phase1;md;local" TIMEOUT 1800)
+        endif()
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
        AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
         # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.
