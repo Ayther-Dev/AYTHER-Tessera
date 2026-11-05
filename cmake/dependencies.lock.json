@@ -454,6 +454,29 @@
           "bytes": 41590
         }
       ]
+    },
+    {
+      "name": "chips-z80",
+      "version": "9e88298",
+      "commit": "9e88298ce56319953ac7a43213a1120359f7a3a6",
+      "repository": "https://github.com/floooh/chips",
+      "include_directory": "third_party/cache/chips-9e88298/chips",
+      "purpose": "Z80 CPU of the native Mega Drive core (spec 008, DA-4); zlib",
+      "status": "pinned_source",
+      "files": [
+        {
+          "path": "third_party/licenses/chips-9e88298/LICENSE",
+          "url": "https://raw.githubusercontent.com/floooh/chips/9e88298ce56319953ac7a43213a1120359f7a3a6/LICENSE",
+          "sha256": "0c692ece632a8ec6d2a566c9234fdabda655644e6abc70027da9ff7c35e48634",
+          "bytes": 893
+        },
+        {
+          "path": "third_party/cache/chips-9e88298/chips/z80.h",
+          "url": "https://raw.githubusercontent.com/floooh/chips/9e88298ce56319953ac7a43213a1120359f7a3a6/chips/z80.h",
+          "sha256": "6ca70ffd91b1bdbaf00f7a41e7092b326145fd1c95dcdd7bb01183370de734f3",
+          "bytes": 138218
+        }
+      ]
     }
   ]
 }

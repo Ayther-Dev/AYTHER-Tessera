@@ -57,6 +57,13 @@ tessera_copy_diagnostic_runtime(tessera_md_m68k_test)
 add_test(NAME unit.md_m68k COMMAND tessera_md_m68k_test)
 set_tests_properties(unit.md_m68k PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 
+add_executable(tessera_md_z80_test unit/md_z80_test.cpp)
+target_include_directories(tessera_md_z80_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(tessera_md_z80_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_z80_test)
+add_test(NAME unit.md_z80 COMMAND tessera_md_z80_test)
+set_tests_properties(unit.md_z80 PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+
 add_executable(tessera_md_vdp_regs_dma_test unit/md_vdp_regs_dma_test.cpp)
 target_include_directories(tessera_md_vdp_regs_dma_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(tessera_md_vdp_regs_dma_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
