@@ -116,17 +116,21 @@ inline Bytes inputs(const InputState &input,
 }
 inline Bytes configuration(std::string_view id, View build, View memory) {
   Bytes b;
-  const bool megadrive = id == "clownmdemu";
+  const bool clown = id == "clownmdemu";
+  const bool native = id == "megadrive"; // the own core: two pads of twelve
+  const bool megadrive = clown || native;
   scalar(b, 1, 1, megadrive ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE);
   field(b, 2, 6, text(id));
   field(b, 3, 5, build);
   scalar(b, 4, 1, megadrive ? 1 : 0);
   scalar(b, 5, 1, 48000);
   std::vector<Bytes> map;
-  for (std::uint32_t i = 0; i < 8; ++i) {
+  const std::uint32_t ports = native ? kPadPorts : 1;
+  const std::uint32_t controls = native ? kPadControls : kLegacyControls;
+  for (std::uint32_t i = 0; i < ports * controls; ++i) {
     Bytes v;
-    scalar(v, 1, 1, 0);
-    scalar(v, 2, 1, i);
+    scalar(v, 1, 1, i / controls);
+    scalar(v, 2, 1, i % controls);
     scalar(v, 3, 1, 1);
     scalar(v, 4, 2, 0);
     scalar(v, 5, 2, 1);
@@ -134,7 +138,7 @@ inline Bytes configuration(std::string_view id, View build, View memory) {
   }
   field(b, 6, 8, array(map));
   field(b, 7, 5, sha(memory));
-  if (megadrive) {
+  if (clown) {
     scalar(b, 8, 1, 895780);
     scalar(b, 9, 1, 53693175);
     scalar(b, 10, 1, 1);

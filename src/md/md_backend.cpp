@@ -1,12 +1,154 @@
 #include "md/md_backend.hpp"
 
+#include "domain/result.hpp"
 #include "domain/wire.hpp"
+#include "md/input.hpp"
+#include "md/region.hpp"
+#include "md/system.hpp"
+
+#include <algorithm>
+#include <cstring>
+#include <limits>
 
 namespace tessera::md {
+namespace {
+/// FRAME | INPUT | VIDEO | PCM | CHECKPOINT. The observation regions arrive
+/// with their own tasks (TP-2xx) and are not claimed until then.
+constexpr std::uint64_t kCapabilities = 0x20F;
+/// A session this long would overflow the tick counters long before; the
+/// bound keeps `tick()` exact in 64 bits.
+constexpr std::uint64_t kMaxFrames = 1ULL << 40;
 
-std::unique_ptr<IEmulatedSystem> make_backend(std::string_view, wire::View,
-                                              wire::View) {
-  throw Failure{TESSERA_IMPLEMENTATION_UNAVAILABLE, TESSERA_PHASE_CREATE};
+class NativeBackend final : public IEmulatedSystem {
+public:
+  NativeBackend(wire::View content, wire::View memory) {
+    require(content.size() >= 512 && content.size() % 2 == 0 &&
+                content.size() <= 8U * 1024U * 1024U,
+            TESSERA_INVALID_CONTENT, TESSERA_PHASE_CREATE);
+    require(memory.size() == 65536 &&
+                std::all_of(memory.begin(), memory.end(),
+                            [](std::uint8_t byte) { return byte == 0; }),
+            TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
+    std::vector<std::uint8_t> rom(content.begin(), content.end());
+    auto config = config_for_rom(rom);
+    config.pads = {PadType::six_button, PadType::six_button};
+    standard_ = config.standard;
+    system_ = std::make_unique<System>(std::move(rom), config);
+    system_->reset();
+    refresh_frame_geometry();
+  }
+
+  [[nodiscard]] std::string_view backend_id() const noexcept override {
+    return "megadrive";
+  }
+  [[nodiscard]] std::uint64_t capabilities() const noexcept override {
+    return kCapabilities;
+  }
+  [[nodiscard]] std::uint64_t frame() const noexcept override { return frame_; }
+  [[nodiscard]] std::uint64_t tick() const noexcept override {
+    return frame_ * frame_ticks();
+  }
+  [[nodiscard]] const InputState &latched_inputs() const noexcept override {
+    return input_;
+  }
+  [[nodiscard]] InputLayout input_layout() const noexcept override {
+    return kPadsInputLayout;
+  }
+  [[nodiscard]] const Bytes &pixels() const noexcept override { return pixels_; }
+  [[nodiscard]] const Bytes &pcm() const noexcept override { return pcm_; }
+  [[nodiscard]] bool original_available() const noexcept override {
+    return frame_ != 0 && !pixels_.empty();
+  }
+  [[nodiscard]] std::uint32_t system() const noexcept override { return 1; }
+  [[nodiscard]] std::uint32_t frame_width() const noexcept override {
+    return width_;
+  }
+  [[nodiscard]] std::uint32_t frame_height() const noexcept override {
+    return height_;
+  }
+  [[nodiscard]] std::uint64_t frame_ticks() const noexcept override {
+    return cycles_per_frame(standard_);
+  }
+  [[nodiscard]] std::uint64_t tick_hz() const noexcept override {
+    return master_hz(standard_);
+  }
+
+  void step(const InputState &inputs) override {
+    require(frame_ < kMaxFrames, TESSERA_BUDGET_EXCEEDED, TESSERA_PHASE_STEP);
+    require(apply_input(*system_, inputs), TESSERA_INPUT_CONTRADICTORY,
+            TESSERA_PHASE_STEP);
+    input_ = inputs;
+    system_->run_frame();
+    ++frame_;
+    capture_output();
+  }
+
+  [[nodiscard]] Bytes machine_record() const override {
+    Bytes record;
+    wire::field(record, 1, TESSERA_ENCODING_BYTES, system_->save_state());
+    return record;
+  }
+
+  void restore_record(std::span<const std::uint8_t> encoded,
+                      std::uint64_t frame, const InputState &inputs) override {
+    require(frame <= kMaxFrames && pad_mask(inputs, 0) && pad_mask(inputs, 1),
+            TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+    const auto fields = wire::record(encoded, TESSERA_CHECKPOINT_INVALID,
+                                     TESSERA_PHASE_RESTORE);
+    require(fields.size() == 1, TESSERA_CHECKPOINT_INVALID,
+            TESSERA_PHASE_RESTORE);
+    const auto state =
+        wire::get(fields, 0, 1, TESSERA_ENCODING_BYTES,
+                  std::numeric_limits<std::size_t>::max(),
+                  TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+    // load_state leaves the machine as it was when it refuses (RF-4.5).
+    require(system_->load_state(state) && system_->frame() == frame,
+            TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+    apply_input(*system_, inputs);
+    input_ = inputs;
+    frame_ = frame;
+    pixels_.clear();
+    pcm_.clear();
+    refresh_frame_geometry();
+  }
+
+  [[nodiscard]] std::vector<RegionData>
+  regions(std::uint64_t mask) const override {
+    require(mask == 0, TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_READ);
+    return {};
+  }
+
+private:
+  void refresh_frame_geometry() {
+    const auto size = system_->renderer().size();
+    width_ = size.width;
+    height_ = size.height;
+  }
+  void capture_output() {
+    refresh_frame_geometry();
+    const auto &frame = system_->renderer().frame();
+    pixels_.resize(frame.size() * sizeof(frame[0]));
+    std::memcpy(pixels_.data(), frame.data(), pixels_.size());
+    const auto audio = system_->audio();
+    pcm_.resize(audio.size() * sizeof(audio[0]));
+    std::memcpy(pcm_.data(), audio.data(), pcm_.size());
+  }
+
+  std::unique_ptr<System> system_;
+  Standard standard_ = Standard::ntsc;
+  InputState input_{};
+  Bytes pixels_, pcm_;
+  std::uint32_t width_ = 0, height_ = 0;
+  std::uint64_t frame_ = 0;
+};
+} // namespace
+
+std::unique_ptr<IEmulatedSystem> make_backend(std::string_view id,
+                                              wire::View content,
+                                              wire::View memory) {
+  require(id == "megadrive", TESSERA_IMPLEMENTATION_UNAVAILABLE,
+          TESSERA_PHASE_CREATE);
+  return std::make_unique<NativeBackend>(content, memory);
 }
 
 } // namespace tessera::md

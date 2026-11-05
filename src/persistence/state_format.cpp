@@ -173,9 +173,7 @@ ParsedState decode_state(View bytes, std::string_view backend, View content_sha,
   const auto fields = record(bytes.subspan(8));
   valid(fields.size() == 10);
   const auto codec = field(fields, 0, 1, TESSERA_ENCODING_UTF8);
-  const auto expected =
-      wire::text(backend == "clownmdemu" ? "tessera.megadrive.clown"
-                                         : "tessera.synthetic");
+  const auto expected = wire::text(codec_id(backend));
   require(equal(codec, expected) &&
               integer(fields, 1, 2, TESSERA_ENCODING_U32, 4) == 1 &&
               integer(fields, 2, 3, TESSERA_ENCODING_U32, 4) == 0,

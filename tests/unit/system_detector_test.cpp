@@ -172,10 +172,12 @@ TEST_CASE("Registry exposes the real Mega Drive strategy and keeps synthetic "
   request.content = fx01::view(rom);
   request.system_override = TESSERA_SYSTEM_MEGA_DRIVE;
   tessera_session untouched = UINT64_C(0x123456);
-  // Without the reference backend no product backend exists for Mega Drive.
+  // Without the reference backend or the native core no product backend
+  // exists for Mega Drive; either one refuses the missing persistent memory.
   CHECK(tessera_session_create_v1(&request, &untouched, &complete.context) ==
-        (TESSERA_CLOWN_REFERENCE ? TESSERA_UNSUPPORTED_CAPABILITY
-                                 : TESSERA_IMPLEMENTATION_UNAVAILABLE));
+        (TESSERA_CLOWN_REFERENCE || TESSERA_MEGADRIVE
+             ? TESSERA_UNSUPPORTED_CAPABILITY
+             : TESSERA_IMPLEMENTATION_UNAVAILABLE));
   CHECK(untouched == UINT64_C(0x123456));
   CHECK(complete.state() == before);
   const auto unknown_id = fx01::str("not.installed");
