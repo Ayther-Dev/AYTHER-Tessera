@@ -29,6 +29,8 @@ void Session::restore(wire::View encoded, wire::View trace_bytes,
   state_data =
       persistence::decode_state(checkpoint.state, backend, content_sha, build,
                                 config_sha, machine->frame_ticks());
+  require(state_data.input_layout == machine->input_layout(),
+          TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
   require(equal(checkpoint.initial_sha, initial_sha),
           TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
 
@@ -41,6 +43,8 @@ void Session::restore(wire::View encoded, wire::View trace_bytes,
                 equal(wire::sha(trace_bytes), checkpoint.trace_sha) &&
                 equal(candidate.content_sha, content_sha) &&
                 equal(candidate.config_sha, config_sha),
+            TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
+    require(candidate.layout == machine->input_layout(),
             TESSERA_CHECKPOINT_INCOMPATIBLE, TESSERA_PHASE_RESTORE);
     require(state_data.completed_frames < candidate.frames.size() + 1 &&
                 checkpoint.next_replay_frame == state_data.completed_frames + 1,

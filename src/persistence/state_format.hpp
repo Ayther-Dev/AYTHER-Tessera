@@ -10,6 +10,7 @@ namespace tessera::persistence {
 struct ParsedState {
   std::uint64_t completed_frames{}, logical_tick{};
   InputState inputs{};
+  InputLayout input_layout = kLegacyInputLayout;
   Bytes machine;
 };
 

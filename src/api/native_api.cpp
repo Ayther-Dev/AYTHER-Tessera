@@ -328,7 +328,8 @@ tessera_status TESSERA_CALL tessera_session_bind_trace_v1(
     auto candidate =
         wire::trace({trace.data, static_cast<std::size_t>(trace.bytes)});
     require(candidate.content_sha == s->content_sha &&
-                candidate.config_sha == s->config_sha,
+                candidate.config_sha == s->config_sha &&
+                candidate.layout == s->machine->input_layout(),
             TESSERA_INVALID_TRACE);
     require(s->machine->frame() == 0, TESSERA_WRONG_STATE);
     Bytes raw(trace.data, trace.data + trace.bytes);

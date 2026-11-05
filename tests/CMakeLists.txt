@@ -85,6 +85,13 @@ tessera_copy_diagnostic_runtime(tessera_md_audio_log_test)
 add_test(NAME unit.md_audio_log COMMAND tessera_md_audio_log_test)
 set_tests_properties(unit.md_audio_log PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
+add_executable(tessera_md_input_test unit/md_input_test.cpp)
+target_include_directories(tessera_md_input_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_input_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_input_test)
+add_test(NAME unit.md_input COMMAND tessera_md_input_test)
+set_tests_properties(unit.md_input PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
+
 add_executable(tessera_md_pad_test unit/md_pad_test.cpp)
 target_include_directories(tessera_md_pad_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_pad_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)

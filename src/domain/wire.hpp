@@ -100,15 +100,18 @@ inline std::vector<View> elements(View b, std::uint64_t maximum) {
   require(b.empty(), TESSERA_INVALID_TRACE);
   return v;
 }
-inline Bytes inputs(const InputState &input) {
+inline Bytes inputs(const InputState &input,
+                    InputLayout layout = kLegacyInputLayout) {
   std::vector<Bytes> entries;
-  for (std::uint32_t i = 0; i < 8; ++i) {
-    Bytes e;
-    scalar(e, 1, 1, 0);
-    scalar(e, 2, 1, i);
-    scalar(e, 3, 2, static_cast<std::uint32_t>(input[i]));
-    entries.push_back(std::move(e));
-  }
+  for (std::uint32_t p = 0; p < layout.ports; ++p)
+    for (std::uint32_t i = 0; i < layout.controls; ++i) {
+      Bytes e;
+      scalar(e, 1, 1, p);
+      scalar(e, 2, 1, i);
+      scalar(e, 3, 2,
+             static_cast<std::uint32_t>(input[p * layout.controls + i]));
+      entries.push_back(std::move(e));
+    }
   return array(entries);
 }
 inline Bytes configuration(std::string_view id, View build, View memory) {
@@ -145,6 +148,7 @@ inline Bytes configuration(std::string_view id, View build, View memory) {
 }
 struct Trace {
   Bytes content_sha, config_sha;
+  InputLayout layout = kLegacyInputLayout;
   std::vector<InputState> frames;
 };
 inline Trace trace(View b) {
@@ -167,12 +171,18 @@ inline Trace trace(View b) {
     require(r.size() == 2 && read(get(r, 0, 1, 3, 8), 0, 8) == i + 1,
             TESSERA_INVALID_TRACE);
     const auto assignments = elements(get(r, 1, 2, 8), 64);
-    require(assignments.size() == 8, TESSERA_INVALID_TRACE);
+    InputLayout layout{};
+    require(input_layout_from_count(assignments.size(), layout),
+            TESSERA_INVALID_TRACE);
+    // One layout per trace.
+    require(i == 0 || layout == t.layout, TESSERA_INVALID_TRACE);
+    t.layout = layout;
     InputState state{};
-    for (std::size_t k = 0; k < 8; ++k) {
+    for (std::size_t k = 0; k < assignments.size(); ++k) {
       const auto e = record(assignments[k]);
-      require(e.size() == 3 && read(get(e, 0, 1, 1, 4), 0, 4) == 0 &&
-                  read(get(e, 1, 2, 1, 4), 0, 4) == k,
+      require(e.size() == 3 &&
+                  read(get(e, 0, 1, 1, 4), 0, 4) == k / layout.controls &&
+                  read(get(e, 1, 2, 1, 4), 0, 4) == k % layout.controls,
               TESSERA_INVALID_TRACE);
       const auto v = read(get(e, 2, 3, 2, 4), 0, 4);
       require(v <= 1, TESSERA_INVALID_TRACE);

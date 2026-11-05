@@ -84,15 +84,17 @@ std::uint64_t integer(const std::vector<wire::Field> &fields, std::size_t index,
                       static_cast<unsigned>(bytes));
 }
 
-InputState parse_inputs(View bytes) {
+InputState parse_inputs(View bytes, InputLayout &layout) {
   InputState result{};
   const auto entries = elements(bytes, 64);
-  valid(entries.size() == result.size());
+  valid(input_layout_from_count(entries.size(), layout));
   for (std::size_t index = 0; index < entries.size(); ++index) {
     const auto fields = record(entries[index]);
     valid(fields.size() == 3 &&
-          integer(fields, 0, 1, TESSERA_ENCODING_U32, 4) == 0 &&
-          integer(fields, 1, 2, TESSERA_ENCODING_U32, 4) == index);
+          integer(fields, 0, 1, TESSERA_ENCODING_U32, 4) ==
+              index / layout.controls &&
+          integer(fields, 1, 2, TESSERA_ENCODING_U32, 4) ==
+              index % layout.controls);
     const auto value = integer(fields, 2, 3, TESSERA_ENCODING_I32, 4);
     valid(value <= 1);
     result[index] = static_cast<std::int32_t>(value);
@@ -190,7 +192,8 @@ ParsedState decode_state(View bytes, std::string_view backend, View content_sha,
         result.completed_frames <=
             std::numeric_limits<std::uint64_t>::max() / ticks_per_frame &&
         result.logical_tick == result.completed_frames * ticks_per_frame);
-  result.inputs = parse_inputs(field(fields, 8, 9, TESSERA_ENCODING_ARRAY));
+  result.inputs = parse_inputs(field(fields, 8, 9, TESSERA_ENCODING_ARRAY),
+                               result.input_layout);
   const auto machine = field(fields, 9, 65536, TESSERA_ENCODING_RECORD);
   result.machine.assign(machine.begin(), machine.end());
   return result;
