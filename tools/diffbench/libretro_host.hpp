@@ -49,10 +49,20 @@ RunResult run_tessera(const std::string &backend_id,
                       const std::vector<TraceFrame> *trace = nullptr);
 #endif
 
+// Escritura de control sobre una region despues de `frame` frames
+// (`--poke <region>:<offset hex>:<bytes hex>:<frame>`).
+struct Poke {
+  uint32_t region = 0, offset = 0;
+  std::vector<uint8_t> data;
+  unsigned frame = 0;
+  int32_t status = 0; ///< resultado de write_control
+};
+
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
                        bool dump_regions = false,
-                       const std::vector<TraceFrame> *trace = nullptr);
+                       const std::vector<TraceFrame> *trace = nullptr,
+                       Poke *poke = nullptr);
 
 } // namespace diffbench

@@ -11,6 +11,7 @@
 #include "md/vdp_render.hpp"
 #include "md/z80.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <span>
@@ -38,6 +39,19 @@ public:
 
   std::uint64_t frame() const noexcept { return frame_; }
   std::span<const std::uint8_t> z80_ram() const noexcept { return z80_ram_; }
+  /// Control write on the Z80_RAM region (TP-103.4): the bytes go straight to
+  /// the 8 KiB, the Z80 and the bus are untouched. False if out of range.
+  bool poke_z80_ram(std::size_t offset,
+                    std::span<const std::uint8_t> bytes) noexcept {
+    if (bytes.empty() || offset >= z80_ram_.size() ||
+        bytes.size() > z80_ram_.size() - offset)
+      return false;
+    z80_sync_now(); // the Z80 sees the new bytes from this point on,
+    if (z80_running())
+      z80_.finish_instruction(); // between two instructions (as for a grant)
+    std::copy(bytes.begin(), bytes.end(), z80_ram_.begin() + offset);
+    return true;
+  }
   std::span<const std::uint8_t> work_ram() const noexcept {
     return bus_.work_ram();
   }

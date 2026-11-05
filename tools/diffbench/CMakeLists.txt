@@ -235,5 +235,16 @@ if(TESSERA_BUILD_MEGADRIVE)
                 PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0.*z80_ram bytes=8192 differing=0"
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
+        # TP-103.4: a poke into Z80_RAM through the control write (a data
+        # area the payload never reads) leaves both sides identical.
+        add_test(NAME integration.md_z80-poke COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_z80.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/z80-bank-0.bin" 8
+            "${CMAKE_CURRENT_BINARY_DIR}/md-z80-poke" 1ff8:01020304:6)
+        set_tests_properties(integration.md_z80-poke PROPERTIES
+            FIXTURES_REQUIRED md_z80-bank-0_rom
+            PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0.*z80_ram bytes=8192 differing=0"
+            LABELS "integration;phase1;md;local" TIMEOUT 120)
     endif()
 endif()

@@ -7,6 +7,8 @@ bytes of every 16 bit word swapped (host order), so that dump is swapped back;
 the Z80 RAM comes in natural order.
 
 usage: compare_z80.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
+       [poke]   <offset hex>:<bytes hex>:<frame> written into Z80_RAM through
+                the control write of both sides (TP-103.4)
 exit:  0 identical, 1 different, 2 a tool failed
 prints: work_ram bytes=N differing=D / z80_ram bytes=N differing=D
 """
@@ -31,6 +33,10 @@ def main(argv):
          "--work-ram-out", gpgx_wram, "--dump-regions", "--region-out",
          "%d:%s" % (Z80_RAM_REGION, gpgx_z80)],
     ]
+    if len(argv) > 7:
+        offset, data, frame = argv[7].split(":")
+        runs[0] += ["--poke-z80", argv[7]]
+        runs[1] += ["--poke", "%d:%s:%s:%s" % (Z80_RAM_REGION, offset, data, frame)]
     for command in runs:
         # --dump-regions exits 1 when a region is smaller than announced (25 of
         # 26 are complete in gpgx r4): only a missing output file is a failure.

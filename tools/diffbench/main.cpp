@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <map>
 #include <regex>
 #include <string>
@@ -287,10 +288,30 @@ int main(int argc, char **argv) {
         return 1;
       }
     }
-    const auto r =
-        diffbench::run_libretro(args["--libretro"], args["--rom"], frames,
-                                args.count("--dump-regions") > 0,
-                                args.count("--trace") ? &trace : nullptr);
+    diffbench::Poke poke;
+    if (args.count("--poke")) {
+      // <region>:<offset hex>:<bytes hex>:<frame>
+      std::vector<std::string> parts;
+      std::stringstream ss(args["--poke"]);
+      for (std::string part; std::getline(ss, part, ':');)
+        parts.push_back(part);
+      if (parts.size() != 4 || parts[2].size() % 2 != 0) {
+        std::cerr << "error: --poke <region>:<offset hex>:<bytes hex>:<frame>\n";
+        return 2;
+      }
+      poke.region = static_cast<uint32_t>(std::stoul(parts[0]));
+      poke.offset = static_cast<uint32_t>(std::stoul(parts[1], nullptr, 16));
+      for (size_t i = 0; i < parts[2].size(); i += 2)
+        poke.data.push_back(
+            static_cast<uint8_t>(std::stoul(parts[2].substr(i, 2), nullptr, 16)));
+      poke.frame = static_cast<unsigned>(std::stoul(parts[3]));
+    }
+    const auto r = diffbench::run_libretro(
+        args["--libretro"], args["--rom"], frames, args.count("--dump-regions") > 0,
+        args.count("--trace") ? &trace : nullptr,
+        args.count("--poke") ? &poke : nullptr);
+    if (args.count("--poke"))
+      std::cout << "poke status=" << poke.status << "\n";
     return report_run(r, frames, args);
   }
   if (args.count("--tessera")) {

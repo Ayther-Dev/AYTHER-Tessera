@@ -15,7 +15,7 @@
 
 int main(int argc, char **argv) {
   std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
-      regs_path, z80_path;
+      regs_path, z80_path, poke_spec;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
       vram_path = argv[++i];
     } else if (arg == "--z80-ram-out" && has_value) {
       z80_path = argv[++i];
+    } else if (arg == "--poke-z80" && has_value) {
+      poke_spec = argv[++i]; // <offset hex>:<bytes hex>:<frame>
     } else if (arg == "--regs-out" && has_value) {
       regs_path = argv[++i];
     } else if (arg == "--frame-out" && has_value) {
@@ -65,8 +67,31 @@ int main(int argc, char **argv) {
   tessera::md::System system(std::move(rom),
                              tessera::md::MachineConfig::for_region(region));
   system.reset();
-  for (unsigned frame = 0; frame < frames; ++frame)
+  std::size_t poke_offset = 0;
+  std::vector<std::uint8_t> poke_bytes;
+  unsigned poke_frame = 0;
+  if (!poke_spec.empty()) {
+    const auto c1 = poke_spec.find(':');
+    const auto c2 = poke_spec.find(':', c1 + 1);
+    if (c1 == std::string::npos || c2 == std::string::npos ||
+        (c2 - c1 - 1) % 2 != 0) {
+      std::fputs("--poke-z80 <offset hex>:<bytes hex>:<frame>\n", stderr);
+      return 2;
+    }
+    poke_offset = std::strtoul(poke_spec.c_str(), nullptr, 16);
+    for (auto i = c1 + 1; i < c2; i += 2)
+      poke_bytes.push_back(static_cast<std::uint8_t>(
+          std::strtoul(poke_spec.substr(i, 2).c_str(), nullptr, 16)));
+    poke_frame = static_cast<unsigned>(std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
+  }
+  for (unsigned frame = 0; frame < frames; ++frame) {
+    if (!poke_spec.empty() && frame == poke_frame &&
+        !system.poke_z80_ram(poke_offset, poke_bytes)) {
+      std::fputs("poke out of range\n", stderr);
+      return 2;
+    }
     system.run_frame();
+  }
   std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
   const auto ram = system.work_ram();
   out.write(reinterpret_cast<const char *>(ram.data()),

@@ -38,7 +38,8 @@ struct AytherInterface {
                                  uint32_t);
   int32_t(__cdecl *read_region)(uint32_t, uint32_t, void *, uint32_t, uint64_t,
                                 uint64_t *);
-  void *write_control;
+  int32_t(__cdecl *write_control)(uint32_t, uint32_t, const void *, uint32_t,
+                                  uint64_t, uint64_t *);
   void *capture_snapshot;
   void *recompose_frame;
   uint32_t audio_event_size, audio_transport_stats_size;
@@ -146,7 +147,7 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
                        bool dump_regions,
-                       const std::vector<TraceFrame> *trace) {
+                       const std::vector<TraceFrame> *trace, Poke *poke) {
   RunResult result;
   std::ifstream in(rom_path, std::ios::binary);
   if (!in) {
@@ -201,15 +202,23 @@ RunResult run_libretro(const std::string &core_path,
     using GetIface = const AytherInterface *(__cdecl *)(uint32_t);
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;
-    if (dump_regions && sym(core, "ayther_get_interface", get_iface))
+    const bool want_iface = dump_regions || poke != nullptr;
+    if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
-    if (dump_regions && !iface)
+    if (want_iface && !iface)
       result.error = "el core no ofrece la interfaz AYTHER 1.10";
     if (iface)
       iface->set_subscriptions(TESSERA_OBS_SUB_ALL);
-    for (unsigned i = 0; i < frames && result.error.empty(); ++i)
+    for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
+      if (poke && iface && i == poke->frame) {
+        uint64_t generation = 0;
+        poke->status = iface->write_control(
+            poke->region, poke->offset, poke->data.data(),
+            static_cast<uint32_t>(poke->data.size()), UINT64_MAX, &generation);
+      }
       run();
-    if (iface) {
+    }
+    if (iface && dump_regions) {
       for (uint32_t id = 1; id < TESSERA_OBS_REGION_COUNT; ++id) {
         RegionDump d;
         d.id = id;
