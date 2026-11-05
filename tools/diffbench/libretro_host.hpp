@@ -28,6 +28,10 @@ struct RunResult {
   std::vector<uint8_t>
       last_frame; // ancho, alto (u32 LE) y R,G,B por pixel del ultimo frame
   uint32_t width = 0, height = 0;
+  // AYTHER interface announced by the core (0 when it has none).
+  uint32_t ayther_abi = 0;
+  uint64_t ayther_capabilities = 0;
+  std::string ayther_build_id;
   std::string error;
 };
 

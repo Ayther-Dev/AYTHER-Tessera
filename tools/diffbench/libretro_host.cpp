@@ -279,8 +279,13 @@ RunResult run_libretro(const std::string &core_path,
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
       result.error = "el core no ofrece la interfaz AYTHER 1.10";
-    if (iface)
+    if (iface) {
+      result.ayther_abi = iface->abi_version;
+      result.ayther_capabilities = iface->capabilities;
+      if (iface->build_id != nullptr)
+        result.ayther_build_id.assign(iface->build_id, iface->build_id_size);
       iface->set_subscriptions(TESSERA_OBS_SUB_ALL);
+    }
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
       if (poke && iface && i == poke->frame) {
         uint64_t generation = 0;

@@ -151,6 +151,9 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
         size_ok += d.bytes_read == d.byte_size && d.byte_size > 0;
       }
     }
+    std::cout << "ayther_abi=" << r.ayther_abi << " capabilities=0x" << std::hex
+              << r.ayther_capabilities << std::dec << " build_id=\""
+              << r.ayther_build_id << "\"\n";
     std::cout << "regions=" << r.regions.size() << " readable=" << readable
               << " read_ok=" << read_ok << " size_ok=" << size_ok << "\n";
     return read_ok == readable && size_ok == readable ? 0 : 1;
