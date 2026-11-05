@@ -82,6 +82,7 @@ public:
   /// Frame drawn by the last run_frame (RGBA8, `renderer().size()`).
   const Renderer &renderer() const noexcept { return renderer_; }
   const Sram &sram() const noexcept { return sram_; }
+  Sram &sram() noexcept { return sram_; }
   const M68k &cpu() const noexcept { return cpu_; }
 
   void set_pad(unsigned port, std::uint16_t pressed) noexcept;
@@ -92,10 +93,11 @@ public:
   std::vector<std::uint8_t> save_state() const;
   /// Restores a stream written by `save_state` for the same ROM and
   /// configuration. On false (wrong magic, version, ROM, configuration, size or
-  /// contents) the machine is left in an unspecified state and must be
-  /// discarded or reset; a caller that needs to keep its machine restores into
-  /// a new one.
+  /// contents) the machine is left exactly as it was (RF-4.5).
   bool load_state(std::span<const std::uint8_t> state);
+private:
+  bool read_state(std::span<const std::uint8_t> state);
+public:
 
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;

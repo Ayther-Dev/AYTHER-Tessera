@@ -106,6 +106,13 @@ tessera_copy_diagnostic_runtime(tessera_md_reset_test)
 add_test(NAME integration.md_reset COMMAND tessera_md_reset_test)
 set_tests_properties(integration.md_reset PROPERTIES LABELS "integration;phase1;md" TIMEOUT 120)
 
+add_executable(tessera_md_malformed_test integration/md_malformed_test.cpp)
+target_include_directories(tessera_md_malformed_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_malformed_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_malformed_test)
+add_test(NAME integration.md_malformed COMMAND tessera_md_malformed_test)
+set_tests_properties(integration.md_malformed PROPERTIES LABELS "integration;phase1;md" TIMEOUT 300)
+
 add_executable(tessera_md_region_test unit/md_region_test.cpp)
 target_include_directories(tessera_md_region_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_region_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)

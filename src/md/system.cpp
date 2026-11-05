@@ -652,6 +652,17 @@ std::vector<std::uint8_t> System::save_state() const {
 }
 
 bool System::load_state(std::span<const std::uint8_t> state) {
+  // All or nothing: a state that fails half way (it is only known to be whole
+  // once everything is read) must not leave a half loaded machine.
+  const auto backup = save_state();
+  if (read_state(state))
+    return true;
+  const bool restored = read_state(backup);
+  (void)restored; // the backup is a state of this machine; it always loads
+  return false;
+}
+
+bool System::read_state(std::span<const std::uint8_t> state) {
   StateReader r(state);
   if (r.u32() != kStateMagic || r.u32() != kStateVersion ||
       r.u64() != rom_hash_)
