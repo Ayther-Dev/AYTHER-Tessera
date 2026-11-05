@@ -5,6 +5,7 @@
 #pragma once
 #include "md/bus.hpp"
 #include "md/m68k.hpp"
+#include "md/mixer.hpp"
 #include "md/machine.hpp"
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
@@ -101,6 +102,8 @@ public:
   const Z80 &z80() const noexcept { return z80_; }
   const Ym2612 &ym() const noexcept { return ym_; }
   const Psg &psg() const noexcept { return psg_; }
+  /// Audio of the last frame run: interleaved S16 stereo at 48 kHz (TP-107.4).
+  std::span<const std::int16_t> audio() const noexcept { return mixer_.output(); }
   /// Sound chip writes of the last frame run (up to kAudioWriteCapacity) and
   /// the ones that did not fit.
   std::span<const AudioWrite> audio_writes() const noexcept {
@@ -180,6 +183,7 @@ private:
   std::uint16_t z80_bank_ = 0;
   Ym2612 ym_;
   Psg psg_;
+  Mixer mixer_;
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from

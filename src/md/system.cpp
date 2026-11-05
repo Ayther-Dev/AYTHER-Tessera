@@ -44,7 +44,7 @@ constexpr std::uint32_t kStateEnd = 0x444E4553; // "SEND"
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
     : config_(config), rom_hash_(fnv1a(rom)), sram_(read_sram_header(rom)),
       bus_(std::move(rom), *this, config.mapper, &sram_), cpu_(bus_),
-      vdp_(config.standard), tmss_(config.tmss) {
+      vdp_(config.standard), tmss_(config.tmss), mixer_(config.standard) {
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
     return bus_.read16(address);
   });
@@ -78,6 +78,7 @@ void System::reset() {
   z80_bank_ = 0;
   ym_.reset();
   psg_.reset();
+  mixer_.reset();
   ym_addr_ = 0;
   ym_busy_until_ = 0;
   audio_log_.clear();
@@ -186,6 +187,7 @@ void System::run_frame() {
   }
   ym_.run_to(frame_master + cycles_per_frame(config_.standard));
   psg_.run_to(frame_master + cycles_per_frame(config_.standard));
+  mixer_.push(ym_.samples(), psg_.samples());
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();
 }
@@ -627,6 +629,7 @@ std::vector<std::uint8_t> System::save_state() const {
   z80_.save(w);
   ym_.save(w);
   psg_.save(w);
+  mixer_.save(w);
   w.u32(kStateEnd);
   return out;
 }
@@ -681,6 +684,7 @@ bool System::load_state(std::span<const std::uint8_t> state) {
   z80_.load(r);
   ym_.load(r);
   psg_.load(r);
+  mixer_.load(r);
   if (r.u32() != kStateEnd || !r.finished())
     return false;
   // Per frame outputs are rebuilt by the next frame.

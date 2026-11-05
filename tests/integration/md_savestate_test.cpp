@@ -66,6 +66,8 @@ std::uint64_t digest(const System &system) {
     f.add(s);
   const auto psg = system.psg().samples();
   f.add(psg.data(), psg.size() * sizeof(psg[0]));
+  const auto audio = system.audio();
+  f.add(audio.data(), audio.size() * sizeof(audio[0]));
   f.add(system.cpu().getClock());
   f.add(system.z80().cycles());
   return f.h;

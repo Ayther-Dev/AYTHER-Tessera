@@ -332,3 +332,10 @@ target_link_libraries(tessera_synthetic_observation_test PRIVATE Tessera::core T
 tessera_copy_diagnostic_runtime(tessera_synthetic_observation_test)
 add_test(NAME contract.synthetic_observation COMMAND tessera_synthetic_observation_test)
 set_tests_properties(contract.synthetic_observation PROPERTIES LABELS "contract;phase1;observation" TIMEOUT 30)
+
+add_executable(tessera_md_mixer_test unit/md_mixer_test.cpp)
+target_include_directories(tessera_md_mixer_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_mixer_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_mixer_test)
+add_test(NAME unit.md_mixer COMMAND tessera_md_mixer_test)
+set_tests_properties(unit.md_mixer PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
