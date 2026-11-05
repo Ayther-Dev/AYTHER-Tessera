@@ -227,3 +227,93 @@ TEST_CASE("the Clown and synthetic codecs are refused, the native one accepted")
   CHECK(session.restore(clown_record) != TESSERA_OK);
   CHECK(session.checkpoint() == before);
 }
+
+// TP-110.5 (trace part): a truncated or corrupted input trace is refused with
+// an explicit status, never a crash, and the session is left as it was.
+TEST_CASE("malformed traces are refused by the native session") {
+  using namespace tessera;
+  Native session(rom_a());
+  session.step(3);
+  const Bytes cfg_memory(65536, 0);
+  // The session's own config sha is needed in the trace header; take it from
+  // a checkpoint-free path: build the same configuration the session used.
+  std::array<tessera_backend_info_v1, 4> backends{
+      initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
+      initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
+  std::uint32_t required{};
+  REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
+                                        &required, &session.context) ==
+          TESSERA_OK);
+  const tessera_backend_info_v1 *native = nullptr;
+  for (std::uint32_t i = 0; i < required && i < backends.size(); ++i)
+    if (std::string_view(backends[i].id) == "megadrive")
+      native = &backends[i];
+  REQUIRE(native != nullptr);
+  const auto config = wire::configuration("megadrive", native->build_id, cfg_memory);
+
+  Bytes trace = wire::text("TSTRACE1");
+  wire::field(trace, 1, 5, wire::sha(session.rom));
+  wire::field(trace, 2, 5, wire::sha(config));
+  wire::scalar(trace, 3, 3, 4);
+  std::vector<Bytes> frames;
+  for (unsigned i = 0; i < 4; ++i) {
+    std::vector<Bytes> items;
+    for (std::uint32_t k = 0; k < 24; ++k) {
+      Bytes e;
+      wire::scalar(e, 1, 1, k / 12);
+      wire::scalar(e, 2, 1, k % 12);
+      wire::scalar(e, 3, 2, (k + i) % 5 == 0 ? 1 : 0);
+      items.push_back(e);
+    }
+    Bytes f;
+    wire::scalar(f, 1, 3, i + 1);
+    wire::field(f, 2, 8, wire::array(items));
+    frames.push_back(f);
+  }
+  wire::field(trace, 4, 8, wire::array(frames));
+
+  const auto before = session.checkpoint();
+  const auto bind = [&](const Bytes &t) {
+    return tessera_session_bind_trace_v1(session.handle, {t.data(), t.size()},
+                                         &session.context);
+  };
+  // Every truncation and a sweep of single-byte corruptions: never OK for a
+  // damaged trace, never a crash.
+  for (std::size_t cut = 0; cut < trace.size(); cut += 37) {
+    const Bytes part(trace.begin(), trace.begin() + static_cast<std::ptrdiff_t>(cut));
+    CHECK(bind(part) != TESSERA_OK);
+  }
+  for (std::size_t at = 0; at < trace.size(); at += 53) {
+    auto bad = trace;
+    bad[at] ^= 0x5A;
+    (void)bind(bad); // may be a valid but different trace; must not crash
+  }
+  // Wrong content or configuration hash.
+  auto wrong = trace;
+  wrong[8 + 16] ^= 1;
+  CHECK(bind(wrong) != TESSERA_OK);
+  CHECK(session.checkpoint() == before);
+  session.step(); // still runs
+
+  // The undamaged trace is valid and binds to a fresh session.
+  Native fresh(rom_a());
+  CHECK(tessera_session_bind_trace_v1(fresh.handle, {trace.data(), trace.size()},
+                                      &fresh.context) == TESSERA_OK);
+}
+
+// TP-110.3 (observation part): reading the machine between frames (original
+// frame, PCM, checkpoint export) never changes what it computes.
+TEST_CASE("observing every frame does not change the run") {
+  for (const auto &rom : {rom_a(), rom_b()}) {
+    Native watched(rom), blind(rom);
+    for (unsigned i = 0; i < 240; ++i) {
+      watched.step();
+      (void)watched.original();
+      if (i % 40 == 0)
+        (void)watched.checkpoint();
+      blind.step();
+    }
+    CHECK(watched.checkpoint() == blind.checkpoint());
+    CHECK(watched.original() == blind.original());
+  }
+}

@@ -649,4 +649,98 @@ inline std::vector<std::uint8_t> fm_psg_z80_rom() {
   return detail::z80_rom_image("AYTHER FM Z80   ", payload, p);
 }
 
+// `fm_busy_z80` (TP-107.7): the Z80 writes the YM2612 the way sound drivers do,
+// polling the busy flag (bit 7 of $4000) before every address and data write.
+// The spacing of the records gives the busy time and the poll loop timing.
+inline std::vector<std::uint8_t> fm_busy_z80_payload(unsigned pad = 0) {
+  Z80Asm a;
+  a.ld_hl(0x4000);
+  const auto wait_ready = [&] {
+    const auto at = a.here();
+    a.db({0xCB, 0x7E});  // bit 7,(hl)
+    a.db({0x20, static_cast<std::uint8_t>(static_cast<int>(at) -
+                                          static_cast<int>(a.here() + 2))});
+  };
+  const auto write = [&](std::uint8_t reg, std::uint8_t value) {
+    wait_ready();
+    a.db({0x36, reg});   // ld (hl),n: address
+    a.inc_hl();
+    a.db({0x36, value}); // data
+    a.db({0x2B});        // dec hl
+    // `pad` T-states of filler (nop 4, inc de 6, ld a,n 7) before the next
+    // poll, so that the poll lands at another phase of the busy window.
+    for (unsigned sevens = 0; sevens <= pad / 7; ++sevens)
+      for (unsigned sixes = 0; sixes <= pad / 6; ++sixes) {
+        const unsigned used = 7 * sevens + 6 * sixes;
+        if (used <= pad && (pad - used) % 4 == 0) {
+          for (unsigned i = 0; i < sevens; ++i)
+            a.db({0x3E, 0});
+          for (unsigned i = 0; i < sixes; ++i)
+            a.db({0x13});
+          for (unsigned i = 0; i < (pad - used) / 4; ++i)
+            a.db({0x00});
+          return;
+        }
+      }
+  };
+  for (unsigned i = 0; i < 40; ++i)
+    write(static_cast<std::uint8_t>(0x30 + i), static_cast<std::uint8_t>(i));
+  a.jr_self();
+  return a.code;
+}
+
+inline std::vector<std::uint8_t> fm_busy_z80_rom(unsigned pad = 0) {
+  const auto payload = fm_busy_z80_payload(pad);
+  detail::M68kProgram p;
+  p.prologue();
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(payload.size()));
+  p.reset_pin(0x0000);
+  p.reset_pin(0x0100);
+  p.request(0x0000);
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER FM BUSY  ", payload, p);
+}
+
+// `fm_rom_z80` (TP-107.7): like fm_busy_z80, but every data byte is read from
+// the cartridge through the bank window ($8000, bank 0) right before the write,
+// as sound drivers do when they stream register data: the Z80 waits for the
+// 68000 bus on every read.
+inline std::vector<std::uint8_t> fm_rom_z80_payload(unsigned reads) {
+  Z80Asm a;
+  a.ld_hl(0x4000);
+  a.ld_de(0x8100);
+  for (unsigned i = 0; i < 40; ++i) {
+    for (unsigned k = 0; k < reads; ++k)
+      a.db({0x1A, 0x13}); // ld a,(de); inc de
+    const auto at = a.here();
+    a.db({0xCB, 0x7E});   // bit 7,(hl)
+    a.db({0x20, static_cast<std::uint8_t>(static_cast<int>(at) -
+                                          static_cast<int>(a.here() + 2))});
+    a.db({0x36, static_cast<std::uint8_t>(0x30 + i)});
+    a.inc_hl();
+    a.db({0x77});         // ld (hl),a
+    a.db({0x2B});         // dec hl
+  }
+  a.jr_self();
+  return a.code;
+}
+
+inline std::vector<std::uint8_t> fm_rom_z80_rom(unsigned reads) {
+  const auto payload = fm_rom_z80_payload(reads);
+  detail::M68kProgram p;
+  p.prologue();
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(payload.size()));
+  p.reset_pin(0x0000);
+  p.reset_pin(0x0100);
+  p.request(0x0000);
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER FM ROM   ", payload, p);
+}
+
 } // namespace tessera::testrom

@@ -25,6 +25,11 @@ constexpr std::uint64_t kPad6PullUp = 24ULL * 7ULL;
 constexpr std::uint64_t kZ80IntLead = 1620;
 // YM2612 busy time after a data write, master cycles (probe ym-busy-N)
 constexpr std::uint64_t kYmBusy = 1325;
+// The Z80 sees the flag drop later than the 68000 does: polling it from the
+// Z80 (fm-busy-z80-N probes, TP-107.7) puts the end between 1336 and about
+// 1395 master cycles after the write, the 68000 probes (ym-busy-N) at no more
+// than 1330. One Z80 clock more on its writes satisfies both.
+constexpr std::uint64_t kZ80YmBusyExtra = 15;
 } // namespace
 
 namespace {
@@ -579,6 +584,8 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
     z80_ram_[address & 0x1FFFU] = value;
   } else if (address < 0x6000) {
     ym_write(address, value, z80_master_, false); // the rest is TP-107
+    if ((address & 1U) != 0)
+      ym_busy_until_ += kZ80YmBusyExtra;
   } else if (address < 0x8000) {
     if ((address & 0xFF00U) == 0x6000U)
       z80_bank_write(value);

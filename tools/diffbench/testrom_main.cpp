@@ -108,6 +108,12 @@ int main(int argc, char **argv) {
                          static_cast<unsigned>(std::strtoul(argv[5], nullptr, 10)))
                    : tessera::testrom::pad_latch_rom(
                          static_cast<unsigned>(std::strtoul(argv[1] + 10, nullptr, 10)));
+  else if (std::strncmp(argv[1], "fm-rom-z80-", 11) == 0)
+    rom = tessera::testrom::fm_rom_z80_rom(
+        static_cast<unsigned>(std::atoi(argv[1] + 11)));
+  else if (std::strncmp(argv[1], "fm-busy-z80-", 12) == 0)
+    rom = tessera::testrom::fm_busy_z80_rom(
+        static_cast<unsigned>(std::atoi(argv[1] + 12)));
   else if (std::strcmp(argv[1], "fm-psg-z80") == 0)
     rom = tessera::testrom::fm_psg_z80_rom();
   else if (std::strncmp(argv[1], "fm-psg-", 7) == 0)
