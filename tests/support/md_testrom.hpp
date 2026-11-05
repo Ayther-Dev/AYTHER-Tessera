@@ -2129,6 +2129,8 @@ inline std::vector<std::uint8_t> mode4_scene_rom(const Mode4Variant &v) {
 //   2 gaps: the same data write after 0..12 nops, then after growing delays
 //   3 FM words: word writes on the chip ports
 //   4 flood: 9 000 PSG writes in a row (more than the log holds)
+//   5 audible: FM channels 1 and 2 (algorithm 7, fast attack) and the PSG
+//     tones 0 and 1 and the noise, all at full volume (TP-107.5)
 class Ops68 {
 public:
   // move.b #v,off(a0) / move.b #v,off(a1) / move.b #v,off(a2)
@@ -2211,6 +2213,26 @@ inline std::vector<std::uint8_t> fm_psg_sweep_rom(unsigned variant,
   case 4:
     for (unsigned n = 0; n < 9000; ++n)
       o.psg_fast(0x80 + (n & 0x1F));
+    break;
+  case 5:
+    for (unsigned ch = 0; ch < 2; ++ch) {
+      o.ym(0, 0xB0 + ch); o.ym(1, 0x07);          // algorithm 7: all carriers
+      o.ym(0, 0xB4 + ch); o.ym(1, 0xC0);          // both speakers
+      for (unsigned op = 0; op < 4; ++op) {
+        o.ym(0, 0x30 + 4 * op + ch); o.ym(1, 0x01); // multiple 1
+        o.ym(0, 0x40 + 4 * op + ch); o.ym(1, 0x00); // total level 0
+        o.ym(0, 0x50 + 4 * op + ch); o.ym(1, 0x1F); // attack rate 31
+        o.ym(0, 0x60 + 4 * op + ch); o.ym(1, 0x00);
+        o.ym(0, 0x70 + 4 * op + ch); o.ym(1, 0x00);
+        o.ym(0, 0x80 + 4 * op + ch); o.ym(1, 0x0F);
+      }
+      o.ym(0, 0xA4 + ch); o.ym(1, 0x22 + ch);
+      o.ym(0, 0xA0 + ch); o.ym(1, 0x69 + 16 * ch);
+      o.ym(0, 0x28); o.ym(1, 0xF0 + ch);          // key on, all operators
+    }
+    o.psg(0, 0x8A); o.psg(0, 0x0C); o.psg(0, 0x90); // tone 0
+    o.psg(0, 0xA5); o.psg(0, 0x07); o.psg(0, 0xB0); // tone 1
+    o.psg(0, 0xE4); o.psg(0, 0xF0);                 // white noise, loudest
     break;
   default:
     o.ymw(0, 0x2208);   // high byte $22, low byte $08

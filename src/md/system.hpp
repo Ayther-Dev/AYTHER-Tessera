@@ -104,6 +104,16 @@ public:
   const Psg &psg() const noexcept { return psg_; }
   /// Audio of the last frame run: interleaved S16 stereo at 48 kHz (TP-107.4).
   std::span<const std::int16_t> audio() const noexcept { return mixer_.output(); }
+  /// `AUDIO_MUTE` (RF-3.7): 18 bits, FM 0-5, PSG 6-9 (tones 0-2, noise), PCM
+  /// 10-17 (none on this console). It acts on the mix only: not in the state,
+  /// not in the savestate, and it survives reset and restore.
+  static constexpr std::uint32_t kAudioMuteBits = 0x3FFFFU;
+  void set_audio_mute(std::uint32_t mask) noexcept {
+    audio_mute_ = mask & kAudioMuteBits;
+    ym_.set_mute(static_cast<std::uint8_t>(audio_mute_ & 0x3FU));
+    psg_.set_mute(static_cast<std::uint8_t>(audio_mute_ >> 6 & 0xFU));
+  }
+  std::uint32_t audio_mute() const noexcept { return audio_mute_; }
   /// Sound chip writes of the last frame run (up to kAudioWriteCapacity) and
   /// the ones that did not fit.
   std::span<const AudioWrite> audio_writes() const noexcept {
@@ -184,6 +194,7 @@ private:
   Ym2612 ym_;
   Psg psg_;
   Mixer mixer_;
+  std::uint32_t audio_mute_ = 0;
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from

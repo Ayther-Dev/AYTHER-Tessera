@@ -46,9 +46,16 @@ public:
 
   /// Samples generated since the last `clear_samples` (native chip rate).
   std::span<const YmSample> samples() const noexcept;
+  /// The same samples as if nothing were muted (the savestate keeps these).
+  std::span<const YmSample> raw_samples() const noexcept;
   void clear_samples() noexcept;
   /// Number of samples generated since reset.
   std::uint64_t sample_count() const noexcept;
+
+  /// Output mute (TP-107.5): bit n silences FM channel n (5 is also the DAC).
+  /// It acts on the sample sum only; it is not part of the chip state.
+  void set_mute(std::uint8_t mask) noexcept;
+  std::uint8_t mute() const noexcept;
 
   /// Savestate: the chip (ymfm save_restore), the clock and the timers.
   void save(StateWriter &w) const;

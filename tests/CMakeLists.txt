@@ -339,3 +339,10 @@ target_link_libraries(tessera_md_mixer_test PRIVATE Tessera::core Tessera::build
 tessera_copy_diagnostic_runtime(tessera_md_mixer_test)
 add_test(NAME unit.md_mixer COMMAND tessera_md_mixer_test)
 set_tests_properties(unit.md_mixer PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
+
+add_executable(tessera_md_audio_mute_test unit/md_audio_mute_test.cpp)
+target_include_directories(tessera_md_audio_mute_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_audio_mute_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_audio_mute_test)
+add_test(NAME unit.md_audio_mute COMMAND tessera_md_audio_mute_test)
+set_tests_properties(unit.md_audio_mute PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)

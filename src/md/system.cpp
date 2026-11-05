@@ -187,7 +187,8 @@ void System::run_frame() {
   }
   ym_.run_to(frame_master + cycles_per_frame(config_.standard));
   psg_.run_to(frame_master + cycles_per_frame(config_.standard));
-  mixer_.push(ym_.samples(), psg_.samples());
+  mixer_.push(ym_.samples(), psg_.samples(), ym_.raw_samples(),
+              psg_.raw_samples());
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();
 }

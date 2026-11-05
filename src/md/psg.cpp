@@ -28,6 +28,7 @@ void Psg::reset() noexcept {
   latch_ = 0;
   produced_ = 0;
   out_.clear();
+  raw_.clear();
 }
 
 void Psg::write(std::uint8_t value, std::uint64_t master) {
@@ -79,11 +80,13 @@ void Psg::step() noexcept {
   }
 }
 
-std::int16_t Psg::mix() const noexcept {
+std::int16_t Psg::mix(std::uint8_t mute) const noexcept {
   int sum = 0;
   for (unsigned c = 0; c < 3; ++c)
-    sum += flip_[c] != 0 ? kVolume[atten_[c]] : -kVolume[atten_[c]];
-  sum += (lfsr_ & 1U) != 0 ? kVolume[atten_[3]] : -kVolume[atten_[3]];
+    if ((mute >> c & 1U) == 0)
+      sum += flip_[c] != 0 ? kVolume[atten_[c]] : -kVolume[atten_[c]];
+  if ((mute & 8U) == 0)
+    sum += (lfsr_ & 1U) != 0 ? kVolume[atten_[3]] : -kVolume[atten_[3]];
   return static_cast<std::int16_t>(sum * 2);
 }
 
@@ -91,7 +94,8 @@ void Psg::run_to(std::uint64_t master) {
   const std::uint64_t target = master / kMasterPerSample;
   while (produced_ < target) {
     step();
-    out_.push_back(mix());
+    out_.push_back(mix(mute_));
+    raw_.push_back(mix(0));
     ++produced_;
   }
 }
@@ -121,6 +125,7 @@ void Psg::load(StateReader &r) {
   latch_ = r.u8();
   produced_ = r.u64();
   out_.clear();
+  raw_.clear();
 }
 
 } // namespace tessera::md
