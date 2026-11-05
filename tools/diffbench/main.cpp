@@ -346,10 +346,50 @@ int main(int argc, char **argv) {
             static_cast<uint8_t>(std::stoul(parts[2].substr(i, 2), nullptr, 16)));
       poke.frame = static_cast<unsigned>(std::stoul(parts[3]));
     }
+    if (args.count("--bench-out")) {
+      // TP-014.1/.2: time each retro_run, with the observation fully
+      // subscribed (full) or not at all (none).
+      const std::string mode =
+          args.count("--observation") ? args["--observation"] : "full";
+      if (mode != "full" && mode != "none") {
+        std::cerr << "error: --observation full|none\n";
+        return 2;
+      }
+      diffbench::set_bench(true, mode == "full" ? 1 : 0);
+    }
     const auto r = diffbench::run_libretro(
         args["--libretro"], args["--rom"], frames, args.count("--dump-regions") > 0,
         args.count("--trace") ? &trace : nullptr,
         args.count("--poke") ? &poke : nullptr);
+    if (args.count("--bench-out")) {
+      const unsigned warmup =
+          args.count("--warmup")
+              ? static_cast<unsigned>(
+                    std::strtoul(args["--warmup"].c_str(), nullptr, 10))
+              : 60u;
+      std::vector<double> kept;
+      for (size_t i = warmup; i < r.run_micros.size(); ++i)
+        kept.push_back(r.run_micros[i]);
+      std::sort(kept.begin(), kept.end());
+      const auto pct = [&](double q) {
+        return kept.empty() ? 0.0
+                            : kept[std::min(kept.size() - 1,
+                                            static_cast<size_t>(q * kept.size()))];
+      };
+      nlohmann::json j;
+      j["rom"] = args["--rom"];
+      j["frames"] = frames;
+      j["warmup"] = warmup;
+      j["observation"] =
+          args.count("--observation") ? args["--observation"] : "full";
+      j["serialize_size"] = r.serialize_size;
+      j["measured_frames"] = kept.size();
+      j["p50_us"] = pct(0.50);
+      j["p95_us"] = pct(0.95);
+      j["p99_us"] = pct(0.99);
+      std::ofstream out(args["--bench-out"]);
+      out << j.dump(2) << "\n";
+    }
     if (args.count("--poke"))
       std::cout << "poke status=" << poke.status << "\n";
     return report_run(r, frames, args);

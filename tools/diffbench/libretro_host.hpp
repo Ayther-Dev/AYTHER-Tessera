@@ -32,6 +32,10 @@ struct RunResult {
   uint32_t ayther_abi = 0;
   uint64_t ayther_capabilities = 0;
   std::string ayther_build_id;
+  // Cost of each retro_run in microseconds (TP-014.1, --bench), and the size
+  // retro_serialize_size reports.
+  std::vector<double> run_micros;
+  size_t serialize_size = 0;
   std::string error;
 };
 
@@ -72,6 +76,9 @@ void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1);
 // Dispositivo libretro que se pide para ambos puertos tras cargar el juego
 // (0 = el del core por defecto; 0x101 = mando de 6 botones de gpgx).
 void set_pad_device(unsigned device);
+/// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
+/// 0 subscribes to nothing, 1 to every region (the full set).
+void set_bench(bool on, int observation);
 /// Value the core reads for an option (GET_VARIABLE); the rest keep defaults.
 void set_core_option(const std::string &key, const std::string &value);
 

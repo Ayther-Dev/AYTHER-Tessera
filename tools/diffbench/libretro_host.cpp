@@ -4,6 +4,7 @@
 
 #include "tessera/tessera_observation.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -196,6 +197,12 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 
 unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
+static bool g_bench = false;
+static int g_bench_observation = -1;
+void set_bench(bool on, int observation) {
+  g_bench = on;
+  g_bench_observation = observation;
+}
 void set_core_option(const std::string &key, const std::string &value) {
   core_options()[key] = value;
 }
@@ -274,7 +281,8 @@ RunResult run_libretro(const std::string &core_path,
     using GetIface = const AytherInterface *(__cdecl *)(uint32_t);
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;
-    const bool want_iface = dump_regions || poke != nullptr;
+    const bool want_iface =
+        dump_regions || poke != nullptr || g_bench_observation >= 0;
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -284,7 +292,8 @@ RunResult run_libretro(const std::string &core_path,
       result.ayther_capabilities = iface->capabilities;
       if (iface->build_id != nullptr)
         result.ayther_build_id.assign(iface->build_id, iface->build_id_size);
-      iface->set_subscriptions(TESSERA_OBS_SUB_ALL);
+      iface->set_subscriptions(g_bench_observation == 0 ? 0u
+                                                        : TESSERA_OBS_SUB_ALL);
     }
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
       if (poke && iface && i == poke->frame) {
@@ -293,7 +302,20 @@ RunResult run_libretro(const std::string &core_path,
             poke->region, poke->offset, poke->data.data(),
             static_cast<uint32_t>(poke->data.size()), UINT64_MAX, &generation);
       }
-      run();
+      if (g_bench) {
+        const auto t0 = std::chrono::steady_clock::now();
+        run();
+        const auto t1 = std::chrono::steady_clock::now();
+        result.run_micros.push_back(
+            std::chrono::duration<double, std::micro>(t1 - t0).count());
+      } else {
+        run();
+      }
+    }
+    if (g_bench) {
+      size_t(__cdecl * serialize_size)() = nullptr;
+      if (sym(core, "retro_serialize_size", serialize_size))
+        result.serialize_size = serialize_size();
     }
     if (iface && dump_regions) {
       for (uint32_t id = 1; id < TESSERA_OBS_REGION_COUNT; ++id) {
