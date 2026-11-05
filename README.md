@@ -68,6 +68,7 @@ los candidatos se construyen con un trabajo para limitar memoria.
 ./build/windows-dev/src/tessera.exe demo --backend synthetic.complete --scenario action --frames 3000 --observer two-readers
 ```
 
+La [hoja de ruta](docs/roadmap.md) resume las decisiones de alcance, las fases y las puertas.
 La [guía de CLI](docs/cli.md) describe trazas, generación de fixtures e informes.
 Mega Drive se reconoce por bytes, pero su implementación de producto corresponde
 a T019. Los perfiles TEST no anuncian checkpoint; su implementación sigue T022/T023.
