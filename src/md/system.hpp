@@ -154,7 +154,7 @@ private:
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from
-  std::array<std::uint8_t, 2> ym_reg_{}; ///< register latched by each part
+  std::uint16_t ym_addr_ = 0; ///< latch: (part << 8) | register of the last address write
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
   void psg_write(std::uint8_t value, std::uint64_t now);

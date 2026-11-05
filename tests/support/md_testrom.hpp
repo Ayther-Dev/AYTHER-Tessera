@@ -2120,4 +2120,149 @@ inline std::vector<std::uint8_t> mode4_scene_rom(const Mode4Variant &v) {
   return rom;
 }
 
+// `fm_psg_sweep` (TP-107.2/107.3): with the Z80 bus granted the 68000 repeats
+// once per frame (synchronised on the start of the vertical blanking) a list of
+// writes to the YM2612 ($A04000-3) and to the PSG ($C00010-7): the observation
+// region AUDIO_WRITES of the last frame is what the bench compares. Variants:
+//   0 FM: ports, parts, address-only and data-only writes, DAC, key-on
+//   1 PSG: byte writes on the four odd addresses, word writes, even bytes
+//   2 gaps: the same data write after 0..12 nops, then after growing delays
+//   3 FM words: word writes on the chip ports
+//   4 flood: 9 000 PSG writes in a row (more than the log holds)
+class Ops68 {
+public:
+  // move.b #v,off(a0) / move.b #v,off(a1) / move.b #v,off(a2)
+  void ym(unsigned off, unsigned v) { c.insert(c.end(), {0x117C, w(v), w(off)}); }
+  void psg(unsigned off, unsigned v) { c.insert(c.end(), {0x137C, w(v), w(off)}); }
+  // move.b #v,(a1): 12 cycles, the fastest way to fill the log
+  void psg_fast(unsigned v) { c.insert(c.end(), {0x12BC, w(v)}); }
+  void psg_even(unsigned off, unsigned v) {
+    c.insert(c.end(), {0x157C, w(v), w(off)});
+  }
+  // move.w #v,off(a0) / off(a2)
+  void ymw(unsigned off, unsigned v) { c.insert(c.end(), {0x317C, w(v), w(off)}); }
+  void psgw(unsigned off, unsigned v) { c.insert(c.end(), {0x357C, w(v), w(off)}); }
+  void nops(unsigned n) {
+    for (unsigned i = 0; i < n; ++i)
+      c.push_back(0x4E71);
+  }
+  // move.w #n,d0; dbra d0,*: n + 1 iterations of 10 cycles
+  void delay(unsigned n) { c.insert(c.end(), {0x303C, w(n), 0x51C8, 0xFFFE}); }
+  std::vector<std::uint16_t> c;
+
+private:
+  static std::uint16_t w(unsigned v) { return static_cast<std::uint16_t>(v); }
+};
+
+//   `once`: no synchronisation; after a fixed delay the list runs one time and
+//   the 68000 stops, so it all happens in frame 0 (the frame start, not the
+//   status of the VDP, fixes the cycles)
+inline std::vector<std::uint8_t> fm_psg_sweep_rom(unsigned variant,
+                                                  bool once = false) {
+  Ops68 o;
+  switch (variant) {
+  case 0:
+    o.ym(0, 0x22); o.ym(1, 0x08);   // part 1: address, data
+    o.ym(0, 0x27); o.ym(1, 0x00);
+    o.ym(0, 0x28); o.ym(1, 0xF0);   // key on
+    o.ym(1, 0x55);                  // data again, no address
+    o.ym(0, 0x30);                  // address alone
+    o.ym(2, 0x1A); o.ym(3, 0x77);   // part 2: address, data
+    o.ym(3, 0x66);
+    o.ym(0, 0x2A); o.ym(1, 0x80);   // DAC data
+    o.ym(0, 0x2B); o.ym(1, 0x80);   // DAC enable
+    o.ym(0, 0xB4); o.ym(1, 0xC0);
+    o.delay(100);
+    o.ym(0, 0xA4); o.ym(1, 0x22); o.ym(0, 0xA0); o.ym(1, 0x69);
+    o.ym(2, 0xB4); o.ym(3, 0xC0);
+    o.delay(1000);
+    o.ym(0, 0x28); o.ym(1, 0x00);   // key off
+    o.ym(0, 0x21); o.ym(1, 0x01);   // test register
+    o.ym(0, 0x24); o.ym(1, 0x80); o.ym(0, 0x25); o.ym(1, 0x02);
+    o.ym(0, 0x27); o.ym(1, 0x15);   // timer A load
+    break;
+  case 1:
+    o.psg(0, 0x8F); o.psg(0, 0x3F);       // $C00011: tone 0 low, data
+    o.psg(2, 0x90);                       // $C00013: attenuation
+    o.psg(4, 0xA5); o.psg(6, 0xB3);       // $C00015, $C00017
+    o.psg(0, 0xE5); o.psg(0, 0xF1);       // noise, attenuation
+    o.psg_even(0, 0xC9);                  // byte on $C00010: high lane
+    o.psg_even(2, 0xD8);                  // $C00012
+    o.psgw(0, 0x00A7);                    // word on $C00010
+    o.psgw(2, 0x1B84);                    // word on $C00012
+    o.psgw(4, 0xFFC2);
+    o.psgw(6, 0x0001);
+    o.psg(0, 0x9F);
+    break;
+  case 2:
+    for (unsigned n = 0; n <= 12; ++n) {
+      o.ym(1, n);
+      o.nops(n);
+    }
+    for (unsigned d : {0u, 1u, 2u, 5u, 10u, 40u, 120u, 400u}) {
+      o.ym(1, 0xE0 + d % 16);
+      o.delay(d);
+    }
+    for (unsigned n = 0; n <= 6; ++n) {
+      o.psg(0, 0x80 + n);
+      o.nops(n);
+    }
+    break;
+  case 4:
+    for (unsigned n = 0; n < 9000; ++n)
+      o.psg_fast(0x80 + (n & 0x1F));
+    break;
+  default:
+    o.ymw(0, 0x2208);   // high byte $22, low byte $08
+    o.ym(1, 0x99);      // data: which register did the word latch?
+    o.ymw(0, 0x2700);
+    o.ym(1, 0x98);
+    o.ymw(2, 0x1A55);
+    o.ym(3, 0x97);      // part 2
+    o.ymw(2, 0x30AA);
+    o.ym(3, 0x96);
+    o.ymw(4, 0x2B80);   // $A04004: a mirror of the ports?
+    o.ym(5, 0x95);
+    break;
+  }
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00A0, 0x4000, // lea $A04000,a0
+      0x43F9, 0x00C0, 0x0011, // lea $C00011,a1
+      0x45F9, 0x00C0, 0x0010, // lea $C00010,a2
+      0x4DF9, 0x00C0, 0x0004, // lea $C00004,a6
+      0x49F9, 0x00A1, 0x1100, // lea $A11100,a4
+      0x4BF9, 0x00A1, 0x1200, // lea $A11200,a5
+      0x3ABC, 0x0100,         // reset released
+      0x38BC, 0x0100,         // bus request
+      0x0814, 0x0000, 0x66FA, // wait for the grant
+      0x3CBC, 0x8144,         // display on: status bit 3 is the blanking only
+  };
+  const std::size_t loop = c.size();
+  if (once) {
+    c.insert(c.end(), {0x303C, 0x0300, 0x51C8, 0xFFFE}); // delay
+    c.insert(c.end(), o.c.begin(), o.c.end());
+    c.push_back(0x60FE);
+  } else {
+    c.insert(c.end(), {0x082E, 0x0003, 0x0001, 0x67F8}); // wait for vblank
+    c.insert(c.end(), o.c.begin(), o.c.end());
+    c.insert(c.end(), {0x082E, 0x0003, 0x0001, 0x66F8}); // wait for its end
+    // jmp loop (absolute: bra.w would not reach back over a long list)
+    c.insert(c.end(), {0x4EF9, 0x0000, static_cast<std::uint16_t>(0x200 + loop * 2)});
+  }
+  std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER FM PSG   ", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 } // namespace tessera::testrom

@@ -249,6 +249,41 @@ if(TESSERA_BUILD_MEGADRIVE)
             PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0.*z80_ram bytes=8192 differing=0"
             LABELS "integration;phase1;md;local" TIMEOUT 120)
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-107.2/107.3: AUDIO_WRITES (plane 2) of the last frame against gpgx.
+        # The "-once" ROMs run their list in frame 0 with no synchronisation
+        # (cycles within one 68000 cycle: the refresh stall lands on another
+        # instruction); the others repeat it once per frame, locked to the
+        # blanking flag, whose poll phase moves the cycles by up to one poll
+        # (200 master cycles) but never the sequence. fm-psg-z80 is the Z80
+        # side and matches to the cycle.
+        foreach(mode IN ITEMS fm-psg-0-once fm-psg-1-once fm-psg-2-once fm-psg-3-once
+                fm-psg-0 fm-psg-1 fm-psg-2 fm-psg-3 fm-psg-z80)
+            add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
+                "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
+            set_tests_properties(integration.md_${mode}_rom PROPERTIES
+                FIXTURES_SETUP md_${mode}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+            if(mode MATCHES "once$|z80$")
+                set(audio_frames 1)
+                set(audio_tolerance 7)
+            else()
+                set(audio_frames 8)
+                set(audio_tolerance 200)
+            endif()
+            if(mode STREQUAL "fm-psg-z80")
+                set(audio_tolerance 0)
+            endif()
+            add_test(NAME integration.md_${mode} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_audio.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin"
+                ${audio_frames} "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}" --tolerance ${audio_tolerance})
+            set_tests_properties(integration.md_${mode} PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "differing=0 "
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
        AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
         # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.

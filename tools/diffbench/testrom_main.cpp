@@ -90,6 +90,12 @@ int main(int argc, char **argv) {
   else if (std::strncmp(argv[1], "ym-busy-", 8) == 0)
     rom = tessera::testrom::ym_busy_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 8, nullptr, 10)));
+  else if (std::strcmp(argv[1], "fm-psg-z80") == 0)
+    rom = tessera::testrom::fm_psg_z80_rom();
+  else if (std::strncmp(argv[1], "fm-psg-", 7) == 0)
+    rom = tessera::testrom::fm_psg_sweep_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 7, nullptr, 10)),
+        std::strstr(argv[1], "-once") != nullptr);
   else if (std::strcmp(argv[1], "z80-busreq") == 0)
     rom = tessera::testrom::z80_busreq_rom();
   else if (std::strcmp(argv[1], "cpu-drift") == 0)

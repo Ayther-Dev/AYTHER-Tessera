@@ -609,4 +609,44 @@ inline std::vector<std::uint8_t> z80_int_rom(unsigned variant) {
   return detail::z80_rom_image("AYTHER Z80 INT", a.code, p);
 }
 
+// `fm_psg_z80` (TP-107.2/107.3): the Z80 writes the YM2612 ($4000-$4005) and
+// the PSG ($7F11-$7F19) once, from its own code; compared in frame 0 with the
+// AUDIO_WRITES of gpgx.
+inline std::vector<std::uint8_t> fm_psg_z80_payload() {
+  Z80Asm a;
+  const auto put = [&](std::uint16_t address, std::uint8_t value) {
+    a.ld_a(value);
+    a.ld_mem_a(address);
+  };
+  put(0x4000, 0x22); put(0x4001, 0x08);
+  put(0x4000, 0x28); put(0x4001, 0xF0);
+  put(0x4002, 0x1A); put(0x4003, 0x77);
+  put(0x4000, 0x2B); put(0x4001, 0x80);
+  a.ld_mem_a(0x4001);                      // data again, no address
+  put(0x4004, 0x2A); put(0x4005, 0x81);    // a mirror of the ports
+  put(0x4003, 0x66);
+  put(0x7F11, 0x9F); put(0x7F13, 0x8F);
+  put(0x7F15, 0xE4); put(0x7F17, 0xBF);
+  put(0x7F10, 0x85); put(0x7F12, 0x86);    // even addresses
+  put(0x7F19, 0x87); put(0x7F1F, 0x88);    // past the PSG ports
+  put(0x7F11, 0x91);
+  a.jr_self();
+  return a.code;
+}
+
+inline std::vector<std::uint8_t> fm_psg_z80_rom() {
+  const auto payload = fm_psg_z80_payload();
+  detail::M68kProgram p;
+  p.prologue();
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(payload.size()));
+  p.reset_pin(0x0000);
+  p.reset_pin(0x0100);
+  p.request(0x0000);
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER FM Z80   ", payload, p);
+}
+
 } // namespace tessera::testrom

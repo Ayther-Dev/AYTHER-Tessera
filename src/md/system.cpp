@@ -8,6 +8,10 @@ std::uint16_t dup(std::uint8_t v) {
 }
 // Extra Z80 T-states of an access to the 68000 bus through the bank window.
 constexpr unsigned kZ80RomWait = 3;
+constexpr unsigned kZ80VdpWait = 3;
+// Master cycles between the release of the reset line and the first Z80 fetch
+// (gpgx fm_psg_z80: every write of the payload is stamped 67 cycles later).
+constexpr std::uint64_t kZ80ResetDelay = 67;
 // How far the Z80 INT leads the vertical interrupt of the 68000, in master cycles.
 constexpr std::uint64_t kZ80IntLead = 1620;
 // YM2612 busy time after a data write, master cycles (probe ym-busy-N)
@@ -51,7 +55,7 @@ void System::reset() {
   z80_bank_ = 0;
   ym_.reset();
   psg_.reset();
-  ym_reg_ = {};
+  ym_addr_ = 0;
   ym_busy_until_ = 0;
   audio_log_.clear();
   audio_dropped_ = 0;
@@ -318,8 +322,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     if (a < 0x4000)
       z80_ram_[a & 0x1FFFU] = v;
     else if (a < 0x6000)
-      ym_write(a, word ? static_cast<std::uint8_t>(value) : v,
-               cpu_.getClock() * kDivider68k, word);
+      ym_write(a, v, cpu_.getClock() * kDivider68k, word);
     else if ((a & 0xFF00U) == 0x6000U)
       z80_bank_write(v);
     break;
@@ -334,7 +337,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
       if (request && z80_running())
         z80_.finish_instruction(); // the Z80 grants the bus between instructions
       if (!z80_running() && !request && z80_reset_released_)
-        z80_master_ = cpu_.getClock() * kDivider68k; // resumes from now
+        z80_master_ = cpu_.getClock() * kDivider68k + kZ80ResetDelay; // resumes
       z80_bus_requested_ = request;
     } else if (offset == 0x1200) {
       z80_sync_now();
@@ -425,17 +428,21 @@ void System::psg_write(std::uint8_t value, std::uint64_t now) {
 
 void System::ym_write(std::uint32_t address, std::uint8_t value,
                       std::uint64_t now, bool word) {
-  // A word write reaches the chip through the low byte: the data port.
-  const unsigned port = word ? ((address & 2U) | 1U) : (address & 3U);
-  const unsigned part = (port >> 1) & 1U;
+  // A word write puts its high byte on the even address: an address port
+  // (gpgx fm_psg_sweep variant 3); the low byte is lost.
+  const unsigned port = word ? (address & 2U) : (address & 3U);
   ym_.write(port, value, now);
   if ((port & 1U) == 0) {
-    ym_reg_[part] = value;
+    // One latch: the part of the following data writes is the one of the last
+    // address write, whatever port the data goes to (gpgx fm_psg_z80).
+    ym_addr_ = static_cast<std::uint16_t>(((port >> 1) << 8) | value);
   } else {
-    log_audio(static_cast<std::uint16_t>((part << 8) | ym_reg_[part]), value,
-              0, now);
-    ym_busy_until_ = now + kYmBusy;
+    log_audio(ym_addr_, value, 0, now);
   }
+  // The busy time was measured on data writes by byte and on every word write
+  // (ym-busy-N probes, SoR2 corpus).
+  if ((address & 1U) != 0 || word)
+    ym_busy_until_ = now + kYmBusy;
 }
 
 void System::z80_bank_write(std::uint8_t value) noexcept {
@@ -471,8 +478,13 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
   } else if (address < 0x8000) {
     if ((address & 0xFF00U) == 0x6000U)
       z80_bank_write(value);
-    else if ((address & 0xFFF9U) == 0x7F11U)
-      psg_write(value, z80_master_);
+    else if (address >= 0x7F00U) {
+      // The VDP window of the Z80 (68000 bus): 3 wait states for each access,
+      // counted before the write is stamped (gpgx fm_psg_z80).
+      wait = kZ80VdpWait;
+      if ((address & 0xFFF9U) == 0x7F11U)
+        psg_write(value, z80_master_ + std::uint64_t{kZ80VdpWait} * kDividerZ80);
+    }
   } else {
     const std::uint32_t a =
         (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);
