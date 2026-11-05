@@ -42,6 +42,13 @@ public:
       std::function<void(std::uint32_t line, std::span<const std::uint32_t>)>;
 
   void set_line_hook(LineHook hook) { hook_ = std::move(hook); }
+  /// Power-on state of what carries from frame to frame (the line hook stays).
+  void reset() noexcept {
+    flags_ = {};
+    field_ = 0;
+    double_res_ = false;
+    offscreen_ = {};
+  }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
   /// Field drawn in interlace mode 2 (0 even double-resolution lines, 1 odd);

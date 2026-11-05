@@ -35,6 +35,9 @@ public:
 
   /// Power-on state; the clock goes back to master cycle 0.
   void reset();
+  /// The chip's reset line: registers and timers go to their reset state, the
+  /// clock and the sample stream go on (the RESET button of the console).
+  void soft_reset();
   /// Runs the chip up to `master` (timers fire, samples are generated).
   void run_to(std::uint64_t master);
   /// Write to port 0-3 ($A04000-3): address/data of part 1, address/data of

@@ -99,6 +99,13 @@ tessera_copy_diagnostic_runtime(tessera_md_determinism_test)
 add_test(NAME integration.md_determinism COMMAND tessera_md_determinism_test --test-case=*synthetic*,*one\ process*)
 set_tests_properties(integration.md_determinism PROPERTIES LABELS "integration;phase1;md" TIMEOUT 600)
 
+add_executable(tessera_md_reset_test integration/md_reset_test.cpp)
+target_include_directories(tessera_md_reset_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_reset_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_reset_test)
+add_test(NAME integration.md_reset COMMAND tessera_md_reset_test)
+set_tests_properties(integration.md_reset PROPERTIES LABELS "integration;phase1;md" TIMEOUT 120)
+
 add_executable(tessera_md_region_test unit/md_region_test.cpp)
 target_include_directories(tessera_md_region_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_region_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)

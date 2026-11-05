@@ -11,6 +11,8 @@ Z80::Z80(Z80Bus &bus) : bus_(bus) { reset(); }
 void Z80::reset() {
   pins_ = tessera_z80_reset(&cpu_);
   wait_ = 0;
+  cycles_ = 0;
+  int_ = false;
 }
 
 void Z80::finish_instruction() {

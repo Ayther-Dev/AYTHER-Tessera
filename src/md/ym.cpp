@@ -3,6 +3,7 @@
 #include "ymfm_opn.h"
 
 #include <array>
+#include <memory>
 #include <vector>
 
 namespace tessera::md {
@@ -64,6 +65,12 @@ struct Ym2612::Impl final : ymfm::ymfm_interface {
   Impl() : chip(*this) { chip.reset(); }
 
   void reset_state() {
+    // ymfm's reset leaves some hidden state (counters, caches) from the run
+    // before; a hard reset builds the chip again, so that it equals a new one.
+    const auto mute = chip.mute;
+    std::destroy_at(&chip);
+    std::construct_at(&chip, *this);
+    chip.mute = mute;
     chip.reset();
     clock = 0;
     produced = 0;
@@ -120,6 +127,11 @@ Ym2612::Ym2612(Ym2612 &&) noexcept = default;
 Ym2612 &Ym2612::operator=(Ym2612 &&) noexcept = default;
 
 void Ym2612::reset() { impl_->reset_state(); }
+
+void Ym2612::soft_reset() {
+  impl_->chip.reset();
+  impl_->deadline = {kNoDeadline, kNoDeadline};
+}
 
 std::span<const YmSample> Ym2612::raw_samples() const noexcept {
   return impl_->raw;

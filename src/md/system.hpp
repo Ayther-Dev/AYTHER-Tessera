@@ -54,6 +54,10 @@ public:
 
   /// Hard reset: clears RAM and the devices, then resets the CPU.
   void reset();
+  /// The RESET button (RF-4.4): the 68000 starts again from its vectors, the
+  /// Z80 and the YM2612 take their reset line and the Z80 bus is released;
+  /// work RAM, the VDP, the PSG, the I/O ports and the clock are kept.
+  void soft_reset();
   void run_frame();
 
   std::uint64_t frame() const noexcept { return frame_; }

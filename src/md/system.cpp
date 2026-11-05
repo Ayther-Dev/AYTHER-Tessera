@@ -69,6 +69,7 @@ void System::reset() {
     return bus_.read16(address);
   });
   tmss_ = Tmss(config_.tmss);
+  renderer_.reset();
   for (auto &byte : bus_.work_ram())
     byte = 0;
   z80_ram_.fill(0);
@@ -111,6 +112,21 @@ void System::reset() {
       static_cast<moira::i64>(boot_master / kDivider68k + kBootCpuCycles));
   refresh_due_ = cpu_.getClock() + 130;
   z80_master_ = boot_master;
+}
+
+void System::soft_reset() {
+  const auto clock = cpu_.getClock();
+  z80_bus_requested_ = false;
+  z80_reset_released_ = false;
+  z80_.soft_reset();
+  z80_bank_ = 0;
+  ym_.soft_reset();
+  ym_addr_ = 0;
+  ym_busy_until_ = 0;
+  cpu_.reset();
+  // The reset sequence takes the same 68000 cycles as after a hard reset.
+  cpu_.setClock(clock + 31);
+  update_irq();
 }
 
 void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
