@@ -21,6 +21,8 @@ set_tests_properties(tool.diffbench_invalid_manifest PROPERTIES
     PASS_REGULAR_EXPRESSION "sin-hash: sha256" LABELS "tool;phase0" TIMEOUT 30)
 
 set(TESSERA_DIFFBENCH_GPGX_CORE "" CACHE FILEPATH "Core libretro de gpgx (r4) para las pruebas del banco.")
+set(TESSERA_DIFFBENCH_CORPUS_DIR "" CACHE PATH "Carpeta con las ROM del corpus (TP-105.11).")
+set(TESSERA_DIFFBENCH_CORPUS_MANIFEST "${PROJECT_SOURCE_DIR}/../specs/008-AYTHER-tessera-parity/tools/corpus.toml" CACHE FILEPATH "Manifiesto del corpus.")
 set(TESSERA_DIFFBENCH_FX02_ROM "" CACHE FILEPATH "ROM FX-02 generada por el probe del Gate 0.")
 if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
     add_test(NAME tool.diffbench_gpgx_fx02 COMMAND tessera_diffbench
@@ -220,7 +222,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region
         # (26) against gpgx after the request / reset sequences, the 68000 view
         # of the Z80 area and the bank window.
-        foreach(mode IN ITEMS z80-busreq z80-map z80-bank-0 z80-bank-1 z80-bank-2 z80-bank-3 z80-bank-4)
+        foreach(mode IN ITEMS z80-busreq z80-map z80-bank-0 z80-bank-1 z80-bank-2 z80-bank-3 z80-bank-4 ym-busy-0 ym-busy-1 ym-busy-2 ym-busy-3 ym-busy-4 ym-busy-8)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
                 "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
             set_tests_properties(integration.md_${mode}_rom PROPERTIES
@@ -246,5 +248,18 @@ if(TESSERA_BUILD_MEGADRIVE)
             FIXTURES_REQUIRED md_z80-bank-0_rom
             PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0.*z80_ram bytes=8192 differing=0"
             LABELS "integration;phase1;md;local" TIMEOUT 120)
+    endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
+       AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
+        # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.
+        add_test(NAME integration.md_corpus COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_corpus.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}"
+            "${TESSERA_DIFFBENCH_CORPUS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/md-corpus"
+            --planes framebuffer)
+        set_tests_properties(integration.md_corpus PROPERTIES
+            PASS_REGULAR_EXPRESSION "result=identical"
+            LABELS "integration;phase1;md;local" TIMEOUT 1800)
     endif()
 endif()

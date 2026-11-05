@@ -87,6 +87,9 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::z80_clock_rom(false);
   else if (std::strcmp(argv[1], "z80-clock-bank") == 0)
     rom = tessera::testrom::z80_clock_rom(true);
+  else if (std::strncmp(argv[1], "ym-busy-", 8) == 0)
+    rom = tessera::testrom::ym_busy_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 8, nullptr, 10)));
   else if (std::strcmp(argv[1], "z80-busreq") == 0)
     rom = tessera::testrom::z80_busreq_rom();
   else if (std::strcmp(argv[1], "cpu-drift") == 0)

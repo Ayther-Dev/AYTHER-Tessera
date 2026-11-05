@@ -10,6 +10,8 @@ std::uint16_t dup(std::uint8_t v) {
 constexpr unsigned kZ80RomWait = 3;
 // How far the Z80 INT leads the vertical interrupt of the 68000, in master cycles.
 constexpr std::uint64_t kZ80IntLead = 1620;
+// YM2612 busy time after a data write, master cycles (probe ym-busy-N)
+constexpr std::uint64_t kYmBusy = 1325;
 } // namespace
 
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
@@ -234,7 +236,7 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
     if (a < 0x4000)
       v = z80_ram_[a & 0x1FFFU];
     else if (a < 0x6000)
-      v = 0; // YM2612 status: not busy, no timer flag
+      v = ym_status(cpu_.getClock() * kDivider68k);
     else if (a < 0x7F00)
       v = 0xFF;
     else
@@ -282,16 +284,11 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   }
 }
 
-// The 68000 loses 0.7 cycles on average on every access to the Z80 area
-// (measured on gpgx with cpu_z80area: 40 accesses cost 11 H counter units
-// more than the same accesses to work RAM). Spread as whole cycles.
-void System::z80_wait() {
-  z80_wait_acc_ += 70;
-  if (z80_wait_acc_ >= 100) {
-    z80_wait_acc_ -= 100;
-    cpu_.stall(1);
-  }
-}
+// The 68000 loses one cycle on every access to the Z80 area (gpgx: the copy
+// of the sound driver of Streets of Rage 2, 8 KiB of byte writes, ends in the
+// same frame only with exactly one; 0.7 from the first 40-access probe was
+// short and made the title lag a frame behind from its frame 156).
+void System::z80_wait() { cpu_.stall(1); }
 
 void System::write(Target target, std::uint32_t offset, std::uint16_t value,
                    bool word) {
@@ -306,6 +303,9 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
                         : static_cast<std::uint8_t>(value);
     if (a < 0x4000)
       z80_ram_[a & 0x1FFFU] = v;
+    else if (a < 0x6000)
+      ym_write(a, word ? static_cast<std::uint8_t>(value) : v,
+               cpu_.getClock() * kDivider68k, word);
     else if ((a & 0xFF00U) == 0x6000U)
       z80_bank_write(v);
     break;
@@ -379,6 +379,19 @@ std::uint16_t System::open_bus(std::uint32_t offset, bool word) const noexcept {
                             : static_cast<std::uint16_t>(irc >> 8);
 }
 
+// The YM2612 busy flag (bit 7 of the status): set for a fixed time by a write
+// to a data port, not by an address write. Measured on gpgx with ym-busy-N; the
+// timers and everything else of the chip are TP-107.
+std::uint8_t System::ym_status(std::uint64_t now) const noexcept {
+  return now < ym_busy_until_ ? 0x80U : 0U;
+}
+
+void System::ym_write(std::uint32_t address, std::uint8_t, std::uint64_t now,
+                      bool word) noexcept {
+  if ((address & 1U) != 0 || word)
+    ym_busy_until_ = now + kYmBusy;
+}
+
 void System::z80_bank_write(std::uint8_t value) noexcept {
   z80_bank_ = static_cast<std::uint16_t>(((z80_bank_ >> 1) |
                                            ((value & 1U) << 8)) &
@@ -390,7 +403,7 @@ std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
   if (address < 0x4000)
     return z80_ram_[address & 0x1FFFU];
   if (address < 0x6000)
-    return 0; // YM2612 status
+    return ym_status(z80_master_);
   if (address < 0x8000)
     return 0xFF;
   const std::uint32_t a =
@@ -408,7 +421,7 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
   if (address < 0x4000) {
     z80_ram_[address & 0x1FFFU] = value;
   } else if (address < 0x6000) {
-    // YM2612 ports: not modelled yet (TP-107)
+    ym_write(address, value, z80_master_, false); // the rest is TP-107
   } else if (address < 0x8000) {
     if ((address & 0xFF00U) == 0x6000U)
       z80_bank_write(value);

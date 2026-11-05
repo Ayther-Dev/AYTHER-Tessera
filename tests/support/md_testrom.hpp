@@ -453,6 +453,44 @@ inline std::vector<std::uint8_t> z80_busreq_rom() {
   return rom;
 }
 
+// `ym_busy` (TP-103, SoR2 corpus): with the Z80 bus granted the 68000 writes a
+// YM2612 address and a data byte and logs 48 status reads after each (from
+// $FF0000). The busy flag (bit 7) after a write is what the games poll.
+inline std::vector<std::uint8_t> ym_busy_rom(unsigned nops = 0) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER YM BUSY  ", 16);
+  put32(rom, 0x1A4, 0x3FF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+      0x49F9, 0x00A1, 0x1100, // lea $A11100,a4
+      0x4BF9, 0x00A1, 0x1200, // lea $A11200,a5
+      0x41F9, 0x00A0, 0x4000, // lea $A04000,a0
+      0x3ABC, 0x0100,         // reset released
+      0x38BC, 0x0100,         // bus request
+      0x0814, 0x0000, 0x66FA, // wait for the grant
+      0x10BC, 0x002B,         // move.b #$2B,(a0): address
+  };
+  for (unsigned i = 0; i < 48; ++i)
+    c.push_back(0x14D0); // move.b (a0),(a2)+
+  c.insert(c.end(), {0x117C, 0x0000, 0x0001}); // move.b #0,1(a0): data
+  for (unsigned i = 0; i < nops; ++i)
+    c.push_back(0x4E71);
+  for (unsigned i = 0; i < 48; ++i)
+    c.push_back(0x14D0);
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `cpu_timing` (TP-101.8): 40 repetitions of each instruction of a battery,
 // each group followed by a read of the HV counter stored at
 // $FF0000 + 2 * group. The differences between emulators are per instruction

@@ -93,7 +93,6 @@ private:
   std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
   void z80_wait();
-  unsigned z80_wait_acc_ = 0;
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
              bool word) override;
@@ -127,6 +126,10 @@ private:
   Z80 z80_{z80_port_};
   std::uint64_t z80_master_ = 0; ///< master cycle the Z80 has run up to
   std::uint16_t z80_bank_ = 0;
+  std::uint64_t ym_busy_until_ = 0; ///< master cycle the YM busy flag drops
+  std::uint8_t ym_status(std::uint64_t now) const noexcept;
+  void ym_write(std::uint32_t address, std::uint8_t value, std::uint64_t now,
+                bool word) noexcept;
   std::uint64_t z80_int_end_ = 0; ///< master cycle the INT pulse ends
   Renderer renderer_;
   std::uint64_t frame_ = 0;
