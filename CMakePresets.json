@@ -65,6 +65,22 @@
       }
     },
     {
+      "name": "linux-dev",
+      "displayName": "Linux x64 development (synthetic core and Mega Drive core)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux"},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_TESTING": "ON",
+        "TESSERA_PORTABLE_TOOLCHAIN": "ON",
+        "TESSERA_ENABLE_DIAGNOSTICS": "OFF",
+        "TESSERA_ENGINE_INTEGRATION": "OFF",
+        "TESSERA_RUNTIME_INTEGRATION": "OFF",
+        "TESSERA_BUILD_BACKEND_PROBES": "OFF"
+      }
+    },
+    {
       "name": "windows-md-dev",
       "displayName": "Windows x64 development with the differential bench",
       "inherits": "windows-dev",

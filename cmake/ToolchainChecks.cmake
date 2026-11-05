@@ -1,6 +1,13 @@
 include_guard(GLOBAL)
 
 function(tessera_check_toolchain)
+    if(TESSERA_PORTABLE_TOOLCHAIN)
+        if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+            message(FATAL_ERROR "X64_TARGET_REQUIRED: the target pointer size must be 64 bits.")
+        endif()
+        message(STATUS "Toolchain (portable): ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION} on ${CMAKE_SYSTEM_NAME}")
+        return()
+    endif()
     if(NOT WIN32 OR NOT CMAKE_HOST_WIN32 OR NOT MSVC)
         message(FATAL_ERROR "WINDOWS_MSVC_ABI_REQUIRED: use Windows and MSVC or clang-cl with the MSVC ABI.")
     endif()

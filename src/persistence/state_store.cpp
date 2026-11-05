@@ -1,5 +1,6 @@
 #include "persistence/state_store.hpp"
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -146,3 +147,152 @@ StoreResult load_checkpoint(const std::filesystem::path &path, Bytes &out,
 }
 
 } // namespace tessera::persistence
+#else // POSIX
+
+#include <cerrno>
+#include <fcntl.h>
+#include <new>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <string>
+
+namespace tessera::persistence {
+namespace {
+constexpr std::uint64_t maximum_bytes = 64 * 1024 * 1024;
+std::atomic<std::uint64_t> nonce{1};
+
+StoreResult failure(tessera_status code, std::uint32_t phase,
+                    std::uint32_t os_code) {
+  return {code, phase, TESSERA_OS_POSIX, os_code};
+}
+
+StoreResult os_failure(std::uint32_t phase, int error) {
+  const auto code = error == ENOSPC || error == EDQUOT ? TESSERA_IO_NO_SPACE
+                    : error == EACCES || error == EPERM || error == EROFS
+                        ? TESSERA_IO_ACCESS_DENIED
+                    : phase == TESSERA_PHASE_PUBLISH ? TESSERA_IO_PUBLISH_FAILED
+                                                     : TESSERA_IO_OTHER;
+  return failure(code, phase, static_cast<std::uint32_t>(error));
+}
+
+std::filesystem::path temporary_path(const std::filesystem::path &path) {
+  auto temporary = path;
+  temporary += ".tmp-" + std::to_string(::getpid()) + "-" +
+               std::to_string(nonce.fetch_add(1));
+  return temporary;
+}
+
+bool write_all(int fd, const std::uint8_t *data, std::size_t size) {
+  while (size > 0) {
+    const auto n = ::write(fd, data, size);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    data += n;
+    size -= static_cast<std::size_t>(n);
+  }
+  return true;
+}
+} // namespace
+
+StoreResult save_checkpoint(const std::filesystem::path &path,
+                            std::span<const std::uint8_t> bytes,
+                            StoreFault fault) {
+  if (bytes.empty() || bytes.size() > maximum_bytes || path.empty())
+    return {TESSERA_INVALID_ARGUMENT, TESSERA_PHASE_VALIDATE, TESSERA_OS_NONE,
+            0};
+  if (fault == StoreFault::write_denied)
+    return failure(TESSERA_IO_ACCESS_DENIED, TESSERA_PHASE_WRITE, EACCES);
+  const auto temporary = temporary_path(path);
+  const int fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+  if (fd < 0)
+    return os_failure(TESSERA_PHASE_WRITE, errno);
+
+  const auto size = fault == StoreFault::partial_write_interruption
+                        ? bytes.size() / 2
+                        : bytes.size();
+  const bool write_ok = write_all(fd, bytes.data(), size);
+  int error = write_ok ? 0 : errno;
+  const bool flush_ok = write_ok && ::fsync(fd) == 0;
+  if (write_ok && !flush_ok)
+    error = errno;
+  ::close(fd);
+  if (fault == StoreFault::partial_write_interruption) {
+    ::unlink(temporary.c_str());
+    return failure(TESSERA_IO_OTHER, TESSERA_PHASE_WRITE, ECANCELED);
+  }
+  StoreResult result{};
+  if (!write_ok || !flush_ok)
+    result = os_failure(TESSERA_PHASE_WRITE, error);
+  else if (fault == StoreFault::write_no_space)
+    result = failure(TESSERA_IO_NO_SPACE, TESSERA_PHASE_WRITE, ENOSPC);
+  if (!result.ok()) {
+    ::unlink(temporary.c_str());
+    return result;
+  }
+  if (fault == StoreFault::publish_denied) {
+    ::unlink(temporary.c_str());
+    return failure(TESSERA_IO_PUBLISH_FAILED, TESSERA_PHASE_PUBLISH, EACCES);
+  }
+  // rename(2) replaces the destination atomically on POSIX.
+  if (::rename(temporary.c_str(), path.c_str()) != 0) {
+    const int rename_error = errno;
+    ::unlink(temporary.c_str());
+    return os_failure(TESSERA_PHASE_PUBLISH, rename_error);
+  }
+  return {TESSERA_OK, TESSERA_PHASE_PUBLISH, TESSERA_OS_NONE, 0};
+}
+
+StoreResult load_checkpoint(const std::filesystem::path &path, Bytes &out,
+                            StoreFault fault) {
+  if (path.empty())
+    return {TESSERA_INVALID_ARGUMENT, TESSERA_PHASE_VALIDATE, TESSERA_OS_NONE,
+            0};
+  if (fault == StoreFault::read_denied)
+    return failure(TESSERA_IO_ACCESS_DENIED, TESSERA_PHASE_READ, EACCES);
+  const int fd = ::open(path.c_str(), O_RDONLY);
+  if (fd < 0)
+    return os_failure(TESSERA_PHASE_READ, errno);
+  struct stat info{};
+  if (::fstat(fd, &info) != 0) {
+    const int stat_error = errno;
+    ::close(fd);
+    return os_failure(TESSERA_PHASE_READ, stat_error);
+  }
+  if (info.st_size <= 0 ||
+      static_cast<std::uint64_t>(info.st_size) > maximum_bytes) {
+    ::close(fd);
+    return {TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_READ, TESSERA_OS_NONE, 0};
+  }
+  Bytes candidate;
+  try {
+    candidate.resize(static_cast<std::size_t>(info.st_size));
+  } catch (const std::bad_alloc &) {
+    ::close(fd);
+    return {TESSERA_OUT_OF_MEMORY, TESSERA_PHASE_READ, TESSERA_OS_NONE, 0};
+  }
+  std::size_t done = 0;
+  int read_error = 0;
+  while (done < candidate.size()) {
+    const auto n = ::read(fd, candidate.data() + done, candidate.size() - done);
+    if (n < 0 && errno == EINTR)
+      continue;
+    if (n <= 0) {
+      read_error = n < 0 ? errno : EIO;
+      break;
+    }
+    done += static_cast<std::size_t>(n);
+  }
+  ::close(fd);
+  if (read_error != 0)
+    return os_failure(TESSERA_PHASE_READ, read_error);
+  out.swap(candidate);
+  return {TESSERA_OK, TESSERA_PHASE_READ, TESSERA_OS_NONE, 0};
+}
+
+} // namespace tessera::persistence
+#endif

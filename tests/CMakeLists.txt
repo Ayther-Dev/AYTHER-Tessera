@@ -198,6 +198,7 @@ tessera_copy_diagnostic_runtime(tessera_snapshot_test)
 add_test(NAME contract.snapshot COMMAND tessera_snapshot_test)
 set_tests_properties(contract.snapshot PROPERTIES LABELS "contract;phase1" TIMEOUT 60)
 
+if(WIN32) # the CLI and the process-spawning tests are Windows-only for now
 add_executable(tessera_cli_test integration/cli_test.cpp)
 target_link_libraries(tessera_cli_test PRIVATE Tessera::build_options doctest::doctest nlohmann_json::nlohmann_json)
 target_compile_definitions(tessera_cli_test PRIVATE
@@ -213,10 +214,11 @@ target_link_libraries(tessera_replay_test PRIVATE Tessera::core Tessera::build_o
 tessera_copy_diagnostic_runtime(tessera_replay_test)
 add_test(NAME integration.replay COMMAND tessera_replay_test "${PROJECT_BINARY_DIR}/src/tessera.exe" "${PROJECT_BINARY_DIR}/../evidence/phase1-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
 set_tests_properties(integration.replay PROPERTIES LABELS "integration;replay;phase1;FX-01" TIMEOUT 240 RUN_SERIAL TRUE)
+endif()
 
 # El paquete distribuible solo lista los backends sintéticos; con los núcleos
 # de referencia o el núcleo Mega Drive en construcción se verifica en windows-dev.
-if(NOT TESSERA_BUILD_CLOWN_REFERENCE AND NOT TESSERA_BUILD_MEGADRIVE)
+if(WIN32 AND NOT TESSERA_BUILD_CLOWN_REFERENCE AND NOT TESSERA_BUILD_MEGADRIVE)
 add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     "-DPRODUCER_BUILD=${PROJECT_BINARY_DIR}"
     "-DPROJECT_SOURCE=${PROJECT_SOURCE_DIR}"
@@ -303,6 +305,7 @@ tessera_copy_diagnostic_runtime(tessera_state_format_test)
 add_test(NAME unit.state_format COMMAND tessera_state_format_test)
 set_tests_properties(unit.state_format PROPERTIES LABELS "unit;phase3;checkpoint" TIMEOUT 45)
 
+if(WIN32)
 add_executable(tessera_state_store_test integration/state_store_test.cpp)
 target_include_directories(tessera_state_store_test PRIVATE "${PROJECT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -311,6 +314,7 @@ target_link_libraries(tessera_state_store_test PRIVATE Tessera::core Tessera::bu
 tessera_copy_diagnostic_runtime(tessera_state_store_test)
 add_test(NAME integration.state_store COMMAND tessera_state_store_test)
 set_tests_properties(integration.state_store PROPERTIES LABELS "integration;phase3;checkpoint" TIMEOUT 45)
+endif()
 
 add_executable(tessera_checkpoint_test integration/checkpoint_test.cpp)
 target_include_directories(tessera_checkpoint_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -369,9 +373,11 @@ tessera_copy_diagnostic_runtime(tessera_md_mixer_test)
 add_test(NAME unit.md_mixer COMMAND tessera_md_mixer_test)
 set_tests_properties(unit.md_mixer PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
+if(TESSERA_BUILD_MEGADRIVE)
 add_executable(tessera_md_audio_mute_test unit/md_audio_mute_test.cpp)
 target_include_directories(tessera_md_audio_mute_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_audio_mute_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
 tessera_copy_diagnostic_runtime(tessera_md_audio_mute_test)
 add_test(NAME unit.md_audio_mute COMMAND tessera_md_audio_mute_test)
 set_tests_properties(unit.md_audio_mute PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
+endif()

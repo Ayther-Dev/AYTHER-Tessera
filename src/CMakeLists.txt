@@ -56,7 +56,9 @@ if(TESSERA_BUILD_MEGADRIVE)
     target_link_libraries(tessera_core PUBLIC "$<BUILD_INTERFACE:Tessera::moira>" "$<BUILD_INTERFACE:Tessera::z80_chips>" "$<BUILD_INTERFACE:Tessera::ymfm>")
 endif()
 target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>>")
-target_compile_options(tessera_core PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(tessera_core PRIVATE /utf-8)
+endif()
 
 file(GLOB_RECURSE identity_sources CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/api/*.*"
@@ -81,6 +83,7 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/build_identity.hpp"
     CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n" @ONLY)
 
+if(WIN32) # the CLI uses wmain and the Windows console
 add_executable(tessera_cli cli/main.cpp cli/replay_trace.cpp)
 if(TESSERA_ALLOCATION_METRICS)
     target_sources(tessera_cli PRIVATE cli/allocation_metrics.cpp)
@@ -88,13 +91,16 @@ if(TESSERA_ALLOCATION_METRICS)
 endif()
 set_target_properties(tessera_cli PROPERTIES OUTPUT_NAME tessera)
 target_link_libraries(tessera_cli PRIVATE Tessera::core Tessera::build_options nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
-target_compile_options(tessera_cli PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(tessera_cli PRIVATE /utf-8)
+endif()
 target_compile_definitions(tessera_cli PRIVATE NOMINMAX)
 tessera_copy_diagnostic_runtime(tessera_cli)
+endif()
 
 if(TESSERA_BUILD_CLOWN_REFERENCE)
     # A tree that links AGPL-3.0 components must never be installed or packaged.
     install(CODE "message(FATAL_ERROR \"CLOWN_REFERENCE_NOT_DISTRIBUTABLE: this tree links AGPL-3.0 ClownMDEmu for local differential testing; configure without TESSERA_BUILD_CLOWN_REFERENCE to install.\")")
-else()
+elseif(WIN32) # the installable package is Windows x64 only for now
     include("${PROJECT_SOURCE_DIR}/cmake/TesseraPackage.cmake")
 endif()
