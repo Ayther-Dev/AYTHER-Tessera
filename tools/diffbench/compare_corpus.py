@@ -5,9 +5,13 @@ directory and compares the frame of the native machine against gpgx pixel by
 pixel at several checkpoints of the first segment (frames 0 to 600 by default).
 A checkpoint is a fresh cold boot run to that frame, so no input is applied.
 A frame that is a single colour is reported: it proves nothing.
+The audio_writes plane (TP-107.7) compares, at the same checkpoints, the sound
+chip write log of the last frame (compare_audio.py); a checkpoint with no write
+is counted apart, since it proves nothing either.
 
 usage: compare_corpus.py <md_run> <diffbench> <gpgx_core> <manifest.toml>
-                         <corpus_dir> <out_dir> [--planes framebuffer]
+                         <corpus_dir> <out_dir>
+                         [--planes framebuffer,audio_writes]
                          [--step N] [--entry ID]
 exit:  0 no divergence, 1 divergence, 2 a tool failed or a ROM is missing
 """
@@ -100,6 +104,21 @@ def compare(md_run, diffbench, core, rom, frames, work):
     return {"differing": differing, "first": first, "colours": len(colours)}
 
 
+def compare_audio(md_run, diffbench, core, rom, frames, work):
+    """(writes, differing) of the last frame at `frames`, or None on failure."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "compare_audio.py")
+    run = subprocess.run(
+        [sys.executable, "-I", script, md_run, diffbench, core, rom,
+         str(frames), os.path.join(work, "audio-%d" % frames)],
+        capture_output=True, text=True)
+    for line in run.stdout.splitlines():
+        if line.startswith("audio_writes "):
+            fields = dict(item.split("=") for item in line.split()[1:])
+            return int(fields["native"]), int(fields["differing"])
+    return None
+
+
 def main(argv):
     args = [a for a in argv[1:]]
     options = {"--planes": "framebuffer", "--step": "60", "--entry": None,
@@ -112,8 +131,9 @@ def main(argv):
         else:
             positional.append(a)
     md_run, diffbench, core, manifest, corpus_dir, out_dir = positional[:6]
-    if options["--planes"] != "framebuffer":
-        print("only the framebuffer plane is implemented")
+    planes = set(options["--planes"].split(","))
+    if not planes or not planes <= {"framebuffer", "audio_writes"}:
+        print("planes implemented: framebuffer, audio_writes")
         return 2
     entries = read_entries(manifest)
     if options["--entry"]:
@@ -132,6 +152,33 @@ def main(argv):
         work = os.path.join(out_dir, entry["id"])
         os.makedirs(work, exist_ok=True)
         bad, flat, shown = [], 0, 0
+        if "audio_writes" in planes:
+            heard, silent, wrong = 0, 0, []
+            for frames in checkpoints:
+                result = compare_audio(md_run, diffbench, core, rom, frames,
+                                       work)
+                if result is None:
+                    print("%s: compare_audio failed at frame %d"
+                          % (entry["id"], frames))
+                    status = max(status, 2)
+                    break
+                writes, differing = result
+                heard += writes > 0
+                silent += writes == 0
+                if differing and (entry["id"], frames) not in DECLARED:
+                    wrong.append((frames, writes, differing))
+            else:
+                print("%s: audio_writes checkpoints=%d with_writes=%d "
+                      "no_writes=%d divergences=%d"
+                      % (entry["id"], len(checkpoints), heard, silent,
+                         len(wrong)))
+                for frames, writes, differing in wrong:
+                    print("  frame %d: writes=%d differing=%d"
+                          % (frames, writes, differing))
+                if wrong:
+                    status = max(status, 1)
+        if "framebuffer" not in planes:
+            continue
         for frames in checkpoints:
             result = compare(md_run, diffbench, core, rom, frames, work)
             if result is None:
