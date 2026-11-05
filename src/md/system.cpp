@@ -6,6 +6,8 @@ namespace {
 std::uint16_t dup(std::uint8_t v) {
   return static_cast<std::uint16_t>((v << 8) | v);
 }
+// Extra Z80 T-states of an access to the 68000 bus through the bank window.
+constexpr unsigned kZ80RomWait = 3;
 } // namespace
 
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
@@ -41,6 +43,9 @@ void System::reset() {
   z80_ram_.fill(0);
   z80_bus_requested_ = false;
   z80_reset_released_ = false;
+  z80_.reset();
+  z80_bank_ = 0;
+  z80_master_ = 0;
   io_data_ = {0x00, 0x00, 0x00};
   io_ctrl_ = {0x00, 0x00, 0x00};
   frame_ = 0;
@@ -64,6 +69,7 @@ void System::reset() {
   cpu_.setClock(
       static_cast<moira::i64>(boot_master / kDivider68k + kBootCpuCycles));
   refresh_due_ = cpu_.getClock() + 130;
+  z80_master_ = boot_master;
 }
 
 void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
@@ -117,6 +123,7 @@ void System::run_frame() {
     }
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     run_cpu_until(static_cast<moira::i64>(end_master / kDivider68k));
+    z80_sync(end_master);
     renderer_.render_line(vdp_, line);
     const auto flags = renderer_.take_sprite_flags();
     vdp_.raise_sprite_flags(flags.overflow, flags.collision);
@@ -204,26 +211,40 @@ void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
 std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   switch (target) {
   case Target::z80_area: {
+    z80_sync_now();
     z80_wait();
-    // The Z80 side is not emulated yet: RAM is plain storage, the sound chip
-    // ports read back zero (YM2612 status: not busy, no timer flag).
-    if (offset < 0x4000)
-      return word ? dup(z80_ram_[offset & 0x1FFFU])
-                  : z80_ram_[offset & 0x1FFFU];
-    return 0;
+    if (!z80_bus_granted())
+      return open_bus(offset, word);
+    const std::uint32_t a = offset & 0x7FFFU;
+    std::uint8_t v;
+    if (a < 0x4000)
+      v = z80_ram_[a & 0x1FFFU];
+    else if (a < 0x6000)
+      v = 0; // YM2612 status: not busy, no timer flag
+    else if (a < 0x7F00)
+      v = 0xFF;
+    else
+      return open_bus(offset, word); // the Z80 side VDP ports
+    return word ? dup(v) : v;
   }
   case Target::io: {
     const std::uint8_t v = io_read(offset | 1U);
     return word ? dup(v) : v;
   }
   case Target::z80_control: {
-    if (offset == 0x1100) { // bus request: bit 0 low = bus granted
-      const std::uint8_t high = z80_bus_requested_ ? 0x00 : 0x01;
-      return word ? static_cast<std::uint16_t>(high << 8) : high;
+    // Bit 0 of the word at $A11100 is low once the bus is granted; the other
+    // bits are the open bus (the word the CPU has prefetched).
+    if (offset == 0x1100 || offset == 0x1101) {
+      const std::uint16_t irc = cpu_.getIRC();
+      const std::uint16_t busy = z80_bus_granted() ? 0U : 1U;
+      if (word)
+        return static_cast<std::uint16_t>((irc & 0xFEFFU) | (busy << 8));
+      return offset == 0x1100
+                 ? static_cast<std::uint16_t>(((irc >> 8) & 0xFEU) | busy)
+                 : static_cast<std::uint16_t>(irc & 0xFFU);
     }
-    if (offset == 0x1200)
-      return word ? (z80_reset_released_ ? 0x0100 : 0x0000)
-                  : (z80_reset_released_ ? 0x01 : 0x00);
+    if (offset == 0x1200 || offset == 0x1201)
+      return open_bus(offset, word); // the reset register is write only
     return word ? 0xFFFFU : 0xFFU;
   }
   case Target::vdp: {
@@ -261,20 +282,41 @@ void System::z80_wait() {
 void System::write(Target target, std::uint32_t offset, std::uint16_t value,
                    bool word) {
   switch (target) {
-  case Target::z80_area:
+  case Target::z80_area: {
+    z80_sync_now();
     z80_wait();
-    if (offset < 0x4000) // a word write stores its high byte
-      z80_ram_[offset & 0x1FFFU] = word ? static_cast<std::uint8_t>(value >> 8)
-                                        : static_cast<std::uint8_t>(value);
+    if (!z80_bus_granted())
+      break; // the area does not answer without the bus
+    const std::uint32_t a = offset & 0x7FFFU;
+    const auto v = word ? static_cast<std::uint8_t>(value >> 8) // high byte
+                        : static_cast<std::uint8_t>(value);
+    if (a < 0x4000)
+      z80_ram_[a & 0x1FFFU] = v;
+    else if ((a & 0xFF00U) == 0x6000U)
+      z80_bank_write(v);
     break;
+  }
   case Target::io:
     io_write(offset | (word ? 1U : 0U), static_cast<std::uint8_t>(value));
     break;
   case Target::z80_control:
-    if (offset == 0x1100)
-      z80_bus_requested_ = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
-    else if (offset == 0x1200)
-      z80_reset_released_ = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
+    if (offset == 0x1100) {
+      z80_sync_now();
+      const bool request = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
+      if (request && z80_running())
+        z80_.finish_instruction(); // the Z80 grants the bus between instructions
+      if (!z80_running() && !request && z80_reset_released_)
+        z80_master_ = cpu_.getClock() * kDivider68k; // resumes from now
+      z80_bus_requested_ = request;
+    } else if (offset == 0x1200) {
+      z80_sync_now();
+      const bool released = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
+      if (!released)
+        z80_.soft_reset();
+      else if (!z80_reset_released_)
+        z80_master_ = cpu_.getClock() * kDivider68k;
+      z80_reset_released_ = released;
+    }
     break;
   case Target::vdp: {
     const std::uint16_t v =
@@ -295,6 +337,72 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     break;
   default:
     break;
+  }
+}
+
+// Runs the Z80 up to `master`. It advances only while it owns its bus (out of
+// reset and not requested by the 68000); otherwise its clock follows the time.
+void System::z80_sync(std::uint64_t master) {
+  if (!z80_running()) {
+    if (master > z80_master_)
+      z80_master_ = master;
+    return;
+  }
+  while (z80_master_ + kDividerZ80 <= master) {
+    z80_.tick();
+    z80_master_ += kDividerZ80;
+  }
+}
+
+// What the 68000 reads from the Z80 area when the Z80 does not answer: the
+// word the CPU has already prefetched (gpgx measured, z80_map).
+std::uint16_t System::open_bus(std::uint32_t offset, bool word) const noexcept {
+  const std::uint16_t irc = cpu_.getIRC();
+  if (word)
+    return irc;
+  return (offset & 1U) != 0 ? static_cast<std::uint16_t>(irc & 0xFFU)
+                            : static_cast<std::uint16_t>(irc >> 8);
+}
+
+void System::z80_bank_write(std::uint8_t value) noexcept {
+  z80_bank_ = static_cast<std::uint16_t>(((z80_bank_ >> 1) |
+                                           ((value & 1U) << 8)) &
+                                          0x1FFU);
+}
+
+std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
+  wait = 0;
+  if (address < 0x4000)
+    return z80_ram_[address & 0x1FFFU];
+  if (address < 0x6000)
+    return 0; // YM2612 status
+  if (address < 0x8000)
+    return 0xFF;
+  const std::uint32_t a =
+      (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);
+  if (classify(a) == Target::rom) {
+    wait = kZ80RomWait;
+    return bus_.read8(a);
+  }
+  return 0xFF; // gpgx: work RAM and the rest read back open
+}
+
+void System::z80_write(std::uint16_t address, std::uint8_t value,
+                       unsigned &wait) {
+  wait = 0;
+  if (address < 0x4000) {
+    z80_ram_[address & 0x1FFFU] = value;
+  } else if (address < 0x6000) {
+    // YM2612 ports: not modelled yet (TP-107)
+  } else if (address < 0x8000) {
+    if ((address & 0xFF00U) == 0x6000U)
+      z80_bank_write(value);
+  } else {
+    const std::uint32_t a =
+        (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);
+    const Target t = classify(a);
+    if (t == Target::work_ram || t == Target::rom)
+      bus_.write8(a, value);
   }
 }
 

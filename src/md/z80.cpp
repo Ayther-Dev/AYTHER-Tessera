@@ -13,6 +13,16 @@ void Z80::reset() {
   wait_ = 0;
 }
 
+void Z80::finish_instruction() {
+  for (unsigned i = 0; i < 32 && tessera_z80_opdone(&cpu_) == 0; ++i)
+    tick();
+}
+
+void Z80::soft_reset() {
+  pins_ = tessera_z80_soft_reset(&cpu_);
+  wait_ = 0;
+}
+
 void Z80::tick() {
   ++cycles_;
   // Wait states: the chip samples its WAIT pin before it issues an access, so

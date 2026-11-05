@@ -54,11 +54,11 @@ unsigned run_until_halt(Z80 &cpu, unsigned limit = 4000) {
 }
 } // namespace
 
-TEST_CASE("reset starts at address 0 with the chips reset state") {
+TEST_CASE("reset starts at address 0 with every register at 0") {
   FlatBus bus;
   Z80 cpu(bus);
   CHECK(cpu.pc() == 0);
-  CHECK(cpu.sp() == 0xFFFF);
+  CHECK(cpu.sp() == 0); // the Mega Drive Z80 resets every register to 0
   CHECK(cpu.im() == 0);
   CHECK_FALSE(cpu.iff1());
 }

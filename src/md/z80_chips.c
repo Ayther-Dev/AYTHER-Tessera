@@ -11,8 +11,35 @@ _Static_assert(_Alignof(z80_t) <= 8, "z80_t alignment");
 #define CPU(p) ((z80_t *)(p))
 #define CCPU(p) ((const z80_t *)(p))
 
-uint64_t tessera_z80_init(tessera_z80 *cpu) { return z80_init(CPU(cpu)); }
-uint64_t tessera_z80_reset(tessera_z80 *cpu) { return z80_reset(CPU(cpu)); }
+/* z80.h resets the registers to $FFFF. The Mega Drive Z80 comes out of reset
+ * with every register at 0 (measured against gpgx, z80_bank). */
+static void clear_registers(z80_t *c) {
+  c->af = c->bc = c->de = c->hl = 0;
+  c->wz = c->sp = c->ix = c->iy = 0;
+  c->af2 = c->bc2 = c->de2 = c->hl2 = 0;
+}
+
+uint64_t tessera_z80_init(tessera_z80 *cpu) {
+  const uint64_t pins = z80_init(CPU(cpu));
+  clear_registers(CPU(cpu));
+  return pins;
+}
+uint64_t tessera_z80_reset(tessera_z80 *cpu) {
+  const uint64_t pins = z80_reset(CPU(cpu));
+  clear_registers(CPU(cpu));
+  return pins;
+}
+/* The RESET line only restarts the program counter, I, R, the interrupt mode
+ * and the flip-flops; the other registers keep their value (gpgx, z80_bank). */
+uint64_t tessera_z80_soft_reset(tessera_z80 *cpu) {
+  const z80_t saved = *CPU(cpu);
+  const uint64_t pins = z80_reset(CPU(cpu));
+  z80_t *c = CPU(cpu);
+  c->af = saved.af; c->bc = saved.bc; c->de = saved.de; c->hl = saved.hl;
+  c->ix = saved.ix; c->iy = saved.iy; c->sp = saved.sp; c->wz = saved.wz;
+  c->af2 = saved.af2; c->bc2 = saved.bc2; c->de2 = saved.de2; c->hl2 = saved.hl2;
+  return pins;
+}
 uint64_t tessera_z80_tick(tessera_z80 *cpu, uint64_t pins) {
   return z80_tick(CPU(cpu), pins);
 }

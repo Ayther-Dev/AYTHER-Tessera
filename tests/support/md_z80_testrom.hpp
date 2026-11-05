@@ -1,0 +1,514 @@
+// Synthetic Mega Drive test ROMs for the Z80 side (spec 008, TP-103.2/103.3).
+// A 68000 program uploads a Z80 payload through the bus request / reset
+// sequence games use; the Z80 payload exercises its address space and leaves
+// the results in its RAM and, through the bank window, in the 68000 work RAM.
+// The probes carry no commercial content.
+#pragma once
+#include "support/md_testrom.hpp"
+
+#include <cstdint>
+#include <initializer_list>
+#include <vector>
+
+namespace tessera::testrom {
+
+// A tiny Z80 assembler: only what the probes need.
+class Z80Asm {
+public:
+  std::size_t here() const { return code.size(); }
+  void db(std::initializer_list<std::uint8_t> bytes) {
+    code.insert(code.end(), bytes);
+  }
+  void org(std::size_t at) { code.resize(at, 0); }
+  void ld_sp(std::uint16_t n) { db({0x31, lo(n), hi(n)}); }
+  void ld_a(std::uint8_t n) { db({0x3E, n}); }
+  void ld_hl(std::uint16_t n) { db({0x21, lo(n), hi(n)}); }
+  void ld_de(std::uint16_t n) { db({0x11, lo(n), hi(n)}); }
+  void ld_bc(std::uint16_t n) { db({0x01, lo(n), hi(n)}); }
+  void ld_mem_a(std::uint16_t n) { db({0x32, lo(n), hi(n)}); }
+  void ld_a_mem(std::uint16_t n) { db({0x3A, lo(n), hi(n)}); }
+  void ld_mem_hl(std::uint16_t n) { db({0x22, lo(n), hi(n)}); }
+  void inc_a() { db({0x3C}); }
+  void inc_hl() { db({0x23}); }
+  void ldir() { db({0xED, 0xB0}); }
+  void call(std::uint16_t n) { db({0xCD, lo(n), hi(n)}); }
+  void ret() { db({0xC9}); }
+  void jr_self() { db({0x18, 0xFE}); }
+  void jr_to(std::size_t target) {
+    db({0x18, static_cast<std::uint8_t>(static_cast<int>(target) -
+                                         static_cast<int>(here() + 2))});
+  }
+  std::vector<std::uint8_t> code;
+
+private:
+  static std::uint8_t lo(std::uint16_t n) {
+    return static_cast<std::uint8_t>(n);
+  }
+  static std::uint8_t hi(std::uint16_t n) {
+    return static_cast<std::uint8_t>(n >> 8);
+  }
+};
+
+// Bank register routine: HL = address written, DE = 9 bit bank (bit 0 first).
+inline void z80_setbank_routine(Z80Asm &a) {
+  a.db({0x06, 0x09});   // ld b,9
+  a.db({0x73});         // l: ld (hl),e
+  a.db({0xCB, 0x3A});   //    srl d
+  a.db({0xCB, 0x1B});   //    rr e
+  a.db({0x10, 0xF9});   //    djnz l
+  a.ret();
+}
+
+inline constexpr std::uint16_t kZ80SetBank = 0x0300;
+inline constexpr std::uint32_t kPayloadAt = 0x800; // in the ROM, past the 68000 code
+
+// The payload of `z80_bank`: results at $1000-$10FF of the Z80 RAM, a start
+// counter at $1FF1 and the end flag $D0 at $1FF0.
+inline std::vector<std::uint8_t> z80_bank_payload() {
+  Z80Asm a;
+  // Registers as the reset left them, stored at $1100.
+  a.ld_mem_hl(0x1100);
+  a.db({0xED, 0x73, 0x02, 0x11}); // ld ($1102),sp
+  a.ld_mem_a(0x1104);
+  a.db({0xED, 0x43, 0x05, 0x11}); // ld ($1105),bc
+  a.db({0xED, 0x53, 0x07, 0x11}); // ld ($1107),de
+  a.db({0xDD, 0x22, 0x09, 0x11}); // ld ($1109),ix
+  a.db({0xFD, 0x22, 0x0B, 0x11}); // ld ($110B),iy
+  a.ld_sp(0x1FFF);
+  a.ld_a_mem(0x1FF1); // start counter (RAM survives a Z80 reset)
+  a.inc_a();
+  a.ld_mem_a(0x1FF1);
+  // T1: the RAM is mirrored at $2000
+  a.ld_a(0x5A);
+  a.ld_mem_a(0x3800);
+  a.ld_a_mem(0x1800);
+  a.ld_mem_a(0x1000);
+  a.ld_a(0xA5);
+  a.ld_mem_a(0x1801);
+  a.ld_a_mem(0x3801);
+  a.ld_mem_a(0x1001);
+  const auto set_bank = [&](std::uint16_t reg, std::uint16_t bank) {
+    a.ld_hl(reg);
+    a.ld_de(bank);
+    a.call(kZ80SetBank);
+  };
+  // T2: write and read back work RAM through the window
+  set_bank(0x6000, 0x1FE);
+  a.ld_a(0x11);
+  a.ld_mem_a(0x9000);
+  a.ld_a(0x22);
+  a.ld_mem_a(0x9001);
+  a.ld_a(0x33);
+  a.ld_mem_a(0xFFFF);
+  set_bank(0x6000, 0x1FF);
+  a.ld_a(0x44);
+  a.ld_mem_a(0x8000);
+  a.ld_a(0x55);
+  a.ld_mem_a(0x8100);
+  set_bank(0x6000, 0x1FE);
+  a.ld_a_mem(0x9000);
+  a.ld_mem_a(0x1010);
+  a.ld_a_mem(0x9001);
+  a.ld_mem_a(0x1011);
+  a.ld_a_mem(0xFFFF);
+  a.ld_mem_a(0x1012);
+  set_bank(0x6000, 0x1FF);
+  a.ld_a_mem(0x8000);
+  a.ld_mem_a(0x1013);
+  a.ld_a_mem(0x8100);
+  a.ld_mem_a(0x1014);
+  // T5: bytes the 68000 left in work RAM at $FF0100
+  set_bank(0x6000, 0x1FE);
+  for (std::uint16_t i = 0; i < 8; ++i) {
+    a.ld_a_mem(static_cast<std::uint16_t>(0x8100 + i));
+    a.ld_mem_a(static_cast<std::uint16_t>(0x1020 + i));
+  }
+  // T3: ROM header through bank 0
+  set_bank(0x6000, 0x000);
+  a.ld_hl(0x8100);
+  a.ld_de(0x1030);
+  a.ld_bc(0x0010);
+  a.ldir();
+  // T4: decoding of the bank register address
+  set_bank(0x6001, 0x1FE);
+  a.ld_a(0x66);
+  a.ld_mem_a(0x9000);
+  set_bank(0x60FF, 0x1FF);
+  a.ld_a(0x77);
+  a.ld_mem_a(0x8002);
+  set_bank(0x6000, 0x000);
+  set_bank(0x6100, 0x1FE);
+  a.ld_a(0x88);
+  a.ld_mem_a(0x9003);
+  set_bank(0x6000, 0x000);
+  set_bank(0x7000, 0x1FE);
+  a.ld_a(0x99);
+  a.ld_mem_a(0x9004);
+  set_bank(0x6000, 0x1FE);
+  a.ld_a_mem(0x9000);
+  a.ld_mem_a(0x1040);
+  a.ld_a_mem(0x9003);
+  a.ld_mem_a(0x1042);
+  a.ld_a_mem(0x9004);
+  a.ld_mem_a(0x1043);
+  set_bank(0x6000, 0x1FF);
+  a.ld_a_mem(0x8002);
+  a.ld_mem_a(0x1041);
+  // a tenth bank write shifts the register once more
+  set_bank(0x6000, 0x1FE);
+  a.ld_hl(0x6000);
+  a.ld_a(0x01);
+  a.db({0x77}); // ld (hl),a: bank becomes $1FF
+  a.ld_a(0xAA);
+  a.ld_mem_a(0x9005);
+  set_bank(0x6000, 0x1FF);
+  a.ld_a_mem(0x8005);
+  a.ld_mem_a(0x1044);
+  // T7: YM2612 ports
+  for (std::uint16_t i = 0; i < 4; ++i) {
+    a.ld_a_mem(static_cast<std::uint16_t>(0x4000 + i));
+    a.ld_mem_a(static_cast<std::uint16_t>(0x1050 + i));
+  }
+  a.ld_a_mem(0x5000);
+  a.ld_mem_a(0x1054);
+  // T9: reads of addresses nothing drives
+  a.ld_a_mem(0x6000);
+  a.ld_mem_a(0x1060);
+  a.ld_a_mem(0x6100);
+  a.ld_mem_a(0x1061);
+  a.ld_a_mem(0x7000);
+  a.ld_mem_a(0x1062);
+  a.ld_a_mem(0x7F20);
+  a.ld_mem_a(0x1063);
+  // PSG, then the end flag
+  a.ld_a(0x9F);
+  a.ld_mem_a(0x7F11);
+  a.ld_a(0xD0);
+  a.ld_mem_a(0x1FF0);
+  a.jr_self();
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  return a.code;
+}
+
+// Counter payload of `z80_clock`: HL counts in a loop and is stored at $1F00;
+// with `bank_reads` every pass also reads a ROM byte through the window.
+inline std::vector<std::uint8_t> z80_clock_payload(bool bank_reads) {
+  Z80Asm a;
+  a.ld_sp(0x1FFF);
+  a.ld_hl(0);
+  a.ld_mem_hl(0x1F00);
+  if (bank_reads) {
+    a.ld_hl(0x6000);
+    a.ld_de(0x0000);
+    a.call(kZ80SetBank);
+    a.ld_hl(0);
+  }
+  const std::size_t loop = a.here();
+  a.inc_hl();
+  if (bank_reads)
+    a.ld_a_mem(0x8000);
+  a.ld_mem_hl(0x1F00);
+  a.jr_to(loop);
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  return a.code;
+}
+
+namespace detail {
+struct M68kProgram {
+  std::vector<std::uint16_t> c;
+  void w(std::uint16_t v) { c.push_back(v); }
+  void l(std::uint32_t v) {
+    c.push_back(static_cast<std::uint16_t>(v >> 16));
+    c.push_back(static_cast<std::uint16_t>(v));
+  }
+  void request(std::uint16_t v) { // move.w #v,($A11100)
+    w(0x38BC);
+    w(v);
+  }
+  void reset_pin(std::uint16_t v) { // move.w #v,($A11200)
+    w(0x3ABC);
+    w(v);
+  }
+  void delay(std::uint16_t n) { // move.w #n,d0 ; dbra d0,*
+    w(0x303C);
+    w(n);
+    w(0x51C8);
+    w(0xFFFE);
+  }
+  void log_status() { // move.w (a4),d3 ; move.w d3,(a2)+
+    w(0x3614);
+    w(0x34C3);
+  }
+  // Bounded wait for the grant; logs the poll counter left in d2.
+  void wait_grant() {
+    w(0x343C); // move.w #1000,d2
+    w(1000);
+    w(0x0814); // btst #0,(a4)
+    w(0x0000);
+    w(0x57CA); // dbeq d2,*-6
+    w(0xFFFA);
+    w(0x34C2); // move.w d2,(a2)+
+  }
+  void upload(std::uint32_t source, std::uint16_t length) {
+    w(0x41F9); // lea source,a0
+    l(source);
+    w(0x43F9); // lea $A00000,a1
+    l(0x00A00000);
+    w(0x303C); // move.w #length-1,d0
+    w(static_cast<std::uint16_t>(length - 1));
+    w(0x12D8); // copy: move.b (a0)+,(a1)+
+    w(0x51C8); //       dbra d0,copy
+    w(0xFFFC);
+  }
+  void prologue() {
+    w(0x45F9); // lea $FF0000,a2 (log pointer)
+    l(0x00FF0000);
+    w(0x49F9); // lea $A11100,a4
+    l(0x00A11100);
+    w(0x4BF9); // lea $A11200,a5
+    l(0x00A11200);
+  }
+};
+
+inline std::vector<std::uint8_t> z80_rom_image(const char *name,
+                                               const std::vector<std::uint8_t> &payload,
+                                               const detail::M68kProgram &p) {
+  std::vector<std::uint8_t> rom(0x1000, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memset(&rom[0x120], ' ', 16);
+  std::memcpy(&rom[0x120], name, std::min<std::size_t>(16, std::strlen(name)));
+  put32(rom, 0x1A4, 0xFFF);
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::memcpy(&rom[kPayloadAt], payload.data(), payload.size());
+  std::size_t at = 0x200;
+  for (const auto word : p.c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+} // namespace detail
+
+// `z80_bank` sequences (TP-103.2/103.3): 0 request, release reset, upload,
+// reset pulse and release; 1 upload with the Z80 in its power-on reset; 2 reset
+// pulse without the bus while it runs; 3 bus request and release while it
+// runs; 4 reset pulse while holding the bus.
+inline std::vector<std::uint8_t> z80_bank_rom(unsigned sequence) {
+  const auto payload = z80_bank_payload();
+  const auto length = static_cast<std::uint16_t>(payload.size());
+  detail::M68kProgram p;
+  p.prologue();
+  p.w(0x41F9); // lea $FF0100,a0 (bytes for the Z80 to read)
+  p.l(0x00FF0100);
+  p.w(0x20FC); // move.l #..,(a0)+
+  p.l(0xA1B2C3D4);
+  p.w(0x20FC);
+  p.l(0xE5F60718);
+  switch (sequence) {
+  default:
+    p.request(0x0100);
+    p.reset_pin(0x0100);
+    p.wait_grant();
+    p.upload(kPayloadAt, length);
+    p.reset_pin(0x0000);
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+    p.delay(2000);
+    p.log_status();
+    break;
+  case 1:
+    p.request(0x0100);
+    p.wait_grant();
+    p.log_status();
+    p.upload(kPayloadAt, length);
+    p.request(0x0000);
+    p.reset_pin(0x0100);
+    p.delay(2000);
+    p.log_status();
+    break;
+  case 2:
+    p.request(0x0100);
+    p.reset_pin(0x0100);
+    p.wait_grant();
+    p.upload(kPayloadAt, length);
+    p.reset_pin(0x0000);
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+    p.delay(2000);
+    p.reset_pin(0x0000);
+    p.delay(10);
+    p.log_status();
+    p.reset_pin(0x0100);
+    p.delay(2000);
+    p.log_status();
+    break;
+  case 3:
+    p.request(0x0100);
+    p.reset_pin(0x0100);
+    p.wait_grant();
+    p.upload(kPayloadAt, length);
+    p.reset_pin(0x0000);
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+    p.delay(50);
+    p.request(0x0100);
+    p.wait_grant();
+    p.log_status();
+    p.delay(500);
+    p.request(0x0000);
+    p.delay(2000);
+    p.log_status();
+    break;
+  case 4:
+    p.request(0x0100);
+    p.reset_pin(0x0100);
+    p.wait_grant();
+    p.upload(kPayloadAt, length);
+    p.reset_pin(0x0000);
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+    p.delay(2000);
+    p.request(0x0100);
+    p.wait_grant();
+    p.reset_pin(0x0000);
+    p.delay(20);
+    p.reset_pin(0x0100);
+    p.log_status();
+    p.request(0x0000);
+    p.delay(2000);
+    p.log_status();
+    break;
+  }
+  p.w(0x60FE); // bra.s *
+  return detail::z80_rom_image("AYTHER Z80 BANK", payload, p);
+}
+
+// `z80_clock`: the Z80 counts; after a growing delay the 68000 requests the
+// bus, reads the counter and logs it (16 samples).
+inline std::vector<std::uint8_t> z80_clock_rom(bool bank_reads) {
+  const auto payload = z80_clock_payload(bank_reads);
+  detail::M68kProgram p;
+  p.prologue();
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(payload.size()));
+  p.reset_pin(0x0000);
+  p.reset_pin(0x0100);
+  p.request(0x0000);
+  for (unsigned n = 0; n < 16; ++n) {
+    p.delay(static_cast<std::uint16_t>(300 + 2000 * n));
+    p.request(0x0100);
+    p.wait_grant();
+    p.w(0x7200); // moveq #0,d1
+    p.w(0x1239); // move.b ($A01F01),d1
+    p.l(0x00A01F01);
+    p.w(0xE149); // lsl.w #8,d1
+    p.w(0x1239); // move.b ($A01F00),d1
+    p.l(0x00A01F00);
+    p.w(0x34C1); // move.w d1,(a2)+
+    p.request(0x0000);
+  }
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER Z80 CLOCK", payload, p);
+}
+
+// `z80_map` (TP-103.2): what the 68000 sees of the Z80 area, with the bus held
+// and without it. Every access is logged as a byte (or a word) in work RAM.
+inline std::vector<std::uint8_t> z80_map_rom() {
+  detail::M68kProgram p;
+  p.prologue();
+  const auto wb = [&](std::uint32_t addr, std::uint8_t v) { // move.b #v,(addr).l
+    p.w(0x13FC);
+    p.w(v);
+    p.l(addr);
+  };
+  const auto ww = [&](std::uint32_t addr, std::uint16_t v) { // move.w #v,(addr).l
+    p.w(0x33FC);
+    p.w(v);
+    p.l(addr);
+  };
+  const auto rb = [&](std::uint32_t addr) { // moveq #0,d1 ; move.b (addr).l,d1 ; log
+    p.w(0x7200);
+    p.w(0x1239);
+    p.l(addr);
+    p.w(0x34C1);
+  };
+  const auto rw = [&](std::uint32_t addr) { // move.w (addr).l,d1 ; log
+    p.w(0x3239);
+    p.l(addr);
+    p.w(0x34C1);
+  };
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  // Writes: the RAM is 8 KiB mirrored; a word write keeps the high byte.
+  wb(0xA00410, 0x11);
+  wb(0xA02410, 0x22);
+  wb(0xA01FFF, 0x33);
+  ww(0xA00420, 0x4455);
+  ww(0xA00422, 0x6677);
+  wb(0xA00431, 0x88);
+  rb(0xA00410);
+  rb(0xA02410);
+  rb(0xA01FFF);
+  rb(0xA03FFF);
+  rw(0xA00420);
+  rb(0xA00420);
+  rb(0xA00421);
+  rw(0xA00422);
+  rw(0xA00430);
+  rb(0xA00431);
+  // Mirror of the whole 32 KiB window above $A08000.
+  wb(0xA08440, 0x99);
+  rb(0xA00440);
+  rb(0xA08440);
+  wb(0xA0A450, 0x9A);
+  rb(0xA00450);
+  rb(0xA02450);
+  // Reads of the YM2612 ports, the bank register and the VDP area.
+  rb(0xA04000);
+  rb(0xA04001);
+  rb(0xA04002);
+  rb(0xA04003);
+  rb(0xA05000);
+  rb(0xA06000);
+  rb(0xA07000);
+  rb(0xA07F00);
+  rb(0xA07F04);
+  rb(0xA07F11);
+  rw(0xA04000);
+  rw(0xA06000);
+  // The control registers read back the request state and open bus bits.
+  rb(0xA11100);
+  rb(0xA11101);
+  rw(0xA11100);
+  rb(0xA11200);
+  rw(0xA11200);
+  // With the bus released the area does not answer the same way.
+  p.request(0x0000);
+  p.delay(100);
+  rb(0xA00410);
+  rb(0xA00420);
+  rw(0xA11100);
+  wb(0xA00460, 0x5A);
+  p.request(0x0100);
+  p.wait_grant();
+  rb(0xA00460);
+  rb(0xA00410);
+  // Reset asserted: the area is reachable only with the bus.
+  p.reset_pin(0x0000);
+  rb(0xA00410);
+  wb(0xA00461, 0x5B);
+  rb(0xA00461);
+  p.request(0x0000);
+  p.w(0x60FE); // bra.s *
+  return detail::z80_rom_image("AYTHER Z80 MAP", {0}, p);
+}
+
+} // namespace tessera::testrom

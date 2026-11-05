@@ -1,6 +1,7 @@
 // Writes the synthetic Mega Drive test ROMs (spec 008, TP-101.10).
 //   tessera_md_testrom bus-sweep|ssf2-sweep|vint-counter <out.bin>
 #include "support/md_testrom.hpp"
+#include "support/md_z80_testrom.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -71,6 +72,15 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_muldiv_groups());
   else if (std::strcmp(argv[1], "cpu-timing") == 0)
     rom = tessera::testrom::cpu_timing_rom();
+  else if (std::strncmp(argv[1], "z80-bank-", 9) == 0)
+    rom = tessera::testrom::z80_bank_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 9, nullptr, 10)));
+  else if (std::strcmp(argv[1], "z80-map") == 0)
+    rom = tessera::testrom::z80_map_rom();
+  else if (std::strcmp(argv[1], "z80-clock") == 0)
+    rom = tessera::testrom::z80_clock_rom(false);
+  else if (std::strcmp(argv[1], "z80-clock-bank") == 0)
+    rom = tessera::testrom::z80_clock_rom(true);
   else if (std::strcmp(argv[1], "z80-busreq") == 0)
     rom = tessera::testrom::z80_busreq_rom();
   else if (std::strcmp(argv[1], "cpu-drift") == 0)

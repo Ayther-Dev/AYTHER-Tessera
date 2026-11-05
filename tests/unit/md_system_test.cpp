@@ -70,6 +70,8 @@ TEST_CASE("the Z80 bus request is granted at once") {
   system.reset();
   CHECK_FALSE(system.z80_bus_granted());
   system.write16(0xA11100, 0x0100);
+  CHECK_FALSE(system.z80_bus_granted()); // the Z80 is still in its reset
+  system.write16(0xA11200, 0x0100);
   CHECK(system.z80_bus_granted());
   CHECK((system.read16(0xA11100) & 0x0100) == 0);
   system.write16(0xA11100, 0x0000);

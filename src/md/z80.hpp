@@ -24,10 +24,14 @@ class Z80 {
 public:
   explicit Z80(Z80Bus &bus);
 
-  /// Puts the CPU into its reset state (PC = 0); pending waits are dropped.
+  /// Power-on state: PC = 0 and every register 0; pending waits are dropped.
   void reset();
+  /// The RESET line: PC = 0, the other registers keep their value.
+  void soft_reset();
   /// Executes one T-state.
   void tick();
+  /// Ticks until the instruction in flight is complete (at most 32 T-states).
+  void finish_instruction();
   /// Level of the INT pin (kept until the 68000 side lowers it).
   void set_int(bool level) noexcept { int_ = level; }
 

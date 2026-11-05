@@ -28,6 +28,7 @@ typedef struct tessera_z80 {
 /* Each returns the pins to feed to the next tick. */
 uint64_t tessera_z80_init(tessera_z80 *cpu);
 uint64_t tessera_z80_reset(tessera_z80 *cpu);
+uint64_t tessera_z80_soft_reset(tessera_z80 *cpu);
 uint64_t tessera_z80_tick(tessera_z80 *cpu, uint64_t pins);
 int tessera_z80_opdone(tessera_z80 *cpu);
 

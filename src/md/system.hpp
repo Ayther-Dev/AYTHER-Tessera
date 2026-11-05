@@ -9,6 +9,7 @@
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
 #include "md/vdp_render.hpp"
+#include "md/z80.hpp"
 
 #include <array>
 #include <cstdint>
@@ -50,7 +51,13 @@ public:
 
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
-  bool z80_bus_granted() const noexcept { return z80_bus_requested_; }
+  /// The 68000 owns the Z80 bus: requested, and the Z80 out of reset.
+  bool z80_bus_granted() const noexcept {
+    return z80_bus_requested_ && z80_reset_released_;
+  }
+  const Z80 &z80() const noexcept { return z80_; }
+  /// Nine bit bank register: A23-A15 of the Z80 window at $8000.
+  std::uint16_t z80_bank() const noexcept { return z80_bank_; }
 
   // Direct 68000 bus access, for tests and tools.
   std::uint8_t read8(std::uint32_t a) { return bus_.read8(a); }
@@ -60,6 +67,16 @@ public:
 
 private:
   void run_cpu_until(moira::i64 target);
+  bool z80_running() const noexcept {
+    return z80_reset_released_ && !z80_bus_requested_;
+  }
+  /// Runs the Z80 up to `master` (it only advances while it owns its bus).
+  void z80_sync(std::uint64_t master);
+  void z80_sync_now() { z80_sync(cpu_.getClock() * kDivider68k); }
+  std::uint8_t z80_read(std::uint16_t address, unsigned &wait);
+  void z80_write(std::uint16_t address, std::uint8_t value, unsigned &wait);
+  void z80_bank_write(std::uint8_t value) noexcept;
+  std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
   void z80_wait();
   unsigned z80_wait_acc_ = 0;
@@ -78,6 +95,24 @@ private:
   M68k cpu_;
   Vdp vdp_;
   Tmss tmss_;
+  class Z80Port final : public Z80Bus {
+  public:
+    explicit Z80Port(System &system) : system_(system) {}
+    std::uint8_t read(std::uint16_t address, unsigned &wait) override {
+      return system_.z80_read(address, wait);
+    }
+    void write(std::uint16_t address, std::uint8_t value,
+               unsigned &wait) override {
+      system_.z80_write(address, value, wait);
+    }
+
+  private:
+    System &system_;
+  };
+  Z80Port z80_port_{*this};
+  Z80 z80_{z80_port_};
+  std::uint64_t z80_master_ = 0; ///< master cycle the Z80 has run up to
+  std::uint16_t z80_bank_ = 0;
   Renderer renderer_;
   std::uint64_t frame_ = 0;
   std::uint32_t current_line_ = 0;
