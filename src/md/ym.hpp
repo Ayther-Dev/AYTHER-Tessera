@@ -5,6 +5,8 @@
 // run up to that cycle first, so timers and the sample stream depend only on
 // the sequence of (cycle, access) pairs.
 #pragma once
+#include "md/state_io.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -47,6 +49,10 @@ public:
   void clear_samples() noexcept;
   /// Number of samples generated since reset.
   std::uint64_t sample_count() const noexcept;
+
+  /// Savestate: the chip (ymfm save_restore), the clock and the timers.
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   struct Impl;

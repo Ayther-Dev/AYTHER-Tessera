@@ -36,4 +36,14 @@ void Tmss::reset() noexcept {
   reg_ = {};
 }
 
+void Tmss::save(StateWriter &w) const {
+  w.boolean(unlocked_);
+  w.array(reg_);
+}
+
+void Tmss::load(StateReader &r) {
+  unlocked_ = r.boolean();
+  r.array(reg_);
+}
+
 } // namespace tessera::md

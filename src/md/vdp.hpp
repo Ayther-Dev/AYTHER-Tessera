@@ -6,6 +6,7 @@
 // bench compares them with gpgx (TP-105, TP-203).
 #pragma once
 #include "md/machine.hpp"
+#include "md/state_io.hpp"
 
 #include <array>
 #include <cstdint>
@@ -88,6 +89,11 @@ public:
   // gpgx wakes up with its line counter at $FF and only reloads it from
   // register 10 once the first frame is over.
   void power_on_hint_counter() noexcept { hint_counter_ = 0xFFU; }
+
+  /// Savestate: registers, memories, ports, flags, counters and the FIFO (the
+  /// video standard and the DMA reader belong to the machine).
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   std::uint32_t active_lines() const noexcept;

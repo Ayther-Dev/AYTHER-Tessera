@@ -81,6 +81,17 @@ public:
 
   void set_pad(unsigned port, std::uint16_t pressed) noexcept;
 
+  /// Savestate (TP-110.1, docs/savestate-v1.md): the whole machine at a frame
+  /// boundary as a little endian byte stream. The ROM is the content, so the
+  /// stream carries only its hash.
+  std::vector<std::uint8_t> save_state() const;
+  /// Restores a stream written by `save_state` for the same ROM and
+  /// configuration. On false (wrong magic, version, ROM, configuration, size or
+  /// contents) the machine is left in an unspecified state and must be
+  /// discarded or reset; a caller that needs to keep its machine restores into
+  /// a new one.
+  bool load_state(std::span<const std::uint8_t> state);
+
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
   /// The 68000 owns the Z80 bus: requested, and the Z80 out of reset.
@@ -143,6 +154,7 @@ private:
   void update_irq() noexcept;
 
   MachineConfig config_;
+  std::uint64_t rom_hash_ = 0; ///< FNV-1a of the ROM image, for the savestate
   Sram sram_; ///< declared before the bus: built from the ROM header first
   Bus bus_;
   M68k cpu_;

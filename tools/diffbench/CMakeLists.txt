@@ -385,6 +385,24 @@ if(TESSERA_BUILD_MEGADRIVE)
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()
+    if(TESSERA_DIFFBENCH_CORPUS_DIR)
+        # TP-110.1: savestate of five corpus games, 400 frames in, 120 after.
+        set(savestate_roms "")
+        foreach(rom IN ITEMS "Golden Axe (World) (Rev A).md" "Sonic The Hedgehog (USA, Europe).md"
+                "Streets of Rage 2 (USA).md" "Phantasy Star IV (USA).md" "Gunstar Heroes (USA).md")
+            if(EXISTS "${TESSERA_DIFFBENCH_CORPUS_DIR}/${rom}")
+                list(APPEND savestate_roms "${TESSERA_DIFFBENCH_CORPUS_DIR}/${rom}")
+            endif()
+        endforeach()
+        if(savestate_roms)
+            string(REPLACE ";" "|" savestate_roms "${savestate_roms}")
+            add_test(NAME integration.md_savestate_corpus COMMAND tessera_md_savestate_test
+                --test-case=*commercial*)
+            set_tests_properties(integration.md_savestate_corpus PROPERTIES
+                ENVIRONMENT "TESSERA_SAVESTATE_ROMS=${savestate_roms}"
+                LABELS "integration;phase1;md;local" TIMEOUT 900)
+        endif()
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
        AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
         # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.

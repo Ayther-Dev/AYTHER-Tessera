@@ -540,4 +540,22 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
     hook_(line, row);
 }
 
+void Renderer::save(StateWriter &w) const {
+  w.boolean(flags_.overflow);
+  w.boolean(flags_.collision);
+  w.u32(field_);
+  w.boolean(double_res_);
+  for (const bool b : offscreen_)
+    w.boolean(b);
+}
+
+void Renderer::load(StateReader &r) {
+  flags_.overflow = r.boolean();
+  flags_.collision = r.boolean();
+  field_ = r.u32() & 1U;
+  double_res_ = r.boolean();
+  for (auto &b : offscreen_)
+    b = r.boolean();
+}
+
 } // namespace tessera::md

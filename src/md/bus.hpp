@@ -5,6 +5,7 @@
 #pragma once
 #include "md/machine.hpp"
 #include "md/sram.hpp"
+#include "md/state_io.hpp"
 
 #include <array>
 #include <cstdint>
@@ -57,6 +58,10 @@ public:
 
   std::span<const std::uint8_t> work_ram() const noexcept { return ram_; }
   std::span<std::uint8_t> work_ram() noexcept { return ram_; }
+
+  /// Savestate: work RAM and mapper registers (the ROM is the content).
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   std::vector<std::uint8_t> rom_;

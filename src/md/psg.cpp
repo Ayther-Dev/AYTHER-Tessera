@@ -96,4 +96,31 @@ void Psg::run_to(std::uint64_t master) {
   }
 }
 
+void Psg::save(StateWriter &w) const {
+  w.array(tone_);
+  w.array(counter_);
+  w.array(flip_);
+  w.array(atten_);
+  w.u8(noise_ctl_);
+  w.u16(noise_counter_);
+  w.u16(lfsr_);
+  w.u8(noise_out_);
+  w.u8(latch_);
+  w.u64(produced_);
+}
+
+void Psg::load(StateReader &r) {
+  r.array(tone_);
+  r.array(counter_);
+  r.array(flip_);
+  r.array(atten_);
+  noise_ctl_ = r.u8();
+  noise_counter_ = r.u16();
+  lfsr_ = r.u16();
+  noise_out_ = r.u8();
+  latch_ = r.u8();
+  produced_ = r.u64();
+  out_.clear();
+}
+
 } // namespace tessera::md

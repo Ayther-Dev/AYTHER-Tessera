@@ -4,6 +4,7 @@
 // Z80 side and the INT and WAIT pins. The Mega Drive wiring (RAM, YM, PSG, bank
 // window) is `Z80Bus` in system.cpp.
 #pragma once
+#include "md/state_io.hpp"
 #include "md/z80_chips.h"
 
 #include <cstdint>
@@ -47,6 +48,8 @@ public:
   std::uint8_t im() const noexcept { return tessera_z80_im(&cpu_); }
   bool iff1() const noexcept { return tessera_z80_iff1(&cpu_) != 0; }
   bool halted() const noexcept { return tessera_z80_halted(&cpu_) != 0; }
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   Z80Bus &bus_;

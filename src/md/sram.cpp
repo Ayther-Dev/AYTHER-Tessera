@@ -76,4 +76,14 @@ bool Sram::save_atomic(const std::string &path) {
   return true;
 }
 
+void Sram::save(StateWriter &w) const {
+  w.bytes(image_);
+  w.boolean(dirty_);
+}
+
+void Sram::load(StateReader &r) {
+  r.bytes(image_);
+  dirty_ = r.boolean();
+}
+
 } // namespace tessera::md

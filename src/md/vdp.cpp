@@ -465,4 +465,64 @@ void Vdp::acknowledge(std::uint8_t level) noexcept {
     hint_flag_ = false;
 }
 
+void Vdp::save(StateWriter &w) const {
+  w.array(regs_);
+  w.array(vram_);
+  w.array(cram_);
+  w.array(vsram_);
+  w.u8(code_);
+  w.u16(address_);
+  w.u16(first_word_);
+  w.boolean(pending_second_);
+  w.boolean(dma_pending_);
+  w.u32(line_);
+  w.boolean(vint_flag_);
+  w.boolean(odd_field_);
+  w.boolean(sprite_overflow_);
+  w.boolean(sprite_collision_);
+  w.boolean(hint_flag_);
+  w.boolean(hv_latched_);
+  w.u16(hv_latch_value_);
+  w.i32(hint_counter_);
+  w.u64(now_);
+  w.u64(line_start_);
+  w.u64(busy_until_);
+  w.u64(cpu_stall_);
+  w.array(fifo_done_);
+  w.u32(fifo_head_);
+  w.u32(fifo_count_);
+  w.u64(fifo_last_done_);
+}
+
+void Vdp::load(StateReader &r) {
+  r.array(regs_);
+  r.array(vram_);
+  r.array(cram_);
+  r.array(vsram_);
+  code_ = r.u8();
+  address_ = r.u16();
+  first_word_ = r.u16();
+  pending_second_ = r.boolean();
+  dma_pending_ = r.boolean();
+  line_ = r.u32();
+  vint_flag_ = r.boolean();
+  odd_field_ = r.boolean();
+  sprite_overflow_ = r.boolean();
+  sprite_collision_ = r.boolean();
+  hint_flag_ = r.boolean();
+  hv_latched_ = r.boolean();
+  hv_latch_value_ = r.u16();
+  hint_counter_ = r.i32();
+  now_ = r.u64();
+  line_start_ = r.u64();
+  busy_until_ = r.u64();
+  cpu_stall_ = r.u64();
+  r.array(fifo_done_);
+  fifo_head_ = r.u32();
+  fifo_count_ = r.u32();
+  fifo_last_done_ = r.u64();
+  if (fifo_head_ >= fifo_done_.size() || fifo_count_ > fifo_done_.size())
+    r.fail();
+}
+
 } // namespace tessera::md

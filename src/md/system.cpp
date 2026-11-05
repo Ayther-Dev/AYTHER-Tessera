@@ -27,8 +27,22 @@ constexpr std::uint64_t kZ80IntLead = 1620;
 constexpr std::uint64_t kYmBusy = 1325;
 } // namespace
 
+namespace {
+std::uint64_t fnv1a(std::span<const std::uint8_t> bytes) noexcept {
+  std::uint64_t hash = 14695981039346656037ULL;
+  for (const auto b : bytes) {
+    hash ^= b;
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+constexpr std::uint32_t kStateMagic = 0x53444D54; // "TMDS"
+constexpr std::uint32_t kStateVersion = 1;
+constexpr std::uint32_t kStateEnd = 0x444E4553; // "SEND"
+} // namespace
+
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
-    : config_(config), sram_(read_sram_header(rom)),
+    : config_(config), rom_hash_(fnv1a(rom)), sram_(read_sram_header(rom)),
       bus_(std::move(rom), *this, config.mapper, &sram_), cpu_(bus_),
       vdp_(config.standard), tmss_(config.tmss) {
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
@@ -563,6 +577,117 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
     if (t == Target::work_ram || t == Target::rom)
       bus_.write8(a, value);
   }
+}
+
+std::vector<std::uint8_t> System::save_state() const {
+  std::vector<std::uint8_t> out;
+  out.reserve(256 * 1024);
+  StateWriter w(out);
+  w.u32(kStateMagic);
+  w.u32(kStateVersion);
+  w.u64(rom_hash_);
+  w.u8(static_cast<std::uint8_t>(config_.region));
+  w.u8(static_cast<std::uint8_t>(config_.standard));
+  w.u8(static_cast<std::uint8_t>(config_.pads[0]));
+  w.u8(static_cast<std::uint8_t>(config_.pads[1]));
+  w.boolean(config_.tmss);
+  w.u8(static_cast<std::uint8_t>(config_.mapper));
+
+  // Machine: scheduling, buses and I/O.
+  w.u64(frame_);
+  w.u32(current_line_);
+  w.u32(frame_start_line_);
+  w.u64(line_start_master_);
+  w.i64(refresh_due_);
+  w.boolean(z80_bus_requested_);
+  w.boolean(z80_reset_released_);
+  w.u64(z80_master_);
+  w.u16(z80_bank_);
+  w.u64(z80_int_end_);
+  w.bytes(z80_ram_);
+  w.array(io_data_);
+  w.array(io_ctrl_);
+  w.array(pads_);
+  for (const auto &pad : pad_port_) {
+    w.boolean(pad.th);
+    w.u8(pad.phase);
+    w.u64(pad.edge_at);
+    w.u64(pad.pull_up_at);
+  }
+  w.u16(ym_addr_);
+  w.u64(ym_busy_until_);
+
+  // Components.
+  cpu_.save(w);
+  bus_.save(w);
+  sram_.save(w);
+  tmss_.save(w);
+  vdp_.save(w);
+  renderer_.save(w);
+  z80_.save(w);
+  ym_.save(w);
+  psg_.save(w);
+  w.u32(kStateEnd);
+  return out;
+}
+
+bool System::load_state(std::span<const std::uint8_t> state) {
+  StateReader r(state);
+  if (r.u32() != kStateMagic || r.u32() != kStateVersion ||
+      r.u64() != rom_hash_)
+    return false;
+  const auto region = r.u8(), standard = r.u8(), pad0 = r.u8(), pad1 = r.u8();
+  const auto tmss = r.boolean();
+  const auto mapper = r.u8();
+  if (!r.ok() || region != static_cast<std::uint8_t>(config_.region) ||
+      standard != static_cast<std::uint8_t>(config_.standard) ||
+      pad0 != static_cast<std::uint8_t>(config_.pads[0]) ||
+      pad1 != static_cast<std::uint8_t>(config_.pads[1]) ||
+      tmss != config_.tmss || mapper != static_cast<std::uint8_t>(config_.mapper))
+    return false;
+
+  frame_ = r.u64();
+  current_line_ = r.u32();
+  frame_start_line_ = r.u32();
+  line_start_master_ = r.u64();
+  refresh_due_ = r.i64();
+  z80_bus_requested_ = r.boolean();
+  z80_reset_released_ = r.boolean();
+  z80_master_ = r.u64();
+  z80_bank_ = r.u16();
+  z80_int_end_ = r.u64();
+  r.bytes(z80_ram_);
+  r.array(io_data_);
+  r.array(io_ctrl_);
+  r.array(pads_);
+  for (auto &pad : pad_port_) {
+    pad.th = r.boolean();
+    pad.phase = r.u8();
+    pad.edge_at = r.u64();
+    pad.pull_up_at = r.u64();
+  }
+  ym_addr_ = r.u16();
+  ym_busy_until_ = r.u64();
+  if (current_line_ >= lines_per_frame(config_.standard) ||
+      frame_start_line_ >= lines_per_frame(config_.standard) || z80_bank_ > 0x1FF)
+    return false;
+
+  cpu_.load(r);
+  bus_.load(r);
+  sram_.load(r);
+  tmss_.load(r);
+  vdp_.load(r);
+  renderer_.load(r);
+  z80_.load(r);
+  ym_.load(r);
+  psg_.load(r);
+  if (r.u32() != kStateEnd || !r.finished())
+    return false;
+  // Per frame outputs are rebuilt by the next frame.
+  audio_log_.clear();
+  audio_dropped_ = 0;
+  update_irq();
+  return true;
 }
 
 } // namespace tessera::md

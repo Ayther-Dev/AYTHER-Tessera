@@ -167,4 +167,18 @@ void Bus::write32(std::uint32_t address, std::uint32_t value) {
   write16(address + 2, static_cast<std::uint16_t>(value));
 }
 
+void Bus::save(StateWriter &w) const {
+  w.bytes(ram_);
+  w.array(banks_);
+  w.boolean(sram_mapped_);
+  w.boolean(sram_protected_);
+}
+
+void Bus::load(StateReader &r) {
+  r.bytes(ram_);
+  r.array(banks_);
+  sram_mapped_ = r.boolean();
+  sram_protected_ = r.boolean();
+}
+
 } // namespace tessera::md

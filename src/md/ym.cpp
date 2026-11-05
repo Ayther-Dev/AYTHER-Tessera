@@ -87,4 +87,31 @@ std::span<const YmSample> Ym2612::samples() const noexcept {
 void Ym2612::clear_samples() noexcept { impl_->out.clear(); }
 std::uint64_t Ym2612::sample_count() const noexcept { return impl_->produced; }
 
+void Ym2612::save(StateWriter &w) const {
+  auto &impl = *impl_;
+  std::vector<std::uint8_t> chip;
+  ymfm::ymfm_saved_state state(chip, true);
+  impl.chip.save_restore(state);
+  w.block(chip);
+  w.u64(impl.clock);
+  w.u64(impl.produced);
+  for (const auto d : impl.deadline)
+    w.i64(d);
+}
+
+void Ym2612::load(StateReader &r) {
+  auto &impl = *impl_;
+  const auto block = r.block(1U << 16);
+  std::vector<std::uint8_t> chip(block.begin(), block.end());
+  if (r.ok()) {
+    ymfm::ymfm_saved_state state(chip, false);
+    impl.chip.save_restore(state);
+  }
+  impl.clock = r.u64();
+  impl.produced = r.u64();
+  for (auto &d : impl.deadline)
+    d = r.i64();
+  impl.out.clear();
+}
+
 } // namespace tessera::md

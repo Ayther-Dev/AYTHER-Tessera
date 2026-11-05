@@ -4,6 +4,7 @@
 // program writes the ASCII word "SEGA" to $A14000.
 #pragma once
 #include "md/machine.hpp"
+#include "md/state_io.hpp"
 
 #include <array>
 #include <cstdint>
@@ -26,6 +27,8 @@ public:
   void write(std::uint32_t offset, std::uint16_t value, bool word) noexcept;
   bool locked() const noexcept { return enabled_ && !unlocked_; }
   void reset() noexcept;
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   bool enabled_;

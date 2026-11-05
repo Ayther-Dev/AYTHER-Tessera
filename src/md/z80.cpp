@@ -55,4 +55,20 @@ void Z80::tick() {
   }
 }
 
+void Z80::save(StateWriter &w) const {
+  w.bytes(std::span<const std::uint8_t>(cpu_.bytes, sizeof(cpu_.bytes)));
+  w.u64(pins_);
+  w.u64(cycles_);
+  w.u32(wait_);
+  w.boolean(int_);
+}
+
+void Z80::load(StateReader &r) {
+  r.bytes(std::span<std::uint8_t>(cpu_.bytes, sizeof(cpu_.bytes)));
+  pins_ = r.u64();
+  cycles_ = r.u64();
+  wait_ = r.u32();
+  int_ = r.boolean();
+}
+
 } // namespace tessera::md

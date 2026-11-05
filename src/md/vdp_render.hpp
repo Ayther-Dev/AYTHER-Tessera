@@ -4,6 +4,7 @@
 // point where phase 2 attaches; nothing runs after the last line. Planes and
 // sprites arrive with TP-105.3 onwards; today a line holds the backdrop.
 #pragma once
+#include "md/state_io.hpp"
 #include "md/vdp.hpp"
 
 #include <array>
@@ -62,6 +63,11 @@ public:
   }
 
   const std::vector<std::uint32_t> &frame() const noexcept { return frame_; }
+
+  /// Savestate: what carries from one frame to the next (the frame itself is
+  /// drawn again).
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
   FrameSize size() const noexcept { return size_; }
 
 private:

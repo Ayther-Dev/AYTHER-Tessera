@@ -4,6 +4,8 @@
 // per channel in 2 dB steps. The chip clock is master/15; the counters step
 // every 16 chip clocks, so one output sample is 240 master cycles.
 #pragma once
+#include "md/state_io.hpp"
+
 #include <array>
 #include <cstdint>
 #include <span>
@@ -36,6 +38,8 @@ public:
   }
   std::uint8_t noise_control() const noexcept { return noise_ctl_; }
   std::uint16_t lfsr() const noexcept { return lfsr_; }
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 private:
   void step() noexcept;

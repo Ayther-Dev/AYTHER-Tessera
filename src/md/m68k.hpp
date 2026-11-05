@@ -5,6 +5,7 @@
 // `setIPL()`); this class only supplies the bus and the clock.
 #pragma once
 #include "md/bus.hpp"
+#include "md/state_io.hpp"
 
 #include "Moira.h"
 
@@ -23,6 +24,10 @@ public:
 
   /// Holds the CPU for `cycles` 68000 cycles (a DMA owns the bus).
   void stall(int cycles) { sync(cycles); }
+
+  /// Savestate: clock, registers, prefetch queue and interrupt lines.
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
 protected:
   void willInterrupt(moira::u8 level) override;

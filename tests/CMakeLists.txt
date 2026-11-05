@@ -85,6 +85,13 @@ tessera_copy_diagnostic_runtime(tessera_md_audio_log_test)
 add_test(NAME unit.md_audio_log COMMAND tessera_md_audio_log_test)
 set_tests_properties(unit.md_audio_log PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
+add_executable(tessera_md_savestate_test integration/md_savestate_test.cpp)
+target_include_directories(tessera_md_savestate_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_savestate_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_savestate_test)
+add_test(NAME integration.md_savestate COMMAND tessera_md_savestate_test --test-case=*synthetic*,*refused*)
+set_tests_properties(integration.md_savestate PROPERTIES LABELS "integration;phase1;md" TIMEOUT 300)
+
 add_executable(tessera_md_region_test unit/md_region_test.cpp)
 target_include_directories(tessera_md_region_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_region_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)

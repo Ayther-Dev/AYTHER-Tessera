@@ -4,6 +4,7 @@
 // odd address at or above `end`. On an 8 bit bus the other parity holds 0xFF.
 #pragma once
 #include "md/cart.hpp"
+#include "md/state_io.hpp"
 
 #include <cstdint>
 #include <span>
@@ -22,6 +23,9 @@ public:
     return address >= base_ && address - base_ < image_.size();
   }
   bool dirty() const noexcept { return dirty_; }
+  /// Savestate: the whole image (its size is fixed by the ROM header).
+  void save(StateWriter &w) const;
+  void load(StateReader &r);
 
   /// Bus access; addresses outside the range read 0xFF and are not written.
   std::uint8_t read8(std::uint32_t address) const noexcept;
