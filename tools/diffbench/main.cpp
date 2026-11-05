@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -220,6 +221,20 @@ int main(int argc, char **argv) {
       return 2;
     }
     diffbench::set_core_option(option.substr(0, eq), option.substr(eq + 1));
+  }
+  if (args.count("--pad-script")) {
+    // <frame>:<mask1>:<mask2>[,...] (masks in hexadecimal)
+    std::stringstream steps(args["--pad-script"]);
+    for (std::string step; std::getline(steps, step, ',');) {
+      unsigned frame = 0;
+      unsigned long m1 = 0, m2 = 0;
+      if (std::sscanf(step.c_str(), "%u:%lx:%lx", &frame, &m1, &m2) != 3) {
+        std::cerr << "--pad-script espera frame:mask1:mask2[,...]\n";
+        return 2;
+      }
+      diffbench::set_pad_script(frame, static_cast<uint32_t>(m1),
+                                static_cast<uint32_t>(m2));
+    }
   }
   if (args.count("--pad-device"))
     diffbench::set_pad_device(static_cast<unsigned>(

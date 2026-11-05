@@ -6,6 +6,7 @@
 #include "md/region.hpp"
 #include "md/system.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -15,7 +16,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
+  std::string pad_script, rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
       regs_path, z80_path, poke_spec, audio_path;
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
@@ -40,6 +41,8 @@ int main(int argc, char **argv) {
       pad_mask[0] = std::strtoul(argv[++i], nullptr, 16);
     } else if (arg == "--pad-mask2" && has_value) {
       pad_mask[1] = std::strtoul(argv[++i], nullptr, 16);
+    } else if (arg == "--pad-script" && has_value) {
+      pad_script = argv[++i]; // <frame>:<mask1>:<mask2>[,...], hex masks
     } else if (arg == "--pad-type" && has_value) {
       pad_type = std::atoi(argv[++i]);
     } else if (arg == "--audio-writes-out" && has_value) {
@@ -101,7 +104,30 @@ int main(int argc, char **argv) {
           std::strtoul(poke_spec.substr(i, 2).c_str(), nullptr, 16)));
     poke_frame = static_cast<unsigned>(std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
   }
+  // Pad script: from frame N (1 = the first) the pads hold the masks. gpgx
+  // reads the pads just before the V-int, which is the first line of its
+  // frame, so a mask applies from the start of the frame it names.
+  struct PadStep {
+    unsigned frame;
+    unsigned long mask[2];
+  };
+  std::vector<PadStep> steps;
+  for (std::size_t at = 0; at < pad_script.size();) {
+    const auto end = std::min(pad_script.find(',', at), pad_script.size());
+    PadStep step{};
+    if (std::sscanf(pad_script.substr(at, end - at).c_str(), "%u:%lx:%lx",
+                    &step.frame, &step.mask[0], &step.mask[1]) != 3) {
+      std::fputs("--pad-script: <frame>:<mask1>:<mask2>[,...]' + chr(92) + 'n", stderr);
+      return 2;
+    }
+    steps.push_back(step);
+    at = end + 1;
+  }
   for (unsigned frame = 0; frame < frames; ++frame) {
+    for (const auto &step : steps)
+      if (step.frame == frame + 1)
+        for (unsigned port = 0; port < 2; ++port)
+          system.set_pad(port, static_cast<std::uint16_t>(step.mask[port]));
     if (!poke_spec.empty() && frame == poke_frame &&
         !system.poke_z80_ram(poke_offset, poke_bytes)) {
       std::fputs("poke out of range\n", stderr);

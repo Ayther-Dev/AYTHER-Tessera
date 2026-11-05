@@ -8,6 +8,7 @@ every 16 bit word swapped, so that dump is swapped back.
 
 usage: compare_pad.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
        <mask1 hex> <mask2 hex> [--type 3|6] [--show N] [--region a|u|e|j] [--bytes N]
+       [--script <frame>:<mask1>:<mask2>[,...]]
 (--region forces the console region on both sides; `a` or none = detect it
 from the ROM header, as both do by default)
 exit:  0 identical, 1 different, 2 a tool failed
@@ -23,7 +24,7 @@ def main(argv):
     rest = []
     i = 1
     while i < len(argv):
-        if argv[i] in ("--type", "--show", "--region", "--bytes") and i + 1 < len(argv):
+        if argv[i] in ("--type", "--show", "--region", "--bytes", "--script") and i + 1 < len(argv):
             flags[argv[i]] = argv[i + 1]
             i += 2
         else:
@@ -33,14 +34,17 @@ def main(argv):
     os.makedirs(out_dir, exist_ok=True)
     mine = os.path.join(out_dir, "native.wram")
     theirs = os.path.join(out_dir, "gpgx.wram")
+    script = (["--pad-script", flags["--script"]] if "--script" in flags
+              else [])
     region = flags.get("--region", "a")
     oracle_region = {"u": "ntsc-u", "e": "pal", "j": "ntsc-j"}.get(region)
     runs = [
         [md_run, "--rom", rom, "--frames", frames, "--work-ram-out", mine,
          "--pad-mask", mask1, "--pad-mask2", mask2,
-         "--pad-type", flags.get("--type", "3"), "--region", region],
+         "--pad-type", flags.get("--type", "3"), "--region", region] + script,
         [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
          "--work-ram-out", theirs, "--pad-mask", mask1, "--pad-mask2", mask2]
+        + script
         + ["--pad-device", "201" if flags.get("--type") == "6" else "101"]
         + (["--core-option", "genesis_plus_gx_region_detect=" + oracle_region]
            if oracle_region else []),

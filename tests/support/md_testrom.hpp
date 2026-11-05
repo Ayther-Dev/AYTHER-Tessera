@@ -2360,6 +2360,44 @@ region_detect_rom(const char *country, const char *product = nullptr,
   return rom;
 }
 
+// `pad_frames` (TP-108.5, risk R-2): at every vertical interrupt the ROM reads
+// the data port of both pads with TH high and appends the two bytes to a table
+// at $FF0010 (the frame count is at $FF0000). Pad masks that change from one
+// frame to the next must show up in the same row on both machines.
+inline std::vector<std::uint8_t> pad_frames_rom() {
+  auto rom = vint_counter_rom();
+  std::memcpy(&rom[0x120], "AYTHER PAD FRAME", 16);
+  const std::uint16_t main_code[] = {
+      0x23FC, 0x00FF, 0x0010, 0x00FF, 0x000C, // move.l #$FF0010,$FF000C
+      0x13FC, 0x0040, 0x00A1, 0x0009,         // move.b #$40,$A10009 (TH out)
+      0x13FC, 0x0040, 0x00A1, 0x000B,         // move.b #$40,$A1000B
+      0x13FC, 0x0040, 0x00A1, 0x0003,         // move.b #$40,$A10003 (TH high)
+      0x13FC, 0x0040, 0x00A1, 0x0005,         // move.b #$40,$A10005
+      0x33FC, 0x8164, 0x00C0, 0x0004,         // move.w #$8164,$C00004
+      0x46FC, 0x2000,                         // move   #$2000,sr
+      0x60FE,                                 // bra.s  .
+  };
+  std::size_t at = 0x200;
+  for (const auto word : main_code) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  const std::uint16_t handler[] = {
+      0x2079, 0x00FF, 0x000C, // movea.l $FF000C,a0
+      0x10F9, 0x00A1, 0x0003, // move.b  $A10003,(a0)+
+      0x10F9, 0x00A1, 0x0005, // move.b  $A10005,(a0)+
+      0x23C8, 0x00FF, 0x000C, // move.l  a0,$FF000C
+      0x52B9, 0x00FF, 0x0000, // addq.l  #1,$FF0000
+      0x4E73,                 // rte
+  };
+  at = 0x300;
+  for (const auto word : handler) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
                                                unsigned first = 0,
                                                unsigned last = 3200,

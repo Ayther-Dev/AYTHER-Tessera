@@ -23,6 +23,8 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::ssf2_sweep_rom();
   else if (std::strcmp(argv[1], "vint-counter") == 0)
     rom = tessera::testrom::vint_counter_rom();
+  else if (std::strcmp(argv[1], "pad-frames") == 0)
+    rom = tessera::testrom::pad_frames_rom();
   else if (std::strncmp(argv[1], "region-detect-", 14) == 0) {
     // region-detect-<country>: the four characters of the header, '_' = space
     std::string country(argv[1] + 14);

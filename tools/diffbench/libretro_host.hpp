@@ -62,6 +62,9 @@ struct Poke {
 // Mega Drive, arriba, abajo, izquierda, derecha, B, C, A, start, X, Y, Z, mode;
 // uno por puerto. Sin efecto si hay traza de entradas.
 void set_pad_masks(uint32_t port0, uint32_t port1);
+/// From frame `frame` (1 = the first one) the pads hold these masks. Entries
+/// are given in ascending order of frame.
+void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1);
 // Dispositivo libretro que se pide para ambos puertos tras cargar el juego
 // (0 = el del core por defecto; 0x101 = mando de 6 botones de gpgx).
 void set_pad_device(unsigned device);

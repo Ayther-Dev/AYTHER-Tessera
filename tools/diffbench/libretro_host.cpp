@@ -144,10 +144,28 @@ size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
     note_peak(data[i]);
   return frames;
 }
-void __cdecl poll() { ++g_frame; }
+// Cambios de mascara por fotograma (--pad-script): desde el fotograma `frame`
+// los dos puertos valen mask[0] y mask[1]. El sondeo de gpgx ocurre justo antes
+// de la V-int, al comienzo de su fotograma.
+struct PadStep {
+  unsigned frame;
+  uint32_t mask[2];
+};
+std::vector<PadStep> &pad_script() {
+  static std::vector<PadStep> script;
+  return script;
+}
+uint32_t g_pad_masks[2] = {0, 0};
+void __cdecl poll() {
+  ++g_frame;
+  for (const auto &step : pad_script())
+    if (step.frame <= g_frame) {
+      g_pad_masks[0] = step.mask[0];
+      g_pad_masks[1] = step.mask[1];
+    }
+}
 // Controles de la API (up down left right A B C start) -> ids libretro de gpgx
 // (A=JOYPAD_Y, B=JOYPAD_B, C=JOYPAD_A, start=START).
-uint32_t g_pad_masks[2] = {0, 0};
 // Mega Drive bit -> id libretro: arriba, abajo, izquierda, derecha, B, C, A,
 // start, X, Y, Z, mode.
 constexpr unsigned kPadIds[12] = {4, 5, 6, 7, 0, 8, 1, 3, 10, 9, 11, 2};
@@ -180,6 +198,10 @@ unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
 void set_core_option(const std::string &key, const std::string &value) {
   core_options()[key] = value;
+}
+
+void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1) {
+  pad_script().push_back({frame, {port0, port1}});
 }
 
 void set_pad_masks(uint32_t port0, uint32_t port1) {

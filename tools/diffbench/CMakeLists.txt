@@ -348,6 +348,28 @@ if(TESSERA_BUILD_MEGADRIVE)
 ]"
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
+        # TP-108.5 (risk R-2): pad masks that change from frame to frame are
+        # read in the same V-int row by both machines (gpgx samples the pads
+        # just before the V-int, the first line of its frame).
+        add_test(NAME integration.md_pad-frames_rom
+            COMMAND tessera_md_testrom pad-frames "${CMAKE_CURRENT_BINARY_DIR}/pad-frames.bin")
+        set_tests_properties(integration.md_pad-frames_rom PROPERTIES
+            FIXTURES_SETUP md_pad-frames_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+        foreach(type IN ITEMS 3 6)
+            add_test(NAME integration.md_pad-frames-t${type} COMMAND
+                ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/compare_pad.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${CMAKE_CURRENT_BINARY_DIR}/pad-frames.bin" 40
+                "${CMAKE_CURRENT_BINARY_DIR}/md-pad-frames-t${type}" 0 0
+                --type ${type} --bytes 4096
+                --script 3:80:0,6:ff:1,9:0:2a,12:5a5:3c3,15:fff:fff,18:0:0,21:41:22)
+            set_tests_properties(integration.md_pad-frames-t${type} PROPERTIES
+                FIXTURES_REQUIRED md_pad-frames_rom
+                PASS_REGULAR_EXPRESSION "differing=0[
+]"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
         foreach(forced IN ITEMS u e j)
             add_test(NAME integration.md_region-forced-${forced} COMMAND
                 ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/compare_pad.py"
