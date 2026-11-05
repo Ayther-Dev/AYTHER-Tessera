@@ -54,6 +54,7 @@ TEST_CASE("reset loads SP and PC from the vector table") {
 TEST_CASE("a synthetic program leaves the expected work RAM") {
   NoDevices devices;
   Image image;
+  // clang-format off
   image.code(0x200, {
                         0x23FC,
                         0x1234,
@@ -74,6 +75,7 @@ TEST_CASE("a synthetic program leaves the expected work RAM") {
                         0x4E72,
                         0x2700, // stop   #$2700
                     });
+  // clang-format on
   Bus bus(image.rom, devices);
   M68k cpu(bus);
   cpu.reset();

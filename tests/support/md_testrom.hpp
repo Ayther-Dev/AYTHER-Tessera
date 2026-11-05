@@ -127,6 +127,7 @@ inline std::vector<std::uint8_t> vint_counter_rom() {
     put16(rom, at, word);
     at += 2;
   }
+  // clang-format off
   const std::uint16_t handler[] = {
       0x52B9,
       0x00FF,
@@ -134,6 +135,7 @@ inline std::vector<std::uint8_t> vint_counter_rom() {
       0x4E73, // rte
   };
   at = 0x300;
+  // clang-format on
   for (const auto word : handler) {
     put16(rom, at, word);
     at += 2;
@@ -2631,11 +2633,13 @@ inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
     }
     break;
   }
+  // clang-format off
   std::vector<std::uint16_t> c = {
       0x45F9,
       0x00FF,
       0x0000, // lea $FF0000,a2
   };
+  // clang-format on
   c.insert(c.end(), o.c.begin(), o.c.end());
   c.push_back(0x60FE);
   std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
