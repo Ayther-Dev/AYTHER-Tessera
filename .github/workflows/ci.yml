@@ -98,3 +98,27 @@ jobs:
           ./tools/check.ps1 -Preset windows-md-dev -Stage Build -Jobs 2
           ctest --test-dir build/windows-md-dev -R '^(tool|integration\.diffbench)' --output-on-failure -j 2
       # Tests that need gpgx or the corpus are registered only locally (RF-7.3).
+
+  linux:
+    name: Linux (portable toolchain, synthetic core)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            third_party/cache/nlohmann-json-3.12.0
+            third_party/cache/picosha2-1.0.1
+            third_party/cache/doctest-2.5.3
+          key: ${{ runner.os }}-headers-${{ hashFiles('cmake/dependencies.lock.json') }}
+      - name: Prepare and verify pinned headers
+        shell: pwsh
+        run: ./tools/bootstrap-dependencies.ps1 -Download
+      - name: Configure, build and test the synthetic core
+        run: |
+          cmake --preset linux-dev
+          cmake --build build/linux-dev -j 2
+          ctest --test-dir build/linux-dev --output-on-failure -j 2
