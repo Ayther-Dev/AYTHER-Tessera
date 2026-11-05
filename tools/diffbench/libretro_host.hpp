@@ -58,6 +58,14 @@ struct Poke {
   int32_t status = 0; ///< resultado de write_control
 };
 
+// Mando fijo durante toda la ejecucion (TP-108): 12 bits en el orden de la
+// Mega Drive, arriba, abajo, izquierda, derecha, B, C, A, start, X, Y, Z, mode;
+// uno por puerto. Sin efecto si hay traza de entradas.
+void set_pad_masks(uint32_t port0, uint32_t port1);
+// Dispositivo libretro que se pide para ambos puertos tras cargar el juego
+// (0 = el del core por defecto; 0x101 = mando de 6 botones de gpgx).
+void set_pad_device(unsigned device);
+
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,

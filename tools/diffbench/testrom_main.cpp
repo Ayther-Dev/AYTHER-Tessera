@@ -9,7 +9,7 @@
 #include <fstream>
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
+  if (argc != 3 && argc != 6) {
     std::fputs("usage: tessera_md_testrom bus-sweep|ssf2-sweep|vint-counter "
                "<out.bin>\n",
                stderr);
@@ -90,6 +90,14 @@ int main(int argc, char **argv) {
   else if (std::strncmp(argv[1], "ym-busy-", 8) == 0)
     rom = tessera::testrom::ym_busy_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 8, nullptr, 10)));
+  else if (std::strncmp(argv[1], "pad-latch-", 10) == 0)
+    rom = argc > 5 ? tessera::testrom::pad_latch_rom(
+                         static_cast<unsigned>(std::strtoul(argv[1] + 10, nullptr, 10)),
+                         static_cast<unsigned>(std::strtoul(argv[3], nullptr, 10)),
+                         static_cast<unsigned>(std::strtoul(argv[4], nullptr, 10)),
+                         static_cast<unsigned>(std::strtoul(argv[5], nullptr, 10)))
+                   : tessera::testrom::pad_latch_rom(
+                         static_cast<unsigned>(std::strtoul(argv[1] + 10, nullptr, 10)));
   else if (std::strcmp(argv[1], "fm-psg-z80") == 0)
     rom = tessera::testrom::fm_psg_z80_rom();
   else if (std::strncmp(argv[1], "fm-psg-", 7) == 0)

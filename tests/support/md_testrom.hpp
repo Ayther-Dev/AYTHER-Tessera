@@ -2265,4 +2265,138 @@ inline std::vector<std::uint8_t> fm_psg_sweep_rom(unsigned variant,
   return rom;
 }
 
+// `pad_latch` (TP-108.1/108.2): the I/O ports read as the games read them. The
+// 68000 writes the control and data registers of the pad ports and stores every
+// read of the data registers from $FF0000 in work RAM. The pad is held by the
+// harness (a constant mask on port 1 and port 2). Variants:
+//   0 three-button protocol: TH output, TH input, partial control bits
+//   1 six-button sequence: seven TH toggles on each port, then the same after
+//     a pause longer than the pad's timeout
+//   2 timeout: a pause of growing length between the counter and its read
+//   3 forty TH toggles on both ports (the counter wraps)
+//   4 TH changes through the control register (output <-> input)
+//   5 the read after TH becomes an input, 0..11 nops later
+class PadOps {
+public:
+  void wc(unsigned port, unsigned v) { w4(0x13FC, v, 0x00A10009 + 2 * port); }
+  void wd(unsigned port, unsigned v) { w4(0x13FC, v, 0x00A10003 + 2 * port); }
+  void rd(unsigned port) {
+    const std::uint32_t a = 0x00A10003 + 2 * port;
+    c.insert(c.end(), {0x14F9, static_cast<std::uint16_t>(a >> 16),
+                       static_cast<std::uint16_t>(a)});
+  }
+  void delay(unsigned n) {
+    c.insert(c.end(), {0x303C, static_cast<std::uint16_t>(n), 0x51C8, 0xFFFE});
+  }
+  void nops(unsigned n) {
+    for (unsigned i = 0; i < n; ++i)
+      c.push_back(0x4E71);
+  }
+  std::vector<std::uint16_t> c;
+
+private:
+  void w4(std::uint16_t op, unsigned v, std::uint32_t a) {
+    c.insert(c.end(), {op, static_cast<std::uint16_t>(v & 0xFF),
+                       static_cast<std::uint16_t>(a >> 16),
+                       static_cast<std::uint16_t>(a)});
+  }
+};
+
+inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
+                                               unsigned first = 0,
+                                               unsigned last = 3200,
+                                               unsigned step = 100) {
+  PadOps o;
+  switch (variant) {
+  case 0:
+    o.wc(0, 0x40); o.wc(1, 0x40);
+    for (unsigned th : {0x40u, 0x00u, 0x40u, 0x00u}) {
+      o.wd(0, th); o.rd(0); o.wd(1, th); o.rd(1);
+    }
+    o.wc(0, 0x00); o.wc(1, 0x00);          // TH an input: pulled up
+    o.rd(0); o.rd(1);
+    o.wd(0, 0x00); o.rd(0);                // data written, pin still input
+    o.wc(0, 0x7F); o.wd(0, 0x7F); o.rd(0);
+    o.wd(0, 0x3F); o.rd(0);
+    o.wd(0, 0x55); o.rd(0);
+    o.wc(0, 0x0F); o.wd(0, 0x0A); o.rd(0); // pins 0-3 outputs, TH input
+    o.wc(0, 0x40); o.wd(0, 0x40); o.rd(0);
+    o.wd(0, 0x00); o.rd(0);
+    o.wc(0, 0x70); o.wd(0, 0x10); o.rd(0); // TH output low, bit 4 output high
+    break;
+  case 1:
+    for (unsigned pass = 0; pass < 2; ++pass) {
+      o.wc(0, 0x40); o.wc(1, 0x40);
+      for (unsigned i = 0; i < 9; ++i) {
+        const unsigned th = (i & 1U) ? 0x00 : 0x40;
+        o.wd(0, th); o.rd(0); o.wd(1, th); o.rd(1);
+      }
+      o.delay(2000);
+    }
+    break;
+  case 3:
+    o.wc(0, 0x40); o.wc(1, 0x40);
+    for (unsigned i = 0; i < 40; ++i) {   // enough toggles to see the counter wrap
+      const unsigned th = (i & 1U) ? 0x00 : 0x40;
+      o.wd(0, th); o.rd(0); o.wd(1, th); o.rd(1);
+    }
+    break;
+  case 5:                                  // when does the pull-up reach the pad?
+    for (unsigned k = 0; k < 12; ++k) {
+      o.wc(0, 0x40); o.wd(0, 0x00);
+      o.delay(3000);
+      o.wd(0, 0x40); o.wd(0, 0x00); o.wd(0, 0x40); o.wd(0, 0x00);
+      o.wc(0, 0x00);                       // TH becomes an input
+      o.nops(k);
+      o.rd(0);
+    }
+    break;
+  case 4:                                  // reset of the counter by TH writes
+    o.wc(0, 0x40);
+    o.wd(0, 0x40); o.rd(0);
+    o.wd(0, 0x00); o.rd(0); o.wd(0, 0x40); o.rd(0); o.wd(0, 0x00); o.rd(0);
+    o.wc(0, 0x00); o.rd(0);                // TH to input: pull up = rising?
+    o.wd(0, 0x00); o.rd(0);
+    o.wc(0, 0x40); o.wd(0, 0x00); o.rd(0); // output low again
+    o.wd(0, 0x40); o.rd(0);
+    o.wd(0, 0x00); o.rd(0); o.wd(0, 0x40); o.rd(0); o.wd(0, 0x00); o.rd(0);
+    o.wd(0, 0x40); o.rd(0);                // third rising edge: extra
+    o.wc(0, 0x00); o.rd(0); o.wc(0, 0x40); o.rd(0);
+    break;
+  default:
+    // Timeout: after a pause long enough to reset the pad, three TH cycles and
+    // then a pause of d before the read of the low half of the third: the
+    // read is the ID if the counter survived the pause. d grows by 100 loops.
+    o.wc(0, 0x40);
+    for (unsigned d = first; d <= last; d += step) {
+      o.wd(0, 0x00);
+      o.delay(3000);
+      o.wd(0, 0x40); o.wd(0, 0x00);
+      o.wd(0, 0x40); o.wd(0, 0x00);
+      o.delay(d);
+      o.rd(0);
+    }
+    break;
+  }
+  std::vector<std::uint16_t> c = {
+      0x45F9, 0x00FF, 0x0000, // lea $FF0000,a2
+  };
+  c.insert(c.end(), o.c.begin(), o.c.end());
+  c.push_back(0x60FE);
+  std::vector<std::uint8_t> rom(0x200 + c.size() * 2 + 2, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER PAD LATCH", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 } // namespace tessera::testrom

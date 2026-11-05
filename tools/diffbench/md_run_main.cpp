@@ -16,6 +16,8 @@
 int main(int argc, char **argv) {
   std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
       regs_path, z80_path, poke_spec, audio_path;
+  unsigned long pad_mask[2] = {0, 0};
+  int pad_type = 3;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -33,6 +35,12 @@ int main(int argc, char **argv) {
       vram_path = argv[++i];
     } else if (arg == "--z80-ram-out" && has_value) {
       z80_path = argv[++i];
+    } else if (arg == "--pad-mask" && has_value) {
+      pad_mask[0] = std::strtoul(argv[++i], nullptr, 16);
+    } else if (arg == "--pad-mask2" && has_value) {
+      pad_mask[1] = std::strtoul(argv[++i], nullptr, 16);
+    } else if (arg == "--pad-type" && has_value) {
+      pad_type = std::atoi(argv[++i]);
     } else if (arg == "--audio-writes-out" && has_value) {
       audio_path = argv[++i]; // 8 byte records of the last frame's log
     } else if (arg == "--poke-z80" && has_value) {
@@ -66,9 +74,13 @@ int main(int argc, char **argv) {
   }
   std::vector<std::uint8_t> rom((std::istreambuf_iterator<char>(in)),
                                 std::istreambuf_iterator<char>());
-  tessera::md::System system(std::move(rom),
-                             tessera::md::MachineConfig::for_region(region));
+  auto config = tessera::md::MachineConfig::for_region(region);
+  config.pads.fill(pad_type == 6 ? tessera::md::PadType::six_button
+                                 : tessera::md::PadType::three_button);
+  tessera::md::System system(std::move(rom), config);
   system.reset();
+  for (unsigned port = 0; port < 2; ++port)
+    system.set_pad(port, static_cast<std::uint16_t>(pad_mask[port]));
   std::size_t poke_offset = 0;
   std::vector<std::uint8_t> poke_bytes;
   unsigned poke_frame = 0;

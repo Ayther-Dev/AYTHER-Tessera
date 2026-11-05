@@ -212,6 +212,19 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
+  if (args.count("--pad-device"))
+    diffbench::set_pad_device(static_cast<unsigned>(
+        std::strtoul(args["--pad-device"].c_str(), nullptr, 16)));
+  if (args.count("--pad-mask") || args.count("--pad-mask2"))
+    diffbench::set_pad_masks(
+        args.count("--pad-mask")
+            ? static_cast<uint32_t>(
+                  std::strtoul(args["--pad-mask"].c_str(), nullptr, 16))
+            : 0u,
+        args.count("--pad-mask2")
+            ? static_cast<uint32_t>(
+                  std::strtoul(args["--pad-mask2"].c_str(), nullptr, 16))
+            : 0u);
 #ifdef TESSERA_DIFFBENCH_WITH_TESSERA
   if (args.count("--libretro") && args.count("--tessera") &&
       args.count("--first-divergence-out")) {

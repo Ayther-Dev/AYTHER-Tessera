@@ -125,7 +125,17 @@ size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
 void __cdecl poll() { ++g_frame; }
 // Controles de la API (up down left right A B C start) -> ids libretro de gpgx
 // (A=JOYPAD_Y, B=JOYPAD_B, C=JOYPAD_A, start=START).
+uint32_t g_pad_masks[2] = {0, 0};
+// Mega Drive bit -> id libretro: arriba, abajo, izquierda, derecha, B, C, A,
+// start, X, Y, Z, mode.
+constexpr unsigned kPadIds[12] = {4, 5, 6, 7, 0, 8, 1, 3, 10, 9, 11, 2};
 int16_t __cdecl input(unsigned port, unsigned device, unsigned, unsigned id) {
+  if (port < 2 && device == 1 && g_pad_masks[port] != 0 && g_frame != 0) {
+    for (unsigned bit = 0; bit < 12; ++bit)
+      if (kPadIds[bit] == id)
+        return static_cast<int16_t>((g_pad_masks[port] >> bit) & 1U);
+    return 0;
+  }
   if (port != 0 || device != 1 || !g_trace || g_frame == 0 ||
       g_frame > g_trace->size())
     return 0;
@@ -143,6 +153,14 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 }
 
 } // namespace
+
+unsigned g_pad_device = 0;
+void set_pad_device(unsigned device) { g_pad_device = device; }
+
+void set_pad_masks(uint32_t port0, uint32_t port1) {
+  g_pad_masks[0] = port0;
+  g_pad_masks[1] = port1;
+}
 
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
@@ -199,6 +217,13 @@ RunResult run_libretro(const std::string &core_path,
   if (!load(&info)) {
     result.error = "retro_load_game falló";
   } else {
+    if (g_pad_device != 0) {
+      void(__cdecl * set_port_device)(unsigned, unsigned) = nullptr;
+      if (sym(core, "retro_set_controller_port_device", set_port_device)) {
+        set_port_device(0, g_pad_device);
+        set_port_device(1, g_pad_device);
+      }
+    }
     using GetIface = const AytherInterface *(__cdecl *)(uint32_t);
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;

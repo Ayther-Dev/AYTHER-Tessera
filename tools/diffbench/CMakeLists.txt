@@ -284,6 +284,43 @@ if(TESSERA_BUILD_MEGADRIVE)
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()
+    if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-108.1/108.2: data port of the pads against gpgx (work RAM bytes
+        # stored by pad_latch-N). Type 3 is the three-button pad (TH latch);
+        # type 6 the six-button one (gpgx device 0x201), with two mask pairs.
+        # Variant 2 sweeps the wait between TH edges (0..3200 cycles).
+        foreach(variant IN ITEMS 0 1 2 3 4 5)
+            set(pad_rom_args "")
+            set(pad_masks fff a5a)
+            if(variant EQUAL 2)
+                set(pad_rom_args 0 3200 100)
+                set(pad_masks 0 0) # a pressed A or Start hides the ID bits
+            endif()
+            add_test(NAME integration.md_pad-latch-${variant}_rom
+                COMMAND tessera_md_testrom pad-latch-${variant}
+                "${CMAKE_CURRENT_BINARY_DIR}/pad-latch-${variant}.bin" ${pad_rom_args})
+            set_tests_properties(integration.md_pad-latch-${variant}_rom PROPERTIES
+                FIXTURES_SETUP md_pad-latch-${variant}_rom
+                LABELS "integration;phase1;md;local" TIMEOUT 30)
+            foreach(type IN ITEMS 3 6)
+                if(type EQUAL 3 AND variant GREATER 1)
+                    continue()
+                endif()
+                add_test(NAME integration.md_pad-latch-${variant}-t${type} COMMAND
+                    ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_SOURCE_DIR}/compare_pad.py"
+                    $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                    "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                    "${CMAKE_CURRENT_BINARY_DIR}/pad-latch-${variant}.bin" 90
+                    "${CMAKE_CURRENT_BINARY_DIR}/md-pad-${variant}-t${type}"
+                    ${pad_masks} --type ${type})
+                set_tests_properties(integration.md_pad-latch-${variant}-t${type} PROPERTIES
+                    FIXTURES_REQUIRED md_pad-latch-${variant}_rom
+                    PASS_REGULAR_EXPRESSION "differing=0[
+]"
+                    LABELS "integration;phase1;md;local" TIMEOUT 120)
+            endforeach()
+        endforeach()
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_CORPUS_DIR
        AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
         # TP-105.11: tramo 1 de los cinco juegos del corpus en el plano 1.

@@ -12,6 +12,15 @@ constexpr unsigned kZ80VdpWait = 3;
 // Master cycles between the release of the reset line and the first Z80 fetch
 // (gpgx fm_psg_z80: every write of the payload is stamped 67 cycles later).
 constexpr std::uint64_t kZ80ResetDelay = 67;
+// A six-button pad that sees no change of TH for this long starts its sequence
+// again (gpgx pad_latch-2: the ID of the second low half survives a pause of up
+// to 12 540 68000 cycles and is gone from 12 910; the cycles in between depend
+// on the scanline phase, so the middle is taken).
+constexpr std::uint64_t kPad6Timeout = 12'700ULL * 7ULL;
+// Cycles between the control write that turns TH into an input and the moment
+// the pad sees the pull-up (gpgx pad_latch-5: a read 20 cycles after the write
+// still sees the old half, one 24 cycles after sees the new one).
+constexpr std::uint64_t kPad6PullUp = 24ULL * 7ULL;
 // How far the Z80 INT leads the vertical interrupt of the 68000, in master cycles.
 constexpr std::uint64_t kZ80IntLead = 1620;
 // YM2612 busy time after a data write, master cycles (probe ym-busy-N)
@@ -64,6 +73,7 @@ void System::reset() {
   z80_int_end_ = 0;
   io_data_ = {0x00, 0x00, 0x00};
   io_ctrl_ = {0x00, 0x00, 0x00};
+  pad_port_ = {};
   frame_ = 0;
   current_line_ = 0;
   frame_start_line_ = 192;
@@ -166,13 +176,13 @@ void System::run_frame() {
   frame_start_line_ = vdp_.frame_start_line();
 }
 
-void System::set_pad(unsigned port, std::uint8_t pressed) noexcept {
+void System::set_pad(unsigned port, std::uint16_t pressed) noexcept {
   if (port < pads_.size())
     pads_[port] = pressed;
 }
 
 // Pad port: 3 button protocol. TH (bit 6) selects the half of the buttons.
-std::uint8_t System::io_read(std::uint32_t offset) const noexcept {
+std::uint8_t System::io_read(std::uint32_t offset) noexcept {
   switch (offset) {
   case 0x01:
     return io_version();
@@ -181,10 +191,27 @@ std::uint8_t System::io_read(std::uint32_t offset) const noexcept {
     const unsigned port = (offset - 3) / 2;
     const std::uint8_t out = io_data_[port];
     const std::uint8_t ctrl = io_ctrl_[port];
-    const std::uint8_t pressed = pads_[port];
-    const bool th = (out & 0x40U) != 0 || (ctrl & 0x40U) == 0;
+    const std::uint16_t pressed = pads_[port];
+    const bool six = config_.pads[port] == PadType::six_button;
+    if (six)
+      pad_settle(port, cpu_.getClock() * kDivider68k);
+    const bool th = six ? pad_port_[port].th
+                        : (out & 0x40U) != 0 || (ctrl & 0x40U) == 0;
+    const unsigned phase = six ? pad_port_[port].phase : 0;
     std::uint8_t in;
-    if (th) { // C B right left down up
+    if (six && th && phase == 3) { // C B mode X Y Z
+      in = static_cast<std::uint8_t>(
+          ((pressed & kPadZ) ? 0 : 0x01) | ((pressed & kPadY) ? 0 : 0x02) |
+          ((pressed & kPadX) ? 0 : 0x04) | ((pressed & kPadMode) ? 0 : 0x08) |
+          ((pressed & kPadB) ? 0 : 0x10) | ((pressed & kPadC) ? 0 : 0x20) |
+          0x40);
+    } else if (six && !th && phase >= 2 && phase <= 3) {
+      // start A and, in place of the directions, the ID of the six-button pad
+      // (0000) in the second low half and 1111 in the third
+      in = static_cast<std::uint8_t>(
+          (phase == 2 ? 0x00 : 0x0F) | ((pressed & kPadA) ? 0 : 0x10) |
+          ((pressed & kPadStart) ? 0 : 0x20));
+    } else if (th) { // C B right left down up
       in = static_cast<std::uint8_t>(
           ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
           ((pressed & kPadLeft) ? 0 : 0x04) |
@@ -195,6 +222,8 @@ std::uint8_t System::io_read(std::uint32_t offset) const noexcept {
           ((pressed & kPadUp) ? 0 : 0x01) | ((pressed & kPadDown) ? 0 : 0x02) |
           ((pressed & kPadA) ? 0 : 0x10) | ((pressed & kPadStart) ? 0 : 0x20));
     }
+    if (six)
+      in |= 0x40; // TH as an input reads high (pull-up), whatever the phase
     return static_cast<std::uint8_t>((out & ctrl) | (in & ~ctrl));
   }
   case 0x07:
@@ -222,18 +251,65 @@ std::uint32_t System::line_cycle() const noexcept {
              : 0U;
 }
 
+// What a six-button pad sees of TH after a write (TP-108.2). With TH an output
+// it follows the data register; with TH an input the pull-up holds it high.
+// A rise of an output TH is one step of the sequence; every change restarts
+// the time the pad waits before it forgets the sequence. Changing the control
+// register to make TH an input does not reach the pad (gpgx pad_latch-4).
+void System::pad_settle(unsigned port, std::uint64_t now) noexcept {
+  auto &pad = pad_port_[port];
+  if (pad.pull_up_at != 0 && now >= pad.pull_up_at) {
+    if (!pad.th) {
+      pad.th = true; // pulled up: the sequence does not advance
+      pad.edge_at = pad.pull_up_at;
+    }
+    pad.pull_up_at = 0;
+  }
+  if (now - pad.edge_at > kPad6Timeout)
+    pad.phase = 0; // idle for too long: the sequence restarts
+}
+
+void System::pad_notify(unsigned port, bool control_write,
+                        std::uint64_t now) noexcept {
+  pad_settle(port, now);
+  auto &pad = pad_port_[port];
+  const bool output = (io_ctrl_[port] & 0x40U) != 0;
+  pad.pull_up_at = 0;
+  if (control_write && !output) {
+    if (!pad.th)
+      pad.pull_up_at = now + kPad6PullUp;
+    return;
+  }
+  const bool th = output ? (io_data_[port] & 0x40U) != 0 : true;
+  if (th == pad.th)
+    return;
+  if (th && output && pad.phase < 4)
+    ++pad.phase;
+  pad.th = th;
+  pad.edge_at = now;
+}
+
 void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
   const bool th_before = th2();
+  const std::uint64_t now = cpu_.getClock() * kDivider68k;
   switch (offset) {
   case 0x03:
   case 0x05:
-  case 0x07:
     io_data_[(offset - 3) / 2] = value;
+    if (config_.pads[(offset - 3) / 2] == PadType::six_button)
+      pad_notify((offset - 3) / 2, false, now);
+    break;
+  case 0x07:
+    io_data_[2] = value;
     break;
   case 0x09:
   case 0x0B:
-  case 0x0D:
     io_ctrl_[(offset - 9) / 2] = value;
+    if (config_.pads[(offset - 9) / 2] == PadType::six_button)
+      pad_notify((offset - 9) / 2, true, now);
+    break;
+  case 0x0D:
+    io_ctrl_[2] = value;
     break;
   default:
     break;

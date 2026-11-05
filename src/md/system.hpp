@@ -22,14 +22,19 @@
 namespace tessera::md {
 
 // Mega Drive native pad bits (1 = pressed).
-inline constexpr std::uint8_t kPadUp = 0x01;
-inline constexpr std::uint8_t kPadDown = 0x02;
-inline constexpr std::uint8_t kPadLeft = 0x04;
-inline constexpr std::uint8_t kPadRight = 0x08;
-inline constexpr std::uint8_t kPadB = 0x10;
-inline constexpr std::uint8_t kPadC = 0x20;
-inline constexpr std::uint8_t kPadA = 0x40;
-inline constexpr std::uint8_t kPadStart = 0x80;
+inline constexpr std::uint16_t kPadUp = 0x01;
+inline constexpr std::uint16_t kPadDown = 0x02;
+inline constexpr std::uint16_t kPadLeft = 0x04;
+inline constexpr std::uint16_t kPadRight = 0x08;
+inline constexpr std::uint16_t kPadB = 0x10;
+inline constexpr std::uint16_t kPadC = 0x20;
+inline constexpr std::uint16_t kPadA = 0x40;
+inline constexpr std::uint16_t kPadStart = 0x80;
+// Six-button pad only.
+inline constexpr std::uint16_t kPadX = 0x100;
+inline constexpr std::uint16_t kPadY = 0x200;
+inline constexpr std::uint16_t kPadZ = 0x400;
+inline constexpr std::uint16_t kPadMode = 0x800;
 
 /// One write to a sound chip, as the observation region AUDIO_WRITES lists it
 /// (TP-107.2). `addr` is (part << 8) | register for the FM and 0 for the PSG.
@@ -74,7 +79,7 @@ public:
   const Sram &sram() const noexcept { return sram_; }
   const M68k &cpu() const noexcept { return cpu_; }
 
-  void set_pad(unsigned port, std::uint8_t pressed) noexcept;
+  void set_pad(unsigned port, std::uint16_t pressed) noexcept;
 
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
@@ -119,8 +124,20 @@ private:
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
              bool word) override;
-  std::uint8_t io_read(std::uint32_t offset) const noexcept;
+  std::uint8_t io_read(std::uint32_t offset) noexcept;
   void io_write(std::uint32_t offset, std::uint8_t value) noexcept;
+  /// Six-button pad: what the pad has seen of TH (TP-108.2). The pad takes TH
+  /// from a write, not from the pin; `phase` counts the rising edges of TH
+  /// since the pad was last idle.
+  struct PadPort {
+    bool th = true;
+    std::uint8_t phase = 0;
+    std::uint64_t edge_at = 0; ///< master cycle of the last change of TH
+    std::uint64_t pull_up_at = 0; ///< pending pull-up of TH (0 = none)
+  };
+  void pad_notify(unsigned port, bool control_write, std::uint64_t now) noexcept;
+  void pad_settle(unsigned port, std::uint64_t now) noexcept;
+  std::array<PadPort, 2> pad_port_{};
   bool th2() const noexcept;
   std::uint32_t line_cycle() const noexcept;
   void update_irq() noexcept;
@@ -175,7 +192,7 @@ private:
   // I/O: data and control registers of port 1, port 2 and the expansion port.
   std::array<std::uint8_t, 3> io_data_{0x00, 0x00, 0x00};
   std::array<std::uint8_t, 3> io_ctrl_{0x00, 0x00, 0x00};
-  std::array<std::uint8_t, 2> pads_{0x00, 0x00};
+  std::array<std::uint16_t, 2> pads_{0x00, 0x00};
 };
 
 } // namespace tessera::md
