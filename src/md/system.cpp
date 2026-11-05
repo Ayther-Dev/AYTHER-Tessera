@@ -49,6 +49,13 @@ void System::reset() {
   z80_reset_released_ = false;
   z80_.reset();
   z80_bank_ = 0;
+  ym_.reset();
+  psg_.reset();
+  ym_reg_ = {};
+  ym_busy_until_ = 0;
+  audio_log_.clear();
+  audio_dropped_ = 0;
+  log_origin_ = 0;
   z80_master_ = 0;
   z80_int_end_ = 0;
   io_data_ = {0x00, 0x00, 0x00};
@@ -103,6 +110,11 @@ void System::run_frame() {
   // A frame starts at the first line of the vertical blanking (gpgx); the
   // first one at line 192, the height of Mode 4 in which the VDP wakes up.
   const std::uint32_t first_line = frame_start_line_ % lines;
+  log_origin_ = frame_master;
+  audio_log_.clear();
+  audio_dropped_ = 0;
+  ym_.clear_samples();
+  psg_.clear_samples();
   for (std::uint32_t index = 0; index < lines; ++index) {
     const std::uint32_t line = (first_line + index) % lines;
     current_line_ = line;
@@ -144,6 +156,8 @@ void System::run_frame() {
     const auto flags = renderer_.take_sprite_flags();
     vdp_.raise_sprite_flags(flags.overflow, flags.collision);
   }
+  ym_.run_to(frame_master + cycles_per_frame(config_.standard));
+  psg_.run_to(frame_master + cycles_per_frame(config_.standard));
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();
 }
@@ -336,6 +350,13 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     const std::uint16_t v =
         word ? value : dup(static_cast<std::uint8_t>(value));
     vdp_.set_time(cpu_.getClock() * kDivider68k);
+    if (offset >= 0x10 && offset < 0x18) {
+      // The PSG sits on the odd (low) byte lane of $C00010-$C00017.
+      if (word || (offset & 1U) != 0)
+        psg_write(static_cast<std::uint8_t>(value),
+                  cpu_.getClock() * kDivider68k);
+      break;
+    }
     if (offset < 4)
       vdp_.write_data(v);
     else if (offset < 8) {
@@ -382,14 +403,39 @@ std::uint16_t System::open_bus(std::uint32_t offset, bool word) const noexcept {
 // The YM2612 busy flag (bit 7 of the status): set for a fixed time by a write
 // to a data port, not by an address write. Measured on gpgx with ym-busy-N; the
 // timers and everything else of the chip are TP-107.
-std::uint8_t System::ym_status(std::uint64_t now) const noexcept {
-  return now < ym_busy_until_ ? 0x80U : 0U;
+std::uint8_t System::ym_status(std::uint64_t now) {
+  return static_cast<std::uint8_t>((now < ym_busy_until_ ? 0x80U : 0U) |
+                                   ym_.status(now));
 }
 
-void System::ym_write(std::uint32_t address, std::uint8_t, std::uint64_t now,
-                      bool word) noexcept {
-  if ((address & 1U) != 0 || word)
+void System::log_audio(std::uint16_t addr, std::uint8_t data,
+                       std::uint8_t chip, std::uint64_t now) {
+  if (audio_log_.size() >= kAudioWriteCapacity) {
+    ++audio_dropped_;
+    return;
+  }
+  audio_log_.push_back({static_cast<std::uint32_t>(now - log_origin_), addr,
+                        data, chip});
+}
+
+void System::psg_write(std::uint8_t value, std::uint64_t now) {
+  psg_.write(value, now);
+  log_audio(0, value, 1, now);
+}
+
+void System::ym_write(std::uint32_t address, std::uint8_t value,
+                      std::uint64_t now, bool word) {
+  // A word write reaches the chip through the low byte: the data port.
+  const unsigned port = word ? ((address & 2U) | 1U) : (address & 3U);
+  const unsigned part = (port >> 1) & 1U;
+  ym_.write(port, value, now);
+  if ((port & 1U) == 0) {
+    ym_reg_[part] = value;
+  } else {
+    log_audio(static_cast<std::uint16_t>((part << 8) | ym_reg_[part]), value,
+              0, now);
     ym_busy_until_ = now + kYmBusy;
+  }
 }
 
 void System::z80_bank_write(std::uint8_t value) noexcept {
@@ -425,6 +471,8 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
   } else if (address < 0x8000) {
     if ((address & 0xFF00U) == 0x6000U)
       z80_bank_write(value);
+    else if ((address & 0xFFF9U) == 0x7F11U)
+      psg_write(value, z80_master_);
   } else {
     const std::uint32_t a =
         (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);

@@ -477,6 +477,77 @@
           "bytes": 138218
         }
       ]
+    },
+    {
+      "name": "ymfm",
+      "version": "81aec25",
+      "commit": "81aec25ccbb98f4873a255f7551ac4dadac59b4a",
+      "repository": "https://github.com/aaronsgiles/ymfm",
+      "include_directory": "third_party/cache/ymfm-81aec25/src",
+      "purpose": "YM2612/YM3438 FM chip of the native Mega Drive core (spec 008, DA-4, TP-107.1); BSD-3-Clause",
+      "status": "pinned_source",
+      "files": [
+        {
+          "path": "third_party/licenses/ymfm-81aec25/LICENSE",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/LICENSE",
+          "sha256": "2d2e9213c170a9866c616fa85b6da993a6724e10befc61f468ed9bfb84c4691c",
+          "bytes": 1519
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm.h",
+          "sha256": "f5ab6fed63c8669abab8403e0e93132e1dad0ae4d8e4954e7836ab9e5b228405",
+          "bytes": 18554
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_adpcm.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_adpcm.cpp",
+          "sha256": "74e5ded129ea7e532112e5b637d0a7bd4e127fd83331f1fac32011723051d4e0",
+          "bytes": 22040
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_adpcm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_adpcm.h",
+          "sha256": "5933691971493b853a9be443f6e6fd74f63869aa21225f66dd89fc20de20914d",
+          "bytes": 13752
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_fm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_fm.h",
+          "sha256": "1b27bfb7fa4963d7c54cb06fd9bf659450362d8ed496c6af7d487b068cac45c9",
+          "bytes": 17705
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_fm.ipp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_fm.ipp",
+          "sha256": "4fb7fe59d4494a19e9f9c7888eb644a63d86e109fdefb27a8117bf6a5f6ab4b9",
+          "bytes": 59236
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opn.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.cpp",
+          "sha256": "8734c6d5a6e1bf49a08eeb33d260d39c17cd1d26f5db506e5d0d3e416913b489",
+          "bytes": 67918
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opn.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.h",
+          "sha256": "1950990c3ea0c6d492a20f66a683a372a7367ef39f7830aa65b20a20d1bcbef5",
+          "bytes": 28415
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_ssg.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_ssg.cpp",
+          "sha256": "73a3028a77f13f3769b7705079659eb8325431a67b8164ded25e12f324f42bfd",
+          "bytes": 8421
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_ssg.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_ssg.h",
+          "sha256": "27966b0887fe98f2d06a96be2776c911107e2f2a13a64f9a349e1ffc19cf7584",
+          "bytes": 7752
+        }
+      ]
     }
   ]
 }

@@ -15,7 +15,7 @@
 
 int main(int argc, char **argv) {
   std::string rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
-      regs_path, z80_path, poke_spec;
+      regs_path, z80_path, poke_spec, audio_path;
   unsigned frames = 600;
   tessera::md::Region region = tessera::md::Region::usa;
   for (int i = 1; i < argc; ++i) {
@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
       vram_path = argv[++i];
     } else if (arg == "--z80-ram-out" && has_value) {
       z80_path = argv[++i];
+    } else if (arg == "--audio-writes-out" && has_value) {
+      audio_path = argv[++i]; // 8 byte records of the last frame's log
     } else if (arg == "--poke-z80" && has_value) {
       poke_spec = argv[++i]; // <offset hex>:<bytes hex>:<frame>
     } else if (arg == "--regs-out" && has_value) {
@@ -108,6 +110,20 @@ int main(int argc, char **argv) {
     const auto z = system.z80_ram();
     zo.write(reinterpret_cast<const char *>(z.data()),
              static_cast<std::streamsize>(z.size()));
+  }
+  if (!audio_path.empty()) {
+    std::ofstream ao(audio_path, std::ios::binary | std::ios::trunc);
+    for (const auto &w : system.audio_writes()) {
+      const unsigned char rec[8] = {
+          static_cast<unsigned char>(w.cycle),
+          static_cast<unsigned char>(w.cycle >> 8),
+          static_cast<unsigned char>(w.cycle >> 16),
+          static_cast<unsigned char>(w.cycle >> 24),
+          static_cast<unsigned char>(w.addr),
+          static_cast<unsigned char>(w.addr >> 8),
+          w.data, w.chip};
+      ao.write(reinterpret_cast<const char *>(rec), 8);
+    }
   }
   if (!regs_path.empty()) {
     std::ofstream ro(regs_path, std::ios::binary | std::ios::trunc);

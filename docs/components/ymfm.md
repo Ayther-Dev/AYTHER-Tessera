@@ -16,3 +16,8 @@ La interfaz `ymfm_interface` lleva los temporizadores y la ocupación; `generate
 
 ## Mute por canal
 No hay un mute público. `ym2612::generate` ya suma cada canal por separado con la máscara `1 << chan` en `m_fm.output(...)`, así que el mute (RF-3.7) se logra con un parche mínimo: filtrar `chan` con una máscara propia antes de sumar, más el DAC. Es un parche local de pocas líneas y se anota como modificación MIT-compatible en el aviso (la BSD-3 permite modificar). Pendiente de implementar en la fase 1; no es bloqueante.
+
+## Integración (TP-107.1)
+Vendorizado en `cmake/dependencies.lock.json` (`ymfm`, caché `third_party/cache/ymfm-81aec25/src`, SHA-256 verificado al configurar por `cmake/Ymfm.cmake`). Se compilan `ymfm_opn.cpp`, `ymfm_adpcm.cpp` y `ymfm_ssg.cpp` (el header de OPN los arrastra aunque la YM2612 no los use). `src/md/ym.{hpp,cpp}` es el adaptador (`Ym2612`): reloj del chip = maestro/7, una muestra cada 144 relojes (1008 ciclos maestros), temporizadores armados por `ymfm_set_timer` con vencimiento en relojes del chip. Los accesos declaran el ciclo maestro en el que ocurren; la ocupación (bit 7 del estado) la mide `System` en el bus, no ymfm. Prueba: `unit.md_ym`.
+
+El silencio de la YM2612 no es cero: ymfm modela el desplazamiento constante del DAC (discontinuidad de 9 bits), así que «silencio» es un flujo plano.

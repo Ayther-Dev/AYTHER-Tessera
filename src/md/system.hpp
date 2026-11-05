@@ -9,6 +9,8 @@
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
 #include "md/vdp_render.hpp"
+#include "md/psg.hpp"
+#include "md/ym.hpp"
 #include "md/z80.hpp"
 
 #include <algorithm>
@@ -28,6 +30,17 @@ inline constexpr std::uint8_t kPadB = 0x10;
 inline constexpr std::uint8_t kPadC = 0x20;
 inline constexpr std::uint8_t kPadA = 0x40;
 inline constexpr std::uint8_t kPadStart = 0x80;
+
+/// One write to a sound chip, as the observation region AUDIO_WRITES lists it
+/// (TP-107.2). `addr` is (part << 8) | register for the FM and 0 for the PSG.
+struct AudioWrite {
+  std::uint32_t cycle;
+  std::uint16_t addr;
+  std::uint8_t data;
+  std::uint8_t chip; ///< 0 FM, 1 PSG
+};
+/// Capacity of the write log of a frame.
+inline constexpr std::size_t kAudioWriteCapacity = 8192;
 
 class System final : private BusDevices {
 public:
@@ -70,6 +83,16 @@ public:
     return z80_bus_requested_ && z80_reset_released_;
   }
   const Z80 &z80() const noexcept { return z80_; }
+  const Ym2612 &ym() const noexcept { return ym_; }
+  const Psg &psg() const noexcept { return psg_; }
+  /// Sound chip writes of the last frame run (up to kAudioWriteCapacity) and
+  /// the ones that did not fit.
+  std::span<const AudioWrite> audio_writes() const noexcept {
+    return audio_log_;
+  }
+  std::uint32_t audio_writes_dropped() const noexcept {
+    return audio_dropped_;
+  }
   /// Nine bit bank register: A23-A15 of the Z80 window at $8000.
   std::uint16_t z80_bank() const noexcept { return z80_bank_; }
 
@@ -126,10 +149,19 @@ private:
   Z80 z80_{z80_port_};
   std::uint64_t z80_master_ = 0; ///< master cycle the Z80 has run up to
   std::uint16_t z80_bank_ = 0;
+  Ym2612 ym_;
+  Psg psg_;
+  std::vector<AudioWrite> audio_log_;
+  std::uint32_t audio_dropped_ = 0;
+  std::uint64_t log_origin_ = 0; ///< master cycle the log counts from
+  std::array<std::uint8_t, 2> ym_reg_{}; ///< register latched by each part
+  void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
+                 std::uint64_t now);
+  void psg_write(std::uint8_t value, std::uint64_t now);
   std::uint64_t ym_busy_until_ = 0; ///< master cycle the YM busy flag drops
-  std::uint8_t ym_status(std::uint64_t now) const noexcept;
+  std::uint8_t ym_status(std::uint64_t now);
   void ym_write(std::uint32_t address, std::uint8_t value, std::uint64_t now,
-                bool word) noexcept;
+                bool word);
   std::uint64_t z80_int_end_ = 0; ///< master cycle the INT pulse ends
   Renderer renderer_;
   std::uint64_t frame_ = 0;
