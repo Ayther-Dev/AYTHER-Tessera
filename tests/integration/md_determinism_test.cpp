@@ -14,6 +14,7 @@
 #include "support/md_z80_testrom.hpp"
 #include <doctest/doctest.h>
 
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -56,7 +57,7 @@ Rom load_file(const std::string &path) {
 }
 
 /// Runs `frames` frames with a moving pad and returns the chain of digests.
-std::uint64_t run_chain(const Rom &rom, unsigned frames) {
+std::uint64_t run_chain(const Rom &rom, unsigned frames, bool observe = false) {
   auto config = config_for_rom(rom);
   config.pads = {PadType::six_button, PadType::six_button};
   auto system = std::make_unique<System>(rom, config);
@@ -66,13 +67,23 @@ std::uint64_t run_chain(const Rom &rom, unsigned frames) {
     system->set_pad(0, static_cast<std::uint16_t>(0x100 + (i * 37) % 0xFF));
     system->set_pad(1, static_cast<std::uint16_t>((i * 11) % 0xFFF));
     system->run_frame();
+    if (observe) {
+      // Everything an observer reads between frames (TP-110.3): the audio of
+      // the frame, the original video and a full checkpoint export. None of it
+      // may change what the machine computes.
+      volatile std::size_t sink = system->audio().size();
+      sink = sink + system->renderer().frame().size();
+      if (i % 40 == 0)
+        sink = sink + system->save_state().size();
+      (void)sink;
+    }
     chain.add(tessera::testsupport::digest(*system));
   }
   return chain.h;
 }
 
 /// Child side: `name` is a synthetic ROM or a path.
-int child(const std::string &name, unsigned frames) {
+int child(const std::string &name, unsigned frames, bool observe) {
   Rom rom;
   if (const auto it = synthetic().find(name); it != synthetic().end())
     rom = it->second();
@@ -83,7 +94,7 @@ int child(const std::string &name, unsigned frames) {
     return 2;
   }
   std::printf("chain %016llx\n",
-              static_cast<unsigned long long>(run_chain(rom, frames)));
+              static_cast<unsigned long long>(run_chain(rom, frames, observe)));
   return 0;
 }
 
@@ -96,9 +107,10 @@ int child(const std::string &name, unsigned frames) {
 #endif
 
 /// Parent side: the output line of one child process.
-std::string spawn(const std::string &name, unsigned frames) {
+std::string spawn(const std::string &name, unsigned frames,
+                  bool observe = false) {
   std::string command = "\"" + g_self + "\" --child \"" + name + "\" " +
-                        std::to_string(frames);
+                        std::to_string(frames) + (observe ? " observe" : "");
 #ifdef _WIN32
   command = "\"" + command + "\""; // cmd.exe strips the outer pair
 #endif
@@ -119,6 +131,9 @@ void check_two_processes(const std::string &name, unsigned frames) {
   const auto second = spawn(name, frames);
   CHECK(first.rfind("chain ", 0) == 0);
   CHECK(first == second);
+  // With an observer reading every frame the chain is the same one.
+  const auto watched = spawn(name, frames, true);
+  CHECK(watched == first);
 }
 } // namespace
 
@@ -145,8 +160,9 @@ TEST_CASE("commercial ROMs from TESSERA_DETERMINISM_ROMS") {
 
 int main(int argc, char **argv) {
   g_self = argv[0];
-  if (argc == 4 && std::string(argv[1]) == "--child")
-    return child(argv[2], static_cast<unsigned>(std::atoi(argv[3])));
+  if ((argc == 4 || argc == 5) && std::string(argv[1]) == "--child")
+    return child(argv[2], static_cast<unsigned>(std::atoi(argv[3])),
+                 argc == 5 && std::string(argv[4]) == "observe");
   doctest::Context context(argc, argv);
   return context.run();
 }
