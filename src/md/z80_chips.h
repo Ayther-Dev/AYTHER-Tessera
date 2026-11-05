@@ -13,8 +13,14 @@ extern "C" {
 
 #define TESSERA_Z80_STATE_BYTES 160
 
+#ifdef __cplusplus
+#define TESSERA_ALIGNAS(n) alignas(n)
+#else
+#define TESSERA_ALIGNAS(n) _Alignas(n)
+#endif
+
 typedef struct tessera_z80 {
-  _Alignas(8) unsigned char bytes[TESSERA_Z80_STATE_BYTES];
+  TESSERA_ALIGNAS(8) unsigned char bytes[TESSERA_Z80_STATE_BYTES];
 } tessera_z80;
 
 /* Pin masks, as in z80.h. */

@@ -100,7 +100,7 @@ jobs:
       # Tests that need gpgx or the corpus are registered only locally (RF-7.3).
 
   linux:
-    name: Linux (portable toolchain, synthetic core)
+    name: Linux (portable toolchain, synthetic core and md/)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -117,7 +117,7 @@ jobs:
       - name: Prepare and verify pinned headers
         shell: pwsh
         run: ./tools/bootstrap-dependencies.ps1 -Download
-      - name: Configure, build and test the synthetic core
+      - name: Configure, build and test the synthetic core and md/
         run: |
           cmake --preset linux-dev
           cmake --build build/linux-dev -j 2
