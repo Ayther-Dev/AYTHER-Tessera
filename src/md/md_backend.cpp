@@ -3,7 +3,6 @@
 #include "domain/result.hpp"
 #include "domain/wire.hpp"
 #include "md/input.hpp"
-#include "md/region.hpp"
 #include "md/system.hpp"
 
 #include <algorithm>
@@ -30,7 +29,8 @@ public:
                             [](std::uint8_t byte) { return byte == 0; }),
             TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
     std::vector<std::uint8_t> rom(content.begin(), content.end());
-    auto config = config_for_rom(rom);
+    // The console region is not read from the header (TP-108.4 reopened).
+    auto config = MachineConfig::for_region(Region::usa);
     config.pads = {PadType::six_button, PadType::six_button};
     standard_ = config.standard;
     system_ = std::make_unique<System>(std::move(rom), config);

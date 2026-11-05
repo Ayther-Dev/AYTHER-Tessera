@@ -106,7 +106,13 @@ Rom load_file(const std::string &path) {
 TEST_CASE("savestate: K, restore, N is identical on synthetic ROMs") {
   using namespace tessera::testrom;
   check_rom(vint_counter_rom(), 12, 12, false, "vint_counter");
-  check_rom(region_detect_rom("E"), 12, 12, false, "region_detect (PAL)");
+  {
+    // The same ROM with a European header: PAL timing (config_for above).
+    auto pal = vint_counter_rom();
+    pal.resize(0x400, 0);
+    pal[0x1F0] = 'E';
+    check_rom(pal, 12, 12, false, "vint_counter (PAL)");
+  }
   check_rom(pad_frames_rom(), 12, 12, true, "pad_frames (six-button)");
   check_rom(pad_latch_rom(3), 12, 12, true, "pad_latch");
   check_rom(fm_psg_sweep_rom(0), 12, 12, false, "fm_psg_sweep");

@@ -7,7 +7,6 @@
 // parent compares the lines. Synthetic ROMs always (3 000 frames); commercial
 // ROMs when TESSERA_DETERMINISM_ROMS lists them (separated by '|').
 #define DOCTEST_CONFIG_IMPLEMENT
-#include "md/region.hpp"
 #include "md/system.hpp"
 #include "support/md_digest.hpp"
 #include "support/md_testrom.hpp"
@@ -45,7 +44,6 @@ const std::map<std::string, std::function<Rom()>> &synthetic() {
       {"bus_sweep", [] { return bus_sweep_rom(); }},
       {"sprite_limits", [] { return sprite_limits_rom(sprite_variant(1)); }},
       {"modes_sweep", [] { return modes_sweep_rom(modes_variant(1)); }},
-      {"region_detect_pal", [] { return region_detect_rom("E"); }},
   };
   return roms;
 }
@@ -58,7 +56,7 @@ Rom load_file(const std::string &path) {
 
 /// Runs `frames` frames with a moving pad and returns the chain of digests.
 std::uint64_t run_chain(const Rom &rom, unsigned frames, bool observe = false) {
-  auto config = config_for_rom(rom);
+  auto config = MachineConfig::for_region(Region::usa);
   config.pads = {PadType::six_button, PadType::six_button};
   auto system = std::make_unique<System>(rom, config);
   system->reset();

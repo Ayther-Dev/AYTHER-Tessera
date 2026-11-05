@@ -79,8 +79,6 @@ void set_pad_device(unsigned device);
 /// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
 /// 0 subscribes to nothing, 1 to every region (the full set).
 void set_bench(bool on, int observation);
-/// Value the core reads for an option (GET_VARIABLE); the rest keep defaults.
-void set_core_option(const std::string &key, const std::string &value);
 
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,

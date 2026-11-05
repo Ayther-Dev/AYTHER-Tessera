@@ -121,13 +121,6 @@ tessera_copy_diagnostic_runtime(tessera_md_state_restore_test)
 add_test(NAME integration.md_state_restore COMMAND tessera_md_state_restore_test)
 set_tests_properties(integration.md_state_restore PROPERTIES LABELS "integration;phase1;md" TIMEOUT 120)
 
-add_executable(tessera_md_region_test unit/md_region_test.cpp)
-target_include_directories(tessera_md_region_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests")
-target_link_libraries(tessera_md_region_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
-tessera_copy_diagnostic_runtime(tessera_md_region_test)
-add_test(NAME unit.md_region COMMAND tessera_md_region_test)
-set_tests_properties(unit.md_region PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
-
 add_executable(tessera_md_input_test unit/md_input_test.cpp)
 target_include_directories(tessera_md_input_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_input_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
