@@ -53,6 +53,35 @@ struct RegionData {
   Bytes data;
 };
 
+/// Observation surface of a system (spec 008, RF-3, TP-201.3). Statuses are
+/// tessera_status values (0 = ok). Observing never changes the emulated state;
+/// `observation_work()` counts what the observation did (bytes it produced), so
+/// a system with nothing subscribed reports 0.
+class IObservable {
+public:
+  virtual ~IObservable() = default;
+  /// False if the mask has bits the contract lacks; nothing changes then.
+  virtual bool set_subscriptions(std::uint32_t mask) = 0;
+  struct Subscriptions {
+    std::uint32_t supported, active, requested;
+    std::uint64_t activation_frame;
+  };
+  [[nodiscard]] virtual Subscriptions subscriptions() const = 0;
+  /// NOT_SUBSCRIBED while the region's subscription is idle, UNSUPPORTED while
+  /// the system does not serve it yet.
+  [[nodiscard]] virtual std::int32_t
+  read_region(std::uint32_t id, std::uint32_t offset,
+              std::span<std::uint8_t> out) = 0;
+  /// `event_size` bytes per event; `count` events written (0 if none).
+  [[nodiscard]] virtual std::int32_t
+  poll_audio_events(std::span<std::uint8_t> out, std::uint32_t capacity,
+                    std::uint32_t event_size, std::uint32_t &count) = 0;
+  /// 32 bytes of ayther_audio_transport_stats_v1; ok even when idle.
+  [[nodiscard]] virtual std::int32_t
+  audio_transport_stats(std::span<std::uint8_t> out) const = 0;
+  [[nodiscard]] virtual std::uint64_t observation_work() const noexcept = 0;
+};
+
 class IEmulatedSystem {
 public:
   virtual ~IEmulatedSystem() = default;
@@ -81,6 +110,8 @@ public:
                               const InputState &inputs) = 0;
   [[nodiscard]] virtual std::vector<RegionData>
   regions(std::uint64_t mask) const = 0;
+  /// Null when the system serves no observation (the default).
+  [[nodiscard]] virtual IObservable *observation() noexcept { return nullptr; }
 };
 
 } // namespace tessera

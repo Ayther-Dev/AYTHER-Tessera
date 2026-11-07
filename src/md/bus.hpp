@@ -56,6 +56,17 @@ public:
   void write16(std::uint32_t address, std::uint16_t value);
   void write32(std::uint32_t address, std::uint32_t value);
 
+  /// Cartridge patches (cheats, TP-111): what a ROM read at the even `address`
+  /// answers instead of the cartridge. Not in the savestate. An empty list
+  /// restores the cartridge.
+  struct RomPatch {
+    std::uint32_t address;
+    std::uint16_t data;
+  };
+  void set_rom_patches(std::vector<RomPatch> patches) {
+    rom_patches_ = std::move(patches);
+  }
+
   std::span<const std::uint8_t> work_ram() const noexcept { return ram_; }
   std::span<std::uint8_t> work_ram() noexcept { return ram_; }
 
@@ -65,6 +76,7 @@ public:
 
 private:
   std::vector<std::uint8_t> rom_;
+  std::vector<RomPatch> rom_patches_;
   std::array<std::uint8_t, 0x10000> ram_{};
   std::uint32_t rom_offset(std::uint32_t address) const noexcept;
   void write_mapper(std::uint32_t address, std::uint8_t value) noexcept;

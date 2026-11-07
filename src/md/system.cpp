@@ -46,8 +46,23 @@ constexpr std::uint32_t kStateVersion = 1;
 constexpr std::uint32_t kStateEnd = 0x444E4553; // "SEND"
 } // namespace
 
+namespace {
+/// CRC-32 (IEEE 802.3, reflected) of the ROM image.
+std::uint32_t crc32(const std::vector<std::uint8_t> &data) noexcept {
+  std::uint32_t crc = 0xFFFFFFFFU;
+  for (const std::uint8_t byte : data) {
+    crc ^= byte;
+    for (int bit = 0; bit < 8; ++bit)
+      crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
+  }
+  return ~crc;
+}
+} // namespace
+
 System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
-    : config_(config), rom_hash_(fnv1a(rom)), sram_(read_sram_header(rom)),
+    : config_(config), rom_hash_(fnv1a(rom)), rom_crc32_(crc32(rom)),
+      rom_bytes_(static_cast<std::uint32_t>(rom.size())),
+      sram_(read_sram_header(rom)),
       bus_(std::move(rom), *this, config.mapper, &sram_), cpu_(bus_),
       vdp_(config.standard), tmss_(config.tmss), mixer_(config.standard) {
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
@@ -210,8 +225,61 @@ void System::run_frame() {
   psg_.run_to(frame_master + cycles_per_frame(config_.standard));
   mixer_.push(ym_.samples(), psg_.samples(), ym_.raw_samples(),
               psg_.raw_samples());
+  for (const auto &active : cheats_) {
+    if (!cheat_targets_ram(active.cheat))
+      continue;
+    auto ram = bus_.work_ram();
+    const std::size_t at = active.cheat.address & 0xFFFFU;
+    ram[at] = static_cast<std::uint8_t>(active.cheat.data >> 8);
+    ram[at + 1] = static_cast<std::uint8_t>(active.cheat.data);
+  }
+  if (audio_events_on_) {
+    const std::uint64_t cycles = cycles_per_frame(config_.standard);
+    AudioEvent event{};
+    event.t_global = frame_master + cycles;
+    event.t_frame = static_cast<std::uint32_t>(frame_);
+    event.t_cycles = static_cast<std::uint32_t>(cycles);
+    event.type = static_cast<std::uint8_t>(AudioEventType::frame);
+    event.channel = kAudioNoChannel;
+    event.schema = kAudioEventSchema;
+    audio_events_->push(event);
+  }
   ++frame_;
   frame_start_line_ = vdp_.frame_start_line();
+}
+
+std::uint32_t System::add_cheat(std::string_view code) {
+  const auto cheat = decode_cheat(code);
+  if (!cheat || next_cheat_id_ == 0)
+    return 0;
+  const std::uint32_t id = next_cheat_id_++;
+  cheats_.push_back({id, *cheat});
+  refresh_cheats();
+  return id;
+}
+
+bool System::remove_cheat(std::uint32_t id) {
+  const auto at =
+      std::find_if(cheats_.begin(), cheats_.end(),
+                   [id](const ActiveCheat &c) { return c.id == id; });
+  if (at == cheats_.end())
+    return false;
+  cheats_.erase(at);
+  refresh_cheats();
+  return true;
+}
+
+void System::clear_cheats() {
+  cheats_.clear();
+  refresh_cheats();
+}
+
+void System::refresh_cheats() {
+  std::vector<Bus::RomPatch> patches;
+  for (const auto &active : cheats_)
+    if (!cheat_targets_ram(active.cheat))
+      patches.push_back({active.cheat.address, active.cheat.data});
+  bus_.set_rom_patches(std::move(patches));
 }
 
 void System::set_pad(unsigned port, std::uint16_t pressed) noexcept {
@@ -523,6 +591,19 @@ std::uint8_t System::ym_status(std::uint64_t now) {
 
 void System::log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                        std::uint64_t now) {
+  if (audio_events_on_) {
+    AudioEvent event{};
+    event.t_global = now;
+    event.t_frame = static_cast<std::uint32_t>(frame_);
+    event.t_cycles = static_cast<std::uint32_t>(now - log_origin_);
+    event.source = chip; // 0 FM, 1 PSG
+    event.type = static_cast<std::uint8_t>(AudioEventType::raw_write);
+    event.channel = kAudioNoChannel;
+    event.schema = kAudioEventSchema;
+    event.reg = addr;
+    event.data = data;
+    audio_events_->push(event);
+  }
   if (audio_log_.size() >= kAudioWriteCapacity) {
     ++audio_dropped_;
     return;

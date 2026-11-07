@@ -175,8 +175,14 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 
 unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
+static std::string g_audio_events_out;
+void set_audio_events_out(const std::string &path) { g_audio_events_out = path; }
+static unsigned g_reset_at = 0;
+void set_reset_at(unsigned frame) { g_reset_at = frame; }
 static bool g_bench = false;
 static int g_bench_observation = -1;
+static int64_t g_sub_mask = -1;
+void set_subscription_mask(int64_t mask) { g_sub_mask = mask; }
 void set_bench(bool on, int observation) {
   g_bench = on;
   g_bench_observation = observation;
@@ -213,6 +219,7 @@ RunResult run_libretro(const std::string &core_path,
   void(__cdecl * init)() = nullptr;
   bool(__cdecl * load)(const GameInfo *) = nullptr;
   void(__cdecl * run)() = nullptr;
+  void(__cdecl * reset_core)() = nullptr;
   void(__cdecl * unload)() = nullptr;
   void(__cdecl * deinit)() = nullptr;
   if (!(sym(core, "retro_set_environment", set_env) &&
@@ -253,7 +260,9 @@ RunResult run_libretro(const std::string &core_path,
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;
     const bool want_iface =
-        dump_regions || poke != nullptr || g_bench_observation >= 0;
+        dump_regions || poke != nullptr || g_bench_observation >= 0 ||
+        g_sub_mask >= 0 ||
+        !g_audio_events_out.empty();
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -263,16 +272,60 @@ RunResult run_libretro(const std::string &core_path,
       result.ayther_capabilities = iface->capabilities;
       if (iface->build_id != nullptr)
         result.ayther_build_id.assign(iface->build_id, iface->build_id_size);
-      iface->set_subscriptions(g_bench_observation == 0 ? 0u
-                                                        : TESSERA_OBS_SUB_ALL);
+      using GetSubs = int32_t(__cdecl *)(tessera_obs_subscription_state_v1 *,
+                                         uint32_t);
+      const auto get_subs = reinterpret_cast<GetSubs>(iface->get_subscriptions);
+      const auto ask = [&](SubscriptionState &out) {
+        if (!get_subs)
+          return;
+        tessera_obs_subscription_state_v1 s{};
+        out.status = get_subs(&s, sizeof(s));
+        out.struct_size = s.struct_size;
+        out.version = s.state_version;
+        out.supported = s.supported_mask;
+        out.active = s.active_mask;
+        out.requested = s.requested_mask;
+        out.activation_frame = s.activation_frame;
+      };
+      if (g_sub_mask >= 0) {
+        result.sub_set_status =
+            iface->set_subscriptions(static_cast<uint32_t>(g_sub_mask));
+        ask(result.sub_after_set);
+      } else {
+        iface->set_subscriptions(g_bench_observation == 0 ? 0u
+                                                          : TESSERA_OBS_SUB_ALL);
+      }
     }
+    if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
+      result.error = "el core no exporta retro_reset";
+    if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
+      result.error = "el core no exporta retro_reset";
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
+      if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
+        reset_core();
+      if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
+        reset_core();
       if (poke && iface && i == poke->frame) {
         uint64_t generation = 0;
         poke->status = iface->write_control(
             poke->region, poke->offset, poke->data.data(),
             static_cast<uint32_t>(poke->data.size()), UINT64_MAX, &generation);
       }
+      const auto drain_audio_events = [&] {
+        if (g_audio_events_out.empty() || !iface || !iface->poll_audio_events)
+          return;
+        using Poll = int32_t(__cdecl *)(void *, uint32_t, uint32_t *);
+        const auto poll_events = reinterpret_cast<Poll>(iface->poll_audio_events);
+        std::vector<uint8_t> buffer(80u * 1024u);
+        std::ofstream out(g_audio_events_out, std::ios::binary | std::ios::app);
+        for (;;) {
+          uint32_t count = 0;
+          if (poll_events(buffer.data(), 1024, &count) != 0 || count == 0)
+            break;
+          out.write(reinterpret_cast<const char *>(buffer.data()),
+                    static_cast<std::streamsize>(count) * 80);
+        }
+      };
       if (g_bench) {
         const auto t0 = std::chrono::steady_clock::now();
         run();
@@ -282,11 +335,48 @@ RunResult run_libretro(const std::string &core_path,
       } else {
         run();
       }
+      drain_audio_events();
+    }
+    if (!g_audio_events_out.empty() && iface &&
+        iface->get_audio_transport_stats) {
+      using Stats = int32_t(__cdecl *)(void *, uint32_t);
+      tessera_obs_audio_transport_stats_v1 stats{};
+      const int32_t status = reinterpret_cast<Stats>(
+          iface->get_audio_transport_stats)(&stats, sizeof(stats));
+      std::ofstream sf(g_audio_events_out + ".stats",
+                       std::ios::binary | std::ios::trunc);
+      sf.write(reinterpret_cast<const char *>(&status), sizeof(status));
+      sf.write(reinterpret_cast<const char *>(&stats), sizeof(stats));
     }
     if (g_bench) {
       size_t(__cdecl * serialize_size)() = nullptr;
       if (sym(core, "retro_serialize_size", serialize_size))
         result.serialize_size = serialize_size();
+    }
+    if (iface && g_sub_mask >= 0 && iface->get_subscriptions) {
+      tessera_obs_subscription_state_v1 s{};
+      result.sub_end.status =
+          reinterpret_cast<int32_t(__cdecl *)(tessera_obs_subscription_state_v1 *,
+                                              uint32_t)>(
+              iface->get_subscriptions)(&s, sizeof(s));
+      result.sub_end.supported = s.supported_mask;
+      result.sub_end.active = s.active_mask;
+      result.sub_end.requested = s.requested_mask;
+      result.sub_end.activation_frame = s.activation_frame;
+    }
+    if (iface && g_sub_mask >= 0) {
+      if (iface->poll_audio_events) {
+        std::vector<uint8_t> buffer(80u * 1024u);
+        result.sub_poll_status = reinterpret_cast<int32_t(__cdecl *)(
+            void *, uint32_t, uint32_t *)>(iface->poll_audio_events)(
+            buffer.data(), 1024, &result.sub_poll_count);
+      }
+      if (iface->get_audio_transport_stats) {
+        std::vector<uint8_t> stats(256);
+        result.sub_stats_status = reinterpret_cast<int32_t(__cdecl *)(
+            void *, uint32_t)>(iface->get_audio_transport_stats)(
+            stats.data(), 32);
+      }
     }
     if (iface && dump_regions) {
       for (uint32_t id = 1; id < TESSERA_OBS_REGION_COUNT; ++id) {

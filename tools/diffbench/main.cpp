@@ -151,6 +151,21 @@ int report_run(const diffbench::RunResult &r, unsigned frames,
         size_ok += d.bytes_read == d.byte_size && d.byte_size > 0;
       }
     }
+    if (args.count("--sub-mask")) {
+      const auto show = [](const char *tag, const diffbench::SubscriptionState &s) {
+        std::cout << tag << " status=" << s.status << " size=" << s.struct_size
+                  << " version=" << s.version << " supported=0x" << std::hex
+                  << s.supported << " active=0x" << s.active << " requested=0x"
+                  << s.requested << std::dec << " activation_frame="
+                  << s.activation_frame << "\n";
+      };
+      std::cout << "set_status=" << r.sub_set_status << "\n";
+      show("after_set", r.sub_after_set);
+      show("end", r.sub_end);
+      std::cout << "audio_poll status=" << r.sub_poll_status
+                << " count=" << r.sub_poll_count
+                << " transport_status=" << r.sub_stats_status << "\n";
+    }
     std::cout << "ayther_abi=" << r.ayther_abi << " capabilities=0x" << std::hex
               << r.ayther_capabilities << std::dec << " build_id=\""
               << r.ayther_build_id << "\"\n";
@@ -216,6 +231,11 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
+  if (args.count("--audio-events-out"))
+    diffbench::set_audio_events_out(args["--audio-events-out"]);
+  if (args.count("--reset-at"))
+    diffbench::set_reset_at(static_cast<unsigned>(
+        std::strtoul(args["--reset-at"].c_str(), nullptr, 10)));
   if (args.count("--pad-device"))
     diffbench::set_pad_device(static_cast<unsigned>(
         std::strtoul(args["--pad-device"].c_str(), nullptr, 16)));
@@ -323,6 +343,9 @@ int main(int argc, char **argv) {
             static_cast<uint8_t>(std::stoul(parts[2].substr(i, 2), nullptr, 16)));
       poke.frame = static_cast<unsigned>(std::stoul(parts[3]));
     }
+    if (args.count("--sub-mask"))
+      diffbench::set_subscription_mask(static_cast<int64_t>(
+          std::stoull(args["--sub-mask"], nullptr, 16)));
     if (args.count("--bench-out")) {
       // TP-014.1/.2: time each retro_run, with the observation fully
       // subscribed (full) or not at all (none).

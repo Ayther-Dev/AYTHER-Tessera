@@ -3,7 +3,9 @@
 // sound chips and rendering are not here yet; their ports accept writes and
 // answer reads so that a ROM can run.
 #pragma once
+#include "md/audio_events.hpp"
 #include "md/bus.hpp"
+#include "md/cheats.hpp"
 #include "md/m68k.hpp"
 #include "md/mixer.hpp"
 #include "md/machine.hpp"
@@ -17,7 +19,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace tessera::md {
@@ -75,6 +79,18 @@ public:
     std::copy(bytes.begin(), bytes.end(), z80_ram_.begin() + offset);
     return true;
   }
+  /// Control write on the work RAM (TP-201.1, RF-3.1): the bytes go straight
+  /// to the 64 KiB at logical (68000) offsets; the work RAM is part of the
+  /// state, so a poke changes the savestate. False if out of range.
+  bool poke_work_ram(std::size_t offset,
+                     std::span<const std::uint8_t> bytes) noexcept {
+    auto ram = bus_.work_ram();
+    if (bytes.empty() || offset >= ram.size() ||
+        bytes.size() > ram.size() - offset)
+      return false;
+    std::copy(bytes.begin(), bytes.end(), ram.begin() + offset);
+    return true;
+  }
   std::span<const std::uint8_t> work_ram() const noexcept {
     return bus_.work_ram();
   }
@@ -102,6 +118,9 @@ private:
 public:
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
+  const MachineConfig &config() const noexcept { return config_; }
+  std::uint32_t rom_crc32() const noexcept { return rom_crc32_; }
+  std::uint32_t rom_bytes() const noexcept { return rom_bytes_; }
   /// The 68000 owns the Z80 bus: requested, and the Z80 out of reset.
   bool z80_bus_granted() const noexcept {
     return z80_bus_requested_ && z80_reset_released_;
@@ -123,6 +142,36 @@ public:
     psg_.set_mute(static_cast<std::uint8_t>(audio_mute_ >> 6 & 0xFU));
   }
   std::uint32_t audio_mute() const noexcept { return audio_mute_; }
+  /// Cheats (TP-111, RF-4.3): session controls like AUDIO_MUTE, so they are not
+  /// in the savestate and survive reset and restore. `add_cheat` takes a Game
+  /// Genie or Pro Action Replay code and returns its id (0 if the code is
+  /// refused). A cartridge cheat acts at once and `remove_cheat` gives the
+  /// cartridge back at once; a work RAM cheat rewrites its word at the end of
+  /// every frame run, so removing it just stops the rewriting.
+  std::uint32_t add_cheat(std::string_view code);
+  bool remove_cheat(std::uint32_t id);
+  void clear_cheats();
+  std::size_t cheat_count() const noexcept { return cheats_.size(); }
+
+  /// Audio event transport (TP-107.6): while on, every sound chip write is
+  /// published as a RAW_WRITE and every frame closes with a FRAME event. The
+  /// observer drains them with `poll_audio_events`. Not in the savestate.
+  void set_audio_events(bool on) {
+    if (on && !audio_events_)
+      audio_events_ = std::make_unique<AudioEventQueue>(); // 640 KiB: on demand
+    audio_events_on_ = on;
+  }
+  bool audio_events() const noexcept { return audio_events_on_; }
+  std::size_t poll_audio_events(std::span<AudioEvent> out) noexcept {
+    return audio_events_ ? audio_events_->poll(out) : 0;
+  }
+  AudioTransportStats audio_transport_stats() const noexcept {
+    const std::uint32_t flags =
+        audio_events_on_ ? kAudioTransportObservationActive : 0;
+    return audio_events_ ? audio_events_->stats(flags)
+                         : AudioEventQueue::idle_stats(flags);
+  }
+
   /// Sound chip writes of the last frame run (up to kAudioWriteCapacity) and
   /// the ones that did not fit.
   std::span<const AudioWrite> audio_writes() const noexcept {
@@ -176,6 +225,8 @@ private:
 
   MachineConfig config_;
   std::uint64_t rom_hash_ = 0; ///< FNV-1a of the ROM image, for the savestate
+  std::uint32_t rom_crc32_ = 0; ///< CRC-32 of the ROM image (SYSTEM region)
+  std::uint32_t rom_bytes_ = 0; ///< size of the ROM image
   Sram sram_; ///< declared before the bus: built from the ROM header first
   Bus bus_;
   M68k cpu_;
@@ -203,6 +254,15 @@ private:
   Psg psg_;
   Mixer mixer_;
   std::uint32_t audio_mute_ = 0;
+  std::unique_ptr<AudioEventQueue> audio_events_;
+  bool audio_events_on_ = false;
+  struct ActiveCheat {
+    std::uint32_t id;
+    Cheat cheat;
+  };
+  std::vector<ActiveCheat> cheats_;
+  std::uint32_t next_cheat_id_ = 1;
+  void refresh_cheats();
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from

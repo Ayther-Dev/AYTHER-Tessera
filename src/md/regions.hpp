@@ -1,0 +1,180 @@
+// Memory regions of the observation contract (spec 008, TP-201.1, RF-3.1):
+// the bytes the ABI 1.10 hands out for VRAM, CRAM, VDP_REGS, VSRAM and Z80_RAM,
+// plus the console's work RAM, which the ABI leaves to the legacy memory map.
+//
+// Layouts are the ones the reference core shows through the bench (region
+// table, src/observation/region_table.hpp): sizes and flags by id, the VRAM
+// and the work RAM word-swapped (the logical byte `off` lives at `off ^ 1`,
+// AYTHER_REGION_WORD_SWAPPED_LE), the colour RAM as native endian words of
+// nine bits BBBGGGRRR and the scroll RAM as native endian 16 bit words. Reading
+// never changes the machine.
+#pragma once
+#include "md/system.hpp"
+#include "md/vdp_render.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+
+namespace tessera::md {
+
+/// Ids of the ABI 1.10 regions served here.
+inline constexpr std::uint32_t kRegionVram = 1;
+inline constexpr std::uint32_t kRegionCram = 2;
+inline constexpr std::uint32_t kRegionVdpRegs = 3;
+inline constexpr std::uint32_t kRegionVsram = 4;
+inline constexpr std::uint32_t kRegionSystem = 18;
+inline constexpr std::uint32_t kRegionPalette = 24;
+inline constexpr std::uint32_t kRegionZ80Ram = 26;
+/// The work RAM has no AYTHER region id: it is the legacy system memory.
+inline constexpr std::uint32_t kRegionWorkRam = 0x1000;
+
+/// Size in bytes of a memory region, 0 if the id is not one of them.
+constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {
+  switch (id) {
+  case kRegionVram:
+    return 65536;
+  case kRegionCram:
+    return 128;
+  case kRegionVdpRegs:
+    return 32;
+  case kRegionVsram:
+    return 128;
+  case kRegionSystem:
+    return 44;
+  case kRegionPalette:
+    return 512;
+  case kRegionZ80Ram:
+    return 8192;
+  case kRegionWorkRam:
+    return 65536;
+  default:
+    return 0;
+  }
+}
+
+/// Whole content of a memory region as the contract lays it out. Empty for an
+/// id that is not a memory region.
+inline std::vector<std::uint8_t> memory_region(const System &system,
+                                               std::uint32_t id) {
+  std::vector<std::uint8_t> out(memory_region_size(id), 0);
+  const auto word_le = [&](std::size_t at, std::uint16_t value) {
+    out[at] = static_cast<std::uint8_t>(value);
+    out[at + 1] = static_cast<std::uint8_t>(value >> 8);
+  };
+  switch (id) {
+  case kRegionVram: {
+    const auto &vram = system.vdp().vram();
+    // Mode 4 keeps its data in the layout of the reference buffer (the low
+    // byte at the even address, see Vdp::write_data); Mode 5 is word-swapped.
+    const std::size_t flip = system.vdp().mode4_active() ? 0U : 1U;
+    for (std::size_t i = 0; i < out.size(); ++i)
+      out[i ^ flip] = vram[i];
+    break;
+  }
+  case kRegionCram: {
+    const auto &cram = system.vdp().cram();
+    // The reference core keeps each colour as nine bits BBBGGGRRR; the VDP
+    // word is 0BBB0GGG0RRR.
+    for (std::size_t i = 0; i < cram.size(); ++i)
+      word_le(2 * i, static_cast<std::uint16_t>(((cram[i] >> 9 & 7U) << 6) |
+                                                ((cram[i] >> 5 & 7U) << 3) |
+                                                (cram[i] >> 1 & 7U)));
+    break;
+  }
+  case kRegionVdpRegs:
+    for (unsigned i = 0; i < 32; ++i)
+      out[i] = system.vdp().reg(i);
+    break;
+  case kRegionVsram: {
+    const auto &vsram = system.vdp().vsram();
+    for (std::size_t i = 0; i < vsram.size(); ++i)
+      word_le(2 * i, vsram[i]);
+    break;
+  }
+  case kRegionZ80Ram: {
+    const auto ram = system.z80_ram();
+    std::copy(ram.begin(), ram.end(), out.begin());
+    break;
+  }
+  case kRegionPalette: {
+    // 256 resolved colours RGB565, little endian
+    const auto table = palette_565(system.vdp());
+    for (std::size_t i = 0; i < table.size(); ++i)
+      word_le(2 * i, table[i]);
+    break;
+  }
+  case kRegionSystem: {
+    // tessera_obs_system_v1, little endian, 44 bytes.
+    const auto &vdp = system.vdp();
+    const bool pal = system.config().standard == Standard::pal;
+    const bool mode4 = vdp.mode4_active();
+    const unsigned r12 = vdp.reg(12);
+    const bool h40 = !mode4 && (r12 & 0x01U) != 0;
+    const bool v30 = !mode4 && (vdp.reg(1) & 0x08U) != 0;
+    const auto u32 = [&](std::size_t at, std::uint32_t value) {
+      word_le(at, static_cast<std::uint16_t>(value));
+      word_le(at + 2, static_cast<std::uint16_t>(value >> 16));
+    };
+    u32(0, 44);              // struct_size
+    u32(4, 1);               // layout_version
+    out[8] = 0x80;           // system_hw: Mega Drive
+    out[9] = pal ? 1 : 0;    // region_pal
+    out[10] = mode4 ? 0 : 5; // vdp_mode
+    out[11] = mode4 ? 0 : (r12 & 0x02U) != 0 ? ((r12 & 0x04U) != 0 ? 2 : 1) : 0;
+    out[12] = h40 ? 1 : 0;                          // h40
+    out[13] = !mode4 && (r12 & 0x08U) != 0 ? 1 : 0; // shadow_highlight
+    word_le(14, pal ? 313 : 262);                   // lines_per_frame
+    word_le(16, 0);                                 // viewport_x
+    word_le(18, 0);                                 // viewport_y
+    word_le(20, h40 ? 320 : 256);                   // viewport_w
+    word_le(22, mode4 ? 192 : v30 ? 240 : 224);     // viewport_h
+    u32(24, pal ? 7600489U : 7670453U);             // cpu_clock
+    u32(28, pal ? 53203424U : 53693175U);           // master_clock
+    out[32] = 0;                                    // fm_core
+    out[33] = 1;                                    // psg_present
+    out[34] = 0;                                    // pcm_present
+    out[35] = 0;                                    // flags
+    u32(36, system.rom_crc32());
+    u32(40, system.rom_bytes());
+    break;
+  }
+  case kRegionWorkRam: {
+    const auto ram = system.work_ram();
+    for (std::size_t i = 0; i < out.size(); ++i)
+      out[i ^ 1U] = ram[i];
+    break;
+  }
+  default:
+    out.clear();
+  }
+  return out;
+}
+
+/// Control write on a memory region (RF-3.1): the poke of the work RAM and of
+/// the Z80 RAM. `offset` counts bytes of the region as `memory_region` lays it
+/// out, so on the word-swapped work RAM the byte `offset` is the logical byte
+/// `offset ^ 1`. False if the region takes no poke or the range is out of it.
+inline bool poke_memory_region(System &system, std::uint32_t id,
+                               std::size_t offset,
+                               std::span<const std::uint8_t> bytes) {
+  const std::size_t size = memory_region_size(id);
+  if (bytes.empty() || offset >= size || bytes.size() > size - offset)
+    return false;
+  switch (id) {
+  case kRegionZ80Ram:
+    return system.poke_z80_ram(offset, bytes);
+  case kRegionWorkRam:
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+      const std::uint8_t one = bytes[i];
+      if (!system.poke_work_ram((offset + i) ^ 1U, std::span(&one, 1)))
+        return false;
+    }
+    return true;
+  default:
+    return false; // VRAM, CRAM, VSRAM and the registers are read only
+  }
+}
+
+} // namespace tessera::md

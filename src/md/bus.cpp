@@ -75,6 +75,10 @@ std::uint8_t Bus::read8(std::uint32_t address) {
   case Target::rom: {
     if (sram_hit(a))
       return sram_->read8(a);
+    for (const auto &patch : rom_patches_)
+      if ((a & ~1U) == patch.address)
+        return static_cast<std::uint8_t>((a & 1U) ? patch.data
+                                                  : patch.data >> 8);
     const std::uint32_t o = rom_offset(a);
     return o < rom_.size() ? rom_[o] : kUnmappedByte;
   }
@@ -96,6 +100,9 @@ std::uint16_t Bus::read16(std::uint32_t address) {
     if (sram_hit(a))
       return static_cast<std::uint16_t>((sram_->read8(a) << 8) |
                                         sram_->read8(a + 1));
+    for (const auto &patch : rom_patches_)
+      if (a == patch.address)
+        return patch.data;
     const std::uint32_t o = rom_offset(a);
     return o + 1 < rom_.size()
                ? static_cast<std::uint16_t>((rom_[o] << 8) | rom_[o + 1])

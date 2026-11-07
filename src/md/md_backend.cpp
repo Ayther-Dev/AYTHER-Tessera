@@ -5,7 +5,10 @@
 #include "md/cart.hpp"
 #include "md/input.hpp"
 #include "md/region.hpp"
+#include "md/regions.hpp"
 #include "md/system.hpp"
+#include "observation/region_table.hpp"
+#include "observation/subscriptions.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -30,7 +33,7 @@ std::vector<std::uint8_t> plain_header_image(wire::View content) {
   }
 }
 
-class NativeBackend final : public IEmulatedSystem {
+class NativeBackend final : public IEmulatedSystem, public IObservable {
 public:
   NativeBackend(wire::View content, wire::View memory, RegionChoice choice) {
     require(content.size() >= 512 && content.size() % 2 == 0 &&
@@ -92,6 +95,11 @@ public:
     require(apply_input(*system_, inputs), TESSERA_INPUT_CONTRADICTORY,
             TESSERA_PHASE_STEP);
     input_ = inputs;
+    // RF-3.8: a mask requested between frames is active from this frame on; the
+    // audio event transport only runs while its subscription is.
+    subscriptions_.begin_frame();
+    system_->set_audio_events(
+        subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS));
     system_->run_frame();
     ++frame_;
     capture_output();
@@ -132,6 +140,58 @@ public:
     return {};
   }
 
+  [[nodiscard]] IObservable *observation() noexcept override { return this; }
+
+  bool set_subscriptions(std::uint32_t mask) override {
+    return subscriptions_.request(mask);
+  }
+  [[nodiscard]] Subscriptions subscriptions() const override {
+    const auto s = subscriptions_.snapshot();
+    return {s.supported, s.active, s.requested, s.activation_frame};
+  }
+  [[nodiscard]] std::int32_t read_region(std::uint32_t id, std::uint32_t offset,
+                                         std::span<std::uint8_t> out) override {
+    const auto gate = observation::region_gate(id);
+    if (gate != 0 && !subscriptions_.active(gate))
+      return TESSERA_NOT_SUBSCRIBED; // idle: no work at all
+    const auto content = memory_region(*system_, id);
+    if (content.empty())
+      return TESSERA_UNSUPPORTED_CAPABILITY; // not served yet (TP-202 onwards)
+    if (offset > content.size() || out.size() > content.size() - offset)
+      return TESSERA_INVALID_ARGUMENT;
+    std::copy_n(content.begin() + offset, out.size(), out.begin());
+    work_ += out.size();
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
+                                               std::uint32_t capacity,
+                                               std::uint32_t event_size,
+                                               std::uint32_t &count) override {
+    count = 0;
+    if (!subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS))
+      return TESSERA_NOT_SUBSCRIBED;
+    if (event_size != sizeof(AudioEvent) ||
+        out.size() < std::size_t{capacity} * sizeof(AudioEvent))
+      return TESSERA_INVALID_ARGUMENT;
+    std::vector<AudioEvent> events(capacity);
+    count = static_cast<std::uint32_t>(system_->poll_audio_events(events));
+    std::memcpy(out.data(), events.data(),
+                std::size_t{count} * sizeof(AudioEvent));
+    work_ += std::uint64_t{count} * sizeof(AudioEvent);
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t
+  audio_transport_stats(std::span<std::uint8_t> out) const override {
+    const auto stats = system_->audio_transport_stats();
+    if (out.size() < sizeof(stats))
+      return TESSERA_INVALID_ARGUMENT;
+    std::memcpy(out.data(), &stats, sizeof(stats));
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::uint64_t observation_work() const noexcept override {
+    return work_;
+  }
+
 private:
   void refresh_frame_geometry() {
     const auto size = system_->renderer().size();
@@ -154,6 +214,8 @@ private:
   Bytes pixels_, pcm_;
   std::uint32_t width_ = 0, height_ = 0;
   std::uint64_t frame_ = 0;
+  observation::Subscriptions subscriptions_;
+  std::uint64_t work_ = 0; ///< bytes the observation delivered (TP-201.3)
 };
 } // namespace
 

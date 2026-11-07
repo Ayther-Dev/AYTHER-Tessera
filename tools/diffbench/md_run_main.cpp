@@ -5,6 +5,7 @@
 //   <file>
 #include "md/cart.hpp"
 #include "md/region.hpp"
+#include "md/regions.hpp"
 #include "md/system.hpp"
 
 #include <algorithm>
@@ -22,6 +23,9 @@ int main(int argc, char **argv) {
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
   unsigned frames = 600;
+  unsigned soft_reset_at = 0, hard_reset_at = 0;
+  std::string events_path;
+  std::vector<std::pair<std::uint32_t, std::string>> region_outs;
   bool print_region = false;
   // a = from the ROM header (default), j, u, e, p = Japan PAL
   tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
@@ -60,6 +64,25 @@ int main(int argc, char **argv) {
       frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
+    } else if (arg == "--region-out" && has_value) {
+      // <id>:<file>: a memory region as the observation contract lays it out
+      const std::string spec = argv[++i];
+      const auto colon = spec.find(':');
+      if (colon == std::string::npos) {
+        std::fputs("--region-out <id>:<file>\n", stderr);
+        return 2;
+      }
+      region_outs.emplace_back(
+          static_cast<std::uint32_t>(std::strtoul(spec.c_str(), nullptr, 10)),
+          spec.substr(colon + 1));
+    } else if (arg == "--audio-events-out" && has_value) {
+      events_path = argv[++i]; // 80 byte ayther_audio_event_v1 records
+    } else if (arg == "--soft-reset-at" && has_value) {
+      soft_reset_at =
+          static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
+    } else if (arg == "--hard-reset-at" && has_value) {
+      hard_reset_at =
+          static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
       const char r = argv[++i][0];
       region = r == 'j'   ? tessera::md::RegionChoice::japan
@@ -139,7 +162,15 @@ int main(int argc, char **argv) {
     steps.push_back(step);
     at = end + 1;
   }
+  std::vector<tessera::md::AudioEvent> events;
+  system.set_audio_events(!events_path.empty());
   for (unsigned frame = 0; frame < frames; ++frame) {
+    // The RESET button before frame N (1 = the first one), as --reset-at does
+    // on the libretro side (TP-110.4).
+    if (soft_reset_at != 0 && frame == soft_reset_at - 1)
+      system.soft_reset();
+    if (hard_reset_at != 0 && frame == hard_reset_at - 1)
+      system.reset();
     for (const auto &step : steps)
       if (step.frame == frame + 1)
         for (unsigned port = 0; port < 2; ++port)
@@ -150,6 +181,25 @@ int main(int argc, char **argv) {
       return 2;
     }
     system.run_frame();
+    if (!events_path.empty()) {
+      std::vector<tessera::md::AudioEvent> batch(1024);
+      for (;;) {
+        const auto n = system.poll_audio_events(batch);
+        if (n == 0)
+          break;
+        events.insert(events.end(), batch.begin(), batch.begin() + n);
+      }
+    }
+  }
+  if (!events_path.empty()) {
+    std::ofstream eo(events_path, std::ios::binary | std::ios::trunc);
+    eo.write(reinterpret_cast<const char *>(events.data()),
+             static_cast<std::streamsize>(events.size() * sizeof(events[0])));
+    const auto stats = system.audio_transport_stats();
+    std::ofstream so(events_path + ".stats", std::ios::binary | std::ios::trunc);
+    const std::int32_t status = 0;
+    so.write(reinterpret_cast<const char *>(&status), sizeof status);
+    so.write(reinterpret_cast<const char *>(&stats), sizeof stats);
   }
   std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
   const auto ram = system.work_ram();
@@ -181,6 +231,16 @@ int main(int argc, char **argv) {
           w.data, w.chip};
       ao.write(reinterpret_cast<const char *>(rec), 8);
     }
+  }
+  for (const auto &[id, path] : region_outs) {
+    const auto bytes = tessera::md::memory_region(system, id);
+    if (bytes.empty()) {
+      std::fprintf(stderr, "region %u is not a memory region\n", id);
+      return 2;
+    }
+    std::ofstream ro(path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(bytes.data()),
+             static_cast<std::streamsize>(bytes.size()));
   }
   if (!regs_path.empty()) {
     std::ofstream ro(regs_path, std::ios::binary | std::ios::trunc);

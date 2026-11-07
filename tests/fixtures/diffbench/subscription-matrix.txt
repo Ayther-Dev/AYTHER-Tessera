@@ -1,0 +1,846 @@
+audio 0 -9 0 0
+audio 10 -9 0 0
+audio 40 0 1 0
+audio 50 0 1 0
+audio fff 0 1 0
+set 0 0 0
+state 0 0 after_set 0 0 0
+state 0 0 end 0 0 0
+read 0 0 1 -9
+read 0 0 2 -9
+read 0 0 3 -9
+read 0 0 4 -9
+read 0 0 5 0
+read 0 0 6 0
+read 0 0 7 0
+read 0 0 8 0
+read 0 0 9 0
+read 0 0 10 0
+read 0 0 11 -9
+read 0 0 12 -9
+read 0 0 13 -9
+read 0 0 14 -9
+read 0 0 15 0
+read 0 0 16 -9
+read 0 0 17 -9
+read 0 0 18 0
+read 0 0 19 -9
+read 0 0 20 -9
+read 0 0 21 -9
+read 0 0 22 -9
+read 0 0 23 -9
+read 0 0 24 -9
+read 0 0 25 -9
+read 0 0 26 0
+set 0 1 0
+state 0 1 after_set 0 0 0
+state 0 1 end 0 0 1
+read 0 1 1 -9
+read 0 1 2 -9
+read 0 1 3 -9
+read 0 1 4 -9
+read 0 1 5 0
+read 0 1 6 0
+read 0 1 7 0
+read 0 1 8 0
+read 0 1 9 0
+read 0 1 10 0
+read 0 1 11 -9
+read 0 1 12 -9
+read 0 1 13 -9
+read 0 1 14 -9
+read 0 1 15 0
+read 0 1 16 -9
+read 0 1 17 -9
+read 0 1 18 0
+read 0 1 19 -9
+read 0 1 20 -9
+read 0 1 21 -9
+read 0 1 22 -9
+read 0 1 23 -9
+read 0 1 24 -9
+read 0 1 25 -9
+read 0 1 26 0
+set 1 0 0
+state 1 0 after_set 0 1 1
+state 1 0 end 0 1 1
+read 1 0 1 -9
+read 1 0 2 -9
+read 1 0 3 -9
+read 1 0 4 -9
+read 1 0 5 0
+read 1 0 6 0
+read 1 0 7 0
+read 1 0 8 0
+read 1 0 9 0
+read 1 0 10 0
+read 1 0 11 -9
+read 1 0 12 -9
+read 1 0 13 -9
+read 1 0 14 -9
+read 1 0 15 0
+read 1 0 16 -9
+read 1 0 17 -9
+read 1 0 18 0
+read 1 0 19 -9
+read 1 0 20 -9
+read 1 0 21 -9
+read 1 0 22 -9
+read 1 0 23 -9
+read 1 0 24 -9
+read 1 0 25 -9
+read 1 0 26 0
+set 1 1 0
+state 1 1 after_set 0 1 1
+state 1 1 end 1 1 1
+read 1 1 1 0
+read 1 1 2 0
+read 1 1 3 0
+read 1 1 4 0
+read 1 1 5 0
+read 1 1 6 0
+read 1 1 7 0
+read 1 1 8 0
+read 1 1 9 0
+read 1 1 10 0
+read 1 1 11 -9
+read 1 1 12 -9
+read 1 1 13 -9
+read 1 1 14 -9
+read 1 1 15 0
+read 1 1 16 -9
+read 1 1 17 -9
+read 1 1 18 0
+read 1 1 19 -9
+read 1 1 20 -9
+read 1 1 21 -9
+read 1 1 22 -9
+read 1 1 23 -9
+read 1 1 24 0
+read 1 1 25 -9
+read 1 1 26 0
+set 10 0 0
+state 10 0 after_set 0 16 1
+state 10 0 end 0 16 1
+read 10 0 1 -9
+read 10 0 2 -9
+read 10 0 3 -9
+read 10 0 4 -9
+read 10 0 5 0
+read 10 0 6 0
+read 10 0 7 0
+read 10 0 8 0
+read 10 0 9 0
+read 10 0 10 0
+read 10 0 11 -9
+read 10 0 12 -9
+read 10 0 13 -9
+read 10 0 14 -9
+read 10 0 15 0
+read 10 0 16 -9
+read 10 0 17 -9
+read 10 0 18 0
+read 10 0 19 -9
+read 10 0 20 -9
+read 10 0 21 -9
+read 10 0 22 -9
+read 10 0 23 -9
+read 10 0 24 -9
+read 10 0 25 -9
+read 10 0 26 0
+set 10 1 0
+state 10 1 after_set 0 16 1
+state 10 1 end 16 16 1
+read 10 1 1 -9
+read 10 1 2 -9
+read 10 1 3 -9
+read 10 1 4 -9
+read 10 1 5 0
+read 10 1 6 0
+read 10 1 7 0
+read 10 1 8 0
+read 10 1 9 0
+read 10 1 10 0
+read 10 1 11 0
+read 10 1 12 0
+read 10 1 13 -9
+read 10 1 14 -9
+read 10 1 15 0
+read 10 1 16 -9
+read 10 1 17 -9
+read 10 1 18 0
+read 10 1 19 -9
+read 10 1 20 -9
+read 10 1 21 -9
+read 10 1 22 -9
+read 10 1 23 -9
+read 10 1 24 -9
+read 10 1 25 -9
+read 10 1 26 0
+set 100 0 0
+state 100 0 after_set 0 256 1
+state 100 0 end 0 256 1
+read 100 0 1 -9
+read 100 0 2 -9
+read 100 0 3 -9
+read 100 0 4 -9
+read 100 0 5 0
+read 100 0 6 0
+read 100 0 7 0
+read 100 0 8 0
+read 100 0 9 0
+read 100 0 10 0
+read 100 0 11 -9
+read 100 0 12 -9
+read 100 0 13 -9
+read 100 0 14 -9
+read 100 0 15 0
+read 100 0 16 -9
+read 100 0 17 -9
+read 100 0 18 0
+read 100 0 19 -9
+read 100 0 20 -9
+read 100 0 21 -9
+read 100 0 22 -9
+read 100 0 23 -9
+read 100 0 24 -9
+read 100 0 25 -9
+read 100 0 26 0
+set 100 1 0
+state 100 1 after_set 0 256 1
+state 100 1 end 256 256 1
+read 100 1 1 -9
+read 100 1 2 -9
+read 100 1 3 -9
+read 100 1 4 -9
+read 100 1 5 0
+read 100 1 6 0
+read 100 1 7 0
+read 100 1 8 0
+read 100 1 9 0
+read 100 1 10 0
+read 100 1 11 -9
+read 100 1 12 -9
+read 100 1 13 -9
+read 100 1 14 -9
+read 100 1 15 0
+read 100 1 16 -9
+read 100 1 17 -9
+read 100 1 18 0
+read 100 1 19 0
+read 100 1 20 -9
+read 100 1 21 -9
+read 100 1 22 -9
+read 100 1 23 -9
+read 100 1 24 -9
+read 100 1 25 -9
+read 100 1 26 0
+set 1000 0 -1
+state 1000 0 after_set 0 0 0
+state 1000 0 end 0 0 0
+read 1000 0 1 -9
+read 1000 0 2 -9
+read 1000 0 3 -9
+read 1000 0 4 -9
+read 1000 0 5 0
+read 1000 0 6 0
+read 1000 0 7 0
+read 1000 0 8 0
+read 1000 0 9 0
+read 1000 0 10 0
+read 1000 0 11 -9
+read 1000 0 12 -9
+read 1000 0 13 -9
+read 1000 0 14 -9
+read 1000 0 15 0
+read 1000 0 16 -9
+read 1000 0 17 -9
+read 1000 0 18 0
+read 1000 0 19 -9
+read 1000 0 20 -9
+read 1000 0 21 -9
+read 1000 0 22 -9
+read 1000 0 23 -9
+read 1000 0 24 -9
+read 1000 0 25 -9
+read 1000 0 26 0
+set 2 0 0
+state 2 0 after_set 0 2 1
+state 2 0 end 0 2 1
+read 2 0 1 -9
+read 2 0 2 -9
+read 2 0 3 -9
+read 2 0 4 -9
+read 2 0 5 0
+read 2 0 6 0
+read 2 0 7 0
+read 2 0 8 0
+read 2 0 9 0
+read 2 0 10 0
+read 2 0 11 -9
+read 2 0 12 -9
+read 2 0 13 -9
+read 2 0 14 -9
+read 2 0 15 0
+read 2 0 16 -9
+read 2 0 17 -9
+read 2 0 18 0
+read 2 0 19 -9
+read 2 0 20 -9
+read 2 0 21 -9
+read 2 0 22 -9
+read 2 0 23 -9
+read 2 0 24 -9
+read 2 0 25 -9
+read 2 0 26 0
+set 2 1 0
+state 2 1 after_set 0 2 1
+state 2 1 end 2 2 1
+read 2 1 1 -9
+read 2 1 2 -9
+read 2 1 3 -9
+read 2 1 4 -9
+read 2 1 5 0
+read 2 1 6 0
+read 2 1 7 0
+read 2 1 8 0
+read 2 1 9 0
+read 2 1 10 0
+read 2 1 11 -9
+read 2 1 12 -9
+read 2 1 13 0
+read 2 1 14 0
+read 2 1 15 0
+read 2 1 16 -9
+read 2 1 17 -9
+read 2 1 18 0
+read 2 1 19 -9
+read 2 1 20 -9
+read 2 1 21 -9
+read 2 1 22 -9
+read 2 1 23 -9
+read 2 1 24 -9
+read 2 1 25 0
+read 2 1 26 0
+set 20 0 0
+state 20 0 after_set 0 32 1
+state 20 0 end 0 32 1
+read 20 0 1 -9
+read 20 0 2 -9
+read 20 0 3 -9
+read 20 0 4 -9
+read 20 0 5 0
+read 20 0 6 0
+read 20 0 7 0
+read 20 0 8 0
+read 20 0 9 0
+read 20 0 10 0
+read 20 0 11 -9
+read 20 0 12 -9
+read 20 0 13 -9
+read 20 0 14 -9
+read 20 0 15 0
+read 20 0 16 -9
+read 20 0 17 -9
+read 20 0 18 0
+read 20 0 19 -9
+read 20 0 20 -9
+read 20 0 21 -9
+read 20 0 22 -9
+read 20 0 23 -9
+read 20 0 24 -9
+read 20 0 25 -9
+read 20 0 26 0
+set 20 1 0
+state 20 1 after_set 0 32 1
+state 20 1 end 32 32 1
+read 20 1 1 -9
+read 20 1 2 -9
+read 20 1 3 -9
+read 20 1 4 -9
+read 20 1 5 0
+read 20 1 6 0
+read 20 1 7 0
+read 20 1 8 0
+read 20 1 9 0
+read 20 1 10 0
+read 20 1 11 -9
+read 20 1 12 -9
+read 20 1 13 -9
+read 20 1 14 -9
+read 20 1 15 0
+read 20 1 16 -9
+read 20 1 17 -9
+read 20 1 18 0
+read 20 1 19 -9
+read 20 1 20 -9
+read 20 1 21 -9
+read 20 1 22 -9
+read 20 1 23 -9
+read 20 1 24 -9
+read 20 1 25 -9
+read 20 1 26 0
+set 200 0 0
+state 200 0 after_set 0 512 1
+state 200 0 end 0 512 1
+read 200 0 1 -9
+read 200 0 2 -9
+read 200 0 3 -9
+read 200 0 4 -9
+read 200 0 5 0
+read 200 0 6 0
+read 200 0 7 0
+read 200 0 8 0
+read 200 0 9 0
+read 200 0 10 0
+read 200 0 11 -9
+read 200 0 12 -9
+read 200 0 13 -9
+read 200 0 14 -9
+read 200 0 15 0
+read 200 0 16 -9
+read 200 0 17 -9
+read 200 0 18 0
+read 200 0 19 -9
+read 200 0 20 -9
+read 200 0 21 -9
+read 200 0 22 -9
+read 200 0 23 -9
+read 200 0 24 -9
+read 200 0 25 -9
+read 200 0 26 0
+set 200 1 0
+state 200 1 after_set 0 512 1
+state 200 1 end 512 512 1
+read 200 1 1 -9
+read 200 1 2 -9
+read 200 1 3 -9
+read 200 1 4 -9
+read 200 1 5 0
+read 200 1 6 0
+read 200 1 7 0
+read 200 1 8 0
+read 200 1 9 0
+read 200 1 10 0
+read 200 1 11 -9
+read 200 1 12 -9
+read 200 1 13 -9
+read 200 1 14 -9
+read 200 1 15 0
+read 200 1 16 -9
+read 200 1 17 -9
+read 200 1 18 0
+read 200 1 19 -9
+read 200 1 20 0
+read 200 1 21 -9
+read 200 1 22 -9
+read 200 1 23 -9
+read 200 1 24 -9
+read 200 1 25 -9
+read 200 1 26 0
+set 4 0 0
+state 4 0 after_set 0 4 1
+state 4 0 end 0 4 1
+read 4 0 1 -9
+read 4 0 2 -9
+read 4 0 3 -9
+read 4 0 4 -9
+read 4 0 5 0
+read 4 0 6 0
+read 4 0 7 0
+read 4 0 8 0
+read 4 0 9 0
+read 4 0 10 0
+read 4 0 11 -9
+read 4 0 12 -9
+read 4 0 13 -9
+read 4 0 14 -9
+read 4 0 15 0
+read 4 0 16 -9
+read 4 0 17 -9
+read 4 0 18 0
+read 4 0 19 -9
+read 4 0 20 -9
+read 4 0 21 -9
+read 4 0 22 -9
+read 4 0 23 -9
+read 4 0 24 -9
+read 4 0 25 -9
+read 4 0 26 0
+set 4 1 0
+state 4 1 after_set 0 4 1
+state 4 1 end 4 4 1
+read 4 1 1 -9
+read 4 1 2 -9
+read 4 1 3 -9
+read 4 1 4 -9
+read 4 1 5 0
+read 4 1 6 0
+read 4 1 7 0
+read 4 1 8 0
+read 4 1 9 0
+read 4 1 10 0
+read 4 1 11 -9
+read 4 1 12 -9
+read 4 1 13 -9
+read 4 1 14 -9
+read 4 1 15 0
+read 4 1 16 -9
+read 4 1 17 -9
+read 4 1 18 0
+read 4 1 19 -9
+read 4 1 20 -9
+read 4 1 21 -9
+read 4 1 22 -9
+read 4 1 23 -9
+read 4 1 24 -9
+read 4 1 25 -9
+read 4 1 26 0
+set 40 0 0
+state 40 0 after_set 0 64 1
+state 40 0 end 0 64 1
+read 40 0 1 -9
+read 40 0 2 -9
+read 40 0 3 -9
+read 40 0 4 -9
+read 40 0 5 0
+read 40 0 6 0
+read 40 0 7 0
+read 40 0 8 0
+read 40 0 9 0
+read 40 0 10 0
+read 40 0 11 -9
+read 40 0 12 -9
+read 40 0 13 -9
+read 40 0 14 -9
+read 40 0 15 0
+read 40 0 16 -9
+read 40 0 17 -9
+read 40 0 18 0
+read 40 0 19 -9
+read 40 0 20 -9
+read 40 0 21 -9
+read 40 0 22 -9
+read 40 0 23 -9
+read 40 0 24 -9
+read 40 0 25 -9
+read 40 0 26 0
+set 40 1 0
+state 40 1 after_set 0 64 1
+state 40 1 end 64 64 1
+read 40 1 1 -9
+read 40 1 2 -9
+read 40 1 3 -9
+read 40 1 4 -9
+read 40 1 5 0
+read 40 1 6 0
+read 40 1 7 0
+read 40 1 8 0
+read 40 1 9 0
+read 40 1 10 0
+read 40 1 11 -9
+read 40 1 12 -9
+read 40 1 13 -9
+read 40 1 14 -9
+read 40 1 15 0
+read 40 1 16 -9
+read 40 1 17 -9
+read 40 1 18 0
+read 40 1 19 -9
+read 40 1 20 -9
+read 40 1 21 -9
+read 40 1 22 -9
+read 40 1 23 -9
+read 40 1 24 -9
+read 40 1 25 -9
+read 40 1 26 0
+set 400 0 0
+state 400 0 after_set 0 1024 1
+state 400 0 end 0 1024 1
+read 400 0 1 -9
+read 400 0 2 -9
+read 400 0 3 -9
+read 400 0 4 -9
+read 400 0 5 0
+read 400 0 6 0
+read 400 0 7 0
+read 400 0 8 0
+read 400 0 9 0
+read 400 0 10 0
+read 400 0 11 -9
+read 400 0 12 -9
+read 400 0 13 -9
+read 400 0 14 -9
+read 400 0 15 0
+read 400 0 16 -9
+read 400 0 17 -9
+read 400 0 18 0
+read 400 0 19 -9
+read 400 0 20 -9
+read 400 0 21 -9
+read 400 0 22 -9
+read 400 0 23 -9
+read 400 0 24 -9
+read 400 0 25 -9
+read 400 0 26 0
+set 400 1 0
+state 400 1 after_set 0 1024 1
+state 400 1 end 1024 1024 1
+read 400 1 1 -9
+read 400 1 2 -9
+read 400 1 3 -9
+read 400 1 4 -9
+read 400 1 5 0
+read 400 1 6 0
+read 400 1 7 0
+read 400 1 8 0
+read 400 1 9 0
+read 400 1 10 0
+read 400 1 11 -9
+read 400 1 12 -9
+read 400 1 13 -9
+read 400 1 14 -9
+read 400 1 15 0
+read 400 1 16 -9
+read 400 1 17 -9
+read 400 1 18 0
+read 400 1 19 -9
+read 400 1 20 -9
+read 400 1 21 0
+read 400 1 22 -9
+read 400 1 23 -9
+read 400 1 24 -9
+read 400 1 25 -9
+read 400 1 26 0
+set 8 0 0
+state 8 0 after_set 0 8 1
+state 8 0 end 0 8 1
+read 8 0 1 -9
+read 8 0 2 -9
+read 8 0 3 -9
+read 8 0 4 -9
+read 8 0 5 0
+read 8 0 6 0
+read 8 0 7 0
+read 8 0 8 0
+read 8 0 9 0
+read 8 0 10 0
+read 8 0 11 -9
+read 8 0 12 -9
+read 8 0 13 -9
+read 8 0 14 -9
+read 8 0 15 0
+read 8 0 16 -9
+read 8 0 17 -9
+read 8 0 18 0
+read 8 0 19 -9
+read 8 0 20 -9
+read 8 0 21 -9
+read 8 0 22 -9
+read 8 0 23 -9
+read 8 0 24 -9
+read 8 0 25 -9
+read 8 0 26 0
+set 8 1 0
+state 8 1 after_set 0 8 1
+state 8 1 end 8 8 1
+read 8 1 1 -9
+read 8 1 2 -9
+read 8 1 3 -9
+read 8 1 4 -9
+read 8 1 5 0
+read 8 1 6 0
+read 8 1 7 0
+read 8 1 8 0
+read 8 1 9 0
+read 8 1 10 0
+read 8 1 11 -9
+read 8 1 12 -9
+read 8 1 13 -9
+read 8 1 14 -9
+read 8 1 15 0
+read 8 1 16 0
+read 8 1 17 -9
+read 8 1 18 0
+read 8 1 19 -9
+read 8 1 20 -9
+read 8 1 21 -9
+read 8 1 22 0
+read 8 1 23 -9
+read 8 1 24 -9
+read 8 1 25 -9
+read 8 1 26 0
+set 80 0 0
+state 80 0 after_set 0 128 1
+state 80 0 end 0 128 1
+read 80 0 1 -9
+read 80 0 2 -9
+read 80 0 3 -9
+read 80 0 4 -9
+read 80 0 5 0
+read 80 0 6 0
+read 80 0 7 0
+read 80 0 8 0
+read 80 0 9 0
+read 80 0 10 0
+read 80 0 11 -9
+read 80 0 12 -9
+read 80 0 13 -9
+read 80 0 14 -9
+read 80 0 15 0
+read 80 0 16 -9
+read 80 0 17 -9
+read 80 0 18 0
+read 80 0 19 -9
+read 80 0 20 -9
+read 80 0 21 -9
+read 80 0 22 -9
+read 80 0 23 -9
+read 80 0 24 -9
+read 80 0 25 -9
+read 80 0 26 0
+set 80 1 0
+state 80 1 after_set 0 128 1
+state 80 1 end 128 128 1
+read 80 1 1 -9
+read 80 1 2 -9
+read 80 1 3 -9
+read 80 1 4 -9
+read 80 1 5 0
+read 80 1 6 0
+read 80 1 7 0
+read 80 1 8 0
+read 80 1 9 0
+read 80 1 10 0
+read 80 1 11 -9
+read 80 1 12 -9
+read 80 1 13 -9
+read 80 1 14 -9
+read 80 1 15 0
+read 80 1 16 -9
+read 80 1 17 0
+read 80 1 18 0
+read 80 1 19 -9
+read 80 1 20 -9
+read 80 1 21 -9
+read 80 1 22 -9
+read 80 1 23 -9
+read 80 1 24 -9
+read 80 1 25 -9
+read 80 1 26 0
+set 800 0 0
+state 800 0 after_set 0 2048 1
+state 800 0 end 0 2048 1
+read 800 0 1 -9
+read 800 0 2 -9
+read 800 0 3 -9
+read 800 0 4 -9
+read 800 0 5 0
+read 800 0 6 0
+read 800 0 7 0
+read 800 0 8 0
+read 800 0 9 0
+read 800 0 10 0
+read 800 0 11 -9
+read 800 0 12 -9
+read 800 0 13 -9
+read 800 0 14 -9
+read 800 0 15 0
+read 800 0 16 -9
+read 800 0 17 -9
+read 800 0 18 0
+read 800 0 19 -9
+read 800 0 20 -9
+read 800 0 21 -9
+read 800 0 22 -9
+read 800 0 23 -9
+read 800 0 24 -9
+read 800 0 25 -9
+read 800 0 26 0
+set 800 1 0
+state 800 1 after_set 0 2048 1
+state 800 1 end 2048 2048 1
+read 800 1 1 -9
+read 800 1 2 -9
+read 800 1 3 -9
+read 800 1 4 -9
+read 800 1 5 0
+read 800 1 6 0
+read 800 1 7 0
+read 800 1 8 0
+read 800 1 9 0
+read 800 1 10 0
+read 800 1 11 -9
+read 800 1 12 -9
+read 800 1 13 -9
+read 800 1 14 -9
+read 800 1 15 0
+read 800 1 16 -9
+read 800 1 17 -9
+read 800 1 18 0
+read 800 1 19 -9
+read 800 1 20 -9
+read 800 1 21 -9
+read 800 1 22 -9
+read 800 1 23 0
+read 800 1 24 -9
+read 800 1 25 -9
+read 800 1 26 0
+set fff 0 0
+state fff 0 after_set 0 4095 1
+state fff 0 end 0 4095 1
+read fff 0 1 -9
+read fff 0 2 -9
+read fff 0 3 -9
+read fff 0 4 -9
+read fff 0 5 0
+read fff 0 6 0
+read fff 0 7 0
+read fff 0 8 0
+read fff 0 9 0
+read fff 0 10 0
+read fff 0 11 -9
+read fff 0 12 -9
+read fff 0 13 -9
+read fff 0 14 -9
+read fff 0 15 0
+read fff 0 16 -9
+read fff 0 17 -9
+read fff 0 18 0
+read fff 0 19 -9
+read fff 0 20 -9
+read fff 0 21 -9
+read fff 0 22 -9
+read fff 0 23 -9
+read fff 0 24 -9
+read fff 0 25 -9
+read fff 0 26 0
+set fff 1 0
+state fff 1 after_set 0 4095 1
+state fff 1 end 4095 4095 1
+read fff 1 1 0
+read fff 1 2 0
+read fff 1 3 0
+read fff 1 4 0
+read fff 1 5 0
+read fff 1 6 0
+read fff 1 7 0
+read fff 1 8 0
+read fff 1 9 0
+read fff 1 10 0
+read fff 1 11 0
+read fff 1 12 0
+read fff 1 13 0
+read fff 1 14 0
+read fff 1 15 0
+read fff 1 16 0
+read fff 1 17 0
+read fff 1 18 0
+read fff 1 19 0
+read fff 1 20 0
+read fff 1 21 0
+read fff 1 22 0
+read fff 1 23 0
+read fff 1 24 0
+read fff 1 25 0
+read fff 1 26 0

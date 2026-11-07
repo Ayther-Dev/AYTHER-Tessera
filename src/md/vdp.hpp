@@ -118,7 +118,13 @@ private:
   std::uint32_t slots_per_line() const noexcept;
 
   Standard standard_;
-  std::array<std::uint8_t, 32> regs_{};
+  // Register 10 (H interrupt counter) powers on at $FF in the reference core
+  // (measured on the regions of palette_sweep: no register write touches it).
+  std::array<std::uint8_t, 32> regs_ = [] {
+    std::array<std::uint8_t, 32> r{};
+    r[10] = 0xFF;
+    return r;
+  }();
   std::array<std::uint8_t, 0x10000> vram_{};
   std::array<std::uint16_t, 64> cram_{};
   std::array<std::uint16_t, 40> vsram_{};

@@ -24,11 +24,24 @@ Tessera expone la ABI 1.10 de gpgx `ayther-abi-1.10-r4` por su API C 1.1 (`obser
 | 19 a 21 | LINE_REGS, LINE_CRAM, LINE_CELLS | 7192, 152, 59160 | `LINE_STATE`, `LINE_CRAM`, `LINE_CELLS` | `LINE_STATE_V1` | 1 |
 | 22 | RASTER_JOURNAL | 2064 | `RASTER_TRACKING` | `OBSERVABILITY_V1` | 1 |
 | 23 | FRAME_HASH | 56 | `FRAME_HASH` | `OBSERVABILITY_V1` | 1 |
-| 24 | PALETTE | 512 | siempre | `OBSERVABILITY_V1` | 1 |
+| 24 | PALETTE | 512 | `VDP_MEMORY` | `OBSERVABILITY_V1` | 1 |
 | 25 | SPRITE_OUTCOME | 80 | `SPRITE_CAPTURE` | `SPRITE_OUTCOME_V1` | 1 |
-| 26 | Z80_RAM | 8192 | `VDP_MEMORY` | `REGION_READ` | 1 |
+| 26 | Z80_RAM | 8192 | siempre | `REGION_READ` | 1 |
 
 Los tamaños se midieron por caja negra sobre gpgx r4 (`src/observation/region_table.hpp`). La columna de suscripciones y capacidades sigue las de la ABI y se revisa contra gpgx en TP-101.
+
+## Semántica de las suscripciones (TP-201.3, medida sobre gpgx r4)
+
+Medida por caja negra con `tools/diffbench/measure_subscriptions.py`; la matriz completa está en `tests/fixtures/diffbench/subscription-matrix.txt` y la comprueba `integration.md_subscriptions`.
+
+- Al arrancar `supported = 0xFFF`, `active = requested = 0`. `set` con un bit desconocido devuelve `INVALID_ARGUMENT` y no cambia nada.
+- La máscara pedida pasa a activa al empezar el siguiente frame. `activation_frame` es el número (base 1) del último frame empezado; un cambio pendiente lo fija en el frame siguiente; pedir 0 estando en 0 lo deja como está.
+- Siempre legibles: LAYER_MASK, regiones 5-10, 15, 18 (SYSTEM) y 26 (Z80_RAM). PALETTE (24) cuelga de `VDP_MEMORY`.
+- Puertas: VDP_MEMORY 1-4, 24; SPRITE_CAPTURE 13, 14, 25; RASTER_TRACKING 16, 22; AUDIO_WRITES 11, 12; ATTRIBUTION 17; LINE_STATE 19; LINE_CRAM 20; LINE_CELLS 21; FRAME_HASH 23. Región inactiva: `TESSERA_NOT_SUBSCRIBED` (-28; gpgx devuelve -9). Región suscrita que Tessera aún no sirve: `UNSUPPORTED_CAPABILITY`.
+- El poll de audio events exige AUDIO_EVENTS activa (si no, `NOT_SUBSCRIBED`); las estadísticas del transporte responden siempre.
+- Con una lectura en curso en otro hilo, las llamadas de observación devuelven `TESSERA_BUSY` (-29) mientras la sesión avanza.
+- Contador de trabajo (`observation_work`, solo para pruebas y TP-208): bytes que la observación entregó. Sin suscripciones activas y sin lecturas queda en 0.
+- Sin medir: momento exacto de la desactivación a mitad de partida y `activation_frame` tras cargar un savestate.
 
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.

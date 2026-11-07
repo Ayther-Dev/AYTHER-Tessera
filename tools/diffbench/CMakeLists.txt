@@ -217,6 +217,29 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_REQUIRED md_${mode}_rom
                 PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
+        # TP-201.1: the memory regions (VRAM, CRAM, VDP_REGS, VSRAM, Z80_RAM)
+        # and the work RAM of the same ROMs, byte for byte.
+        foreach(mode IN LISTS frame_roms)
+            if(mode MATCHES "^(palette|modes|mode4)-")
+                # gpgx answers PAL to palette-sweep-5 although its header says
+                # U (its own choice, not the header rule): the native machine
+                # is told so, to compare the PAL SYSTEM too.
+                set(region_args)
+                if(mode STREQUAL "palette-sweep-5")
+                    set(region_args --region e)
+                endif()
+                add_test(NAME integration.md_${mode}_regions COMMAND ${Python3_EXECUTABLE} -I
+                    "${CMAKE_CURRENT_SOURCE_DIR}/compare_regions.py"
+                    $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                    "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                    "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}-regions" ${region_args})
+                set_tests_properties(integration.md_${mode}_regions PROPERTIES
+                    FIXTURES_REQUIRED md_${mode}_rom
+                    FAIL_REGULAR_EXPRESSION "differing=[1-9]|different sizes|tool failed"
+                    PASS_REGULAR_EXPRESSION "WORK_RAM bytes=65536 differing=0"
+                    LABELS "integration;phase1;md;local" TIMEOUT 120)
+            endif()
+        endforeach()
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region
@@ -281,6 +304,17 @@ if(TESSERA_BUILD_MEGADRIVE)
             set_tests_properties(integration.md_${mode} PROPERTIES
                 FIXTURES_REQUIRED md_${mode}_rom
                 PASS_REGULAR_EXPRESSION "differing=0 "
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+            # TP-107.6: the same ROMs through the event transport (RAW_WRITE and
+            # FRAME records, and the static part of the transport stats).
+            add_test(NAME integration.md_${mode}_events COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_audio_events.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin"
+                ${audio_frames} "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}-events" --tolerance ${audio_tolerance})
+            set_tests_properties(integration.md_${mode}_events PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "differing=0 .*transport_stats .* same"
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
     endif()

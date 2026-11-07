@@ -50,6 +50,11 @@ typedef uint64_t tessera_snapshot;
 #define TESSERA_IO_OTHER (-INT32_C(25))
 #define TESSERA_OUT_OF_MEMORY (-INT32_C(26))
 #define TESSERA_BACKEND_FAILURE (-INT32_C(27))
+/* API 1.1 (observación): la región o la operación existe, pero su suscripción
+   no está activa (el NOT_SUBSCRIBED de gpgx), y la llamada llega con el núcleo
+   ejecutando un frame (el BUSY de gpgx). */
+#define TESSERA_NOT_SUBSCRIBED (-INT32_C(28))
+#define TESSERA_BUSY (-INT32_C(29))
 #define TESSERA_PHASE_NONE UINT32_C(0)
 #define TESSERA_PHASE_VALIDATE UINT32_C(1)
 #define TESSERA_PHASE_DETECT UINT32_C(2)

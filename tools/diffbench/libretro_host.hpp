@@ -19,6 +19,14 @@ struct RegionDump {
 
 using TraceFrame = std::array<int32_t, 8>; // up down left right A B C start
 
+/// ayther_subscription_state_v1 as the core reports it (TP-201.3).
+struct SubscriptionState {
+  int32_t status = -999; ///< get_subscriptions return, -999 = not asked
+  uint32_t struct_size = 0, version = 0;
+  uint32_t supported = 0, active = 0, requested = 0;
+  uint64_t activation_frame = 0;
+};
+
 struct RunResult {
   int peak = 0;                       // pico absoluto del PCM entregado
   std::vector<RegionDump> regions;    // ABI 1.10, si se pidió el volcado
@@ -36,6 +44,12 @@ struct RunResult {
   // retro_serialize_size reports.
   std::vector<double> run_micros;
   size_t serialize_size = 0;
+  // Subscription probe (--sub-mask): the status of set_subscriptions and the
+  // state right after it (before the first frame) and after the last frame.
+  int32_t sub_set_status = -999;
+  SubscriptionState sub_after_set, sub_end;
+  int32_t sub_poll_status = -999, sub_stats_status = -999;
+  uint32_t sub_poll_count = 0;
   std::string error;
 };
 
@@ -76,9 +90,18 @@ void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1);
 // Dispositivo libretro que se pide para ambos puertos tras cargar el juego
 // (0 = el del core por defecto; 0x101 = mando de 6 botones de gpgx).
 void set_pad_device(unsigned device);
+/// Calls retro_reset (the RESET button) before frame `frame` (0 = never; 1 =
+/// before the first run after the game loads) -- TP-110.4.
+void set_reset_at(unsigned frame);
+/// Drains poll_audio_events after every retro_run and appends the 80 byte
+/// records to `path`; the transport stats go to `path` + ".stats" (TP-107.6).
+void set_audio_events_out(const std::string &path);
 /// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
 /// 0 subscribes to nothing, 1 to every region (the full set).
 void set_bench(bool on, int observation);
+/// Requests exactly this subscription mask instead of the default (TP-201.3
+/// probe); negative leaves the default.
+void set_subscription_mask(int64_t mask);
 
 // Ejecuta `frames` frames con `rom` y devuelve un hash por frame.
 RunResult run_libretro(const std::string &core_path,
