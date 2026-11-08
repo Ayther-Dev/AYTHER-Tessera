@@ -164,6 +164,7 @@ public:
   bool audio_events() const noexcept { return audio_events_on_; }
   /// The renderer parses the sprites for the PARSED_SPRITES and
   /// SPRITE_OUTCOME regions only while this is on (SPRITE_CAPTURE).
+  void set_attribution(bool on) noexcept { renderer_.set_attribution(on); }
   void set_sprite_capture(bool on) noexcept {
     renderer_.set_sprite_capture(on);
   }
@@ -229,7 +230,7 @@ private:
   void update_irq() noexcept;
 
   MachineConfig config_;
-  std::uint64_t rom_hash_ = 0; ///< FNV-1a of the ROM image, for the savestate
+  std::uint64_t rom_hash_ = 0;  ///< FNV-1a of the ROM image, for the savestate
   std::uint32_t rom_crc32_ = 0; ///< CRC-32 of the ROM image (SYSTEM region)
   std::uint32_t rom_bytes_ = 0; ///< size of the ROM image
   Sram sram_; ///< declared before the bus: built from the ROM header first

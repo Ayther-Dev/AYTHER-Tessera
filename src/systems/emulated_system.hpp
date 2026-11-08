@@ -72,11 +72,12 @@ public:
   [[nodiscard]] virtual std::int32_t
   read_region(std::uint32_t id, std::uint32_t offset,
               std::span<std::uint8_t> out) = 0;
-  /// Current byte size of a region whose size varies (LINE_REGS, LINE_CRAM),
-  /// as the reference answers in its query; 0 for the table size.
+  /// Current byte size of a region whose size varies (ATTRIBUTION, LINE_*),
+  /// as the reference answers in its query, possibly 0; UINT32_MAX for the
+  /// table size.
   [[nodiscard]] virtual std::uint32_t
   region_byte_size(std::uint32_t /*id*/) const {
-    return 0;
+    return UINT32_MAX;
   }
   /// `event_size` bytes per event; `count` events written (0 if none).
   [[nodiscard]] virtual std::int32_t

@@ -106,6 +106,11 @@ void Renderer::begin_frame(const Vdp &vdp) {
   field_ ^= 1U;
   double_res_ = (vdp.reg(12) & 0x06U) == 0x06U;
   frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
+  // ATTRIBUTION is not cleared between frames: a line that is not drawn
+  // keeps what an earlier frame left (measured, raster_bands 5).
+  if (attribution_on_ &&
+      attribution_.size() != std::size_t{size_.width} * size_.height)
+    attribution_.assign(std::size_t{size_.width} * size_.height, 0);
   // The entries beyond the count keep what earlier frames left there, as in
   // the reference (measured: Golden Axe 600); only the count and the outcome
   // start over.
@@ -447,6 +452,7 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
         Pixel &pixel = out[static_cast<unsigned>(column)];
         if (pixel.opaque) {
           flags_.collision = true;
+          pixel.collided = true;
           continue;
         }
         pixel.opaque = true;
@@ -612,8 +618,10 @@ void Renderer::capture_line_state(const Vdp &vdp, std::uint32_t line) {
   };
   put16(0, latch_.hscroll[0]);
   put16(2, latch_.hscroll[1]);
-  put16(4, latch_.vsram[0]);
-  put16(6, latch_.vsram[1]);
+  // The vertical scroll fields keep 10 bits (measured, Phantasy Star IV
+  // writes 0x738 to VSRAM 1; LINE_REGS says 0x338).
+  put16(4, latch_.vsram[0] & 0x3FFU);
+  put16(6, latch_.vsram[1] & 0x3FFU);
   put16(8, std::uint32_t{vdp.reg(2) & 0x38U} << 10);
   put16(10, std::uint32_t{vdp.reg(4) & 0x07U} << 13);
   put16(12, std::uint32_t{vdp.reg(3) & (h40 ? 0x3CU : 0x3EU)} << 10);
@@ -638,11 +646,156 @@ void Renderer::capture_line_state(const Vdp &vdp, std::uint32_t line) {
     line_cram_[line][i] = static_cast<std::uint16_t>(
         ((c >> 9 & 7U) << 6) | ((c >> 5 & 7U) << 3) | (c >> 1 & 7U));
   }
+  capture_line_cells(vdp, line);
+}
+
+// LINE_CELLS (tessera_obs_line_cells_v1), measured on gpgx with modes_sweep
+// 0-31. Each name is a 2-cell column: the name table word of its left cell in
+// the low half, the right one in the high half. Plane columns start at pair
+// ((-hscroll) & 0x3FF) >> 4 of the cell row ((line + vscroll) >> 3), shift =
+// hscroll & 15, and there is one column more than the width when shift != 0.
+// A horizontal window takes its pairs from plane A's count; to its right
+// plane A starts one pair late (the first column repeats the second, the
+// skew Renderer::plane_line draws, only when shift != 0). Plane B counts the
+// columns of the frame width, plane A those of the line. A line covered by
+// the vertical window
+// leaves plane A empty. The window lists its own pairs from row line >> 3.
+// Fields beyond the column counts are 0.
+void Renderer::capture_line_cells(const Vdp &vdp, std::uint32_t line) {
+  const auto &r = latch_.regs;
+  const auto &vram = vdp.vram_at_line_start();
+  const auto pair_at = [&](std::uint32_t address) {
+    address &= 0xFFFCU;
+    return (std::uint32_t{vram[address]} << 8 | vram[address + 1U]) |
+           (std::uint32_t{vram[address + 2U]} << 24 |
+            std::uint32_t{vram[address + 3U]} << 16);
+  };
+  const bool h40 = (r[12] & 0x81U) != 0;
+  const unsigned width = h40 ? 20U : 16U; // in 2-cell columns
+  const auto cells = [](unsigned bits) {
+    return bits == 0 ? 32U : bits == 1 ? 64U : 128U;
+  };
+  const unsigned plane_w = cells(r[16] & 3U);
+  const unsigned plane_h = cells((r[16] >> 4) & 3U);
+
+  // Window columns of this line.
+  const unsigned v_bound = (r[18] & 0x1FU) * 8U;
+  const bool v_covers = (r[18] & 0x80U) != 0 ? line >= v_bound : line < v_bound;
+  unsigned w_first = 0, w_pairs = 0;
+  bool w_left = false;
+  if (v_covers) {
+    w_pairs = width;
+  } else if ((r[17] & 0x1FU) != 0) {
+    const unsigned split = std::min<unsigned>(r[17] & 0x1FU, width);
+    if ((r[17] & 0x80U) != 0) {
+      w_first = split;
+      w_pairs = width - split;
+    } else {
+      w_pairs = split;
+      w_left = true;
+    }
+  }
+
+  LineCells &e = line_cells_[line];
+  e = {};
+  const auto put32 = [&](std::size_t at, std::uint32_t value) {
+    for (unsigned i = 0; i < 4U; ++i)
+      e[at + i] = static_cast<std::uint8_t>(value >> (8U * i));
+  };
+  const std::uint32_t bases[2] = {std::uint32_t{vdp.reg(2) & 0x38U} << 10,
+                                  std::uint32_t{vdp.reg(4) & 0x07U} << 13};
+  // Plane B counts the columns of the frame width (fixed at line 0), plane A
+  // those of the line (measured, raster_bands 7 and 16).
+  const unsigned frame_width = size_.width / 16U;
+  for (unsigned plane = 0; plane < 2U; ++plane) {
+    if (plane == 0 && w_pairs == width)
+      continue; // all window: plane A empty
+    const unsigned hs = latch_.hscroll[plane];
+    const unsigned vs = latch_.vsram[plane];
+    const unsigned shift = hs & 15U;
+    unsigned cols = (plane == 0 ? width : frame_width) + (shift != 0 ? 1U : 0U);
+    const unsigned first = (((0x400U - hs) & 0x3FFU) >> 4) % (plane_w / 2U);
+    const std::uint32_t row =
+        bases[plane] + (((line + vs) >> 3) % plane_h) * plane_w * 2U;
+    unsigned skip = 0;
+    bool repeat = false;
+    if (plane == 0 && w_pairs != 0) {
+      cols -= w_pairs;
+      if (w_left) {
+        skip = w_pairs;
+        repeat = shift != 0; // no skew without fine scroll (raster_bands 30)
+      }
+    }
+    for (unsigned c = 0; c < cols; ++c) {
+      const unsigned pair =
+          (first + skip + (repeat ? std::max(c, 1U) : c)) % (plane_w / 2U);
+      put32(84U * plane + 4U * c, pair_at(row + pair * 4U));
+    }
+    e[252 + plane] = static_cast<std::uint8_t>(((line + vs) & 7U) << 3);
+    e[255 + plane] = static_cast<std::uint8_t>(shift);
+    e[257 + plane] = static_cast<std::uint8_t>(cols);
+  }
+  if (w_pairs != 0) {
+    const std::uint32_t row =
+        (std::uint32_t{vdp.reg(3) & (h40 ? 0x3CU : 0x3EU)} << 10) +
+        (line >> 3) * (h40 ? 128U : 64U);
+    for (unsigned c = 0; c < w_pairs; ++c)
+      put32(168U + 4U * c, pair_at(row + (w_first + c) * 4U));
+    e[254] = static_cast<std::uint8_t>((line & 7U) << 3);
+    e[259] = static_cast<std::uint8_t>(w_pairs);
+  }
 }
 
 std::uint8_t Renderer::start_reg(const Vdp &vdp, std::uint32_t line,
                                  unsigned index) const noexcept {
   return latch_.line == line ? latch_.regs[index & 31U] : vdp.reg(index);
+}
+
+// ATTRIBUTION byte of one pixel (ABI #41), measured on gpgx with modes_sweep,
+// palette_sweep, sprite_limits and raster_bands. Everything describes the
+// winning background cell by the merge rule (A with priority, B with
+// priority, A, B; the backdrop otherwise), not the visible pixel: the palette
+// line is that cell's (0 on the backdrop, even under a sprite), and the shadow
+// bit is 1 when shadow/highlight is on and neither plane cell has priority,
+// on a plane pixel only (the backdrop and the sprite operators leave 0).
+// Plane A and the window share a buffer: a pixel of it is the window when it
+// lies in the window clip of LINE_REGS (Vdp::window_clip at the line start)
+// on a line that has a window; the clip keeps its last value, so a line
+// covered by the vertical window outside that clip counts as plane A, and a
+// line without a window is plane A everywhere (raster_bands 30). A pixel met
+// by two opaque sprites carries the sprite bit (see render_line).
+std::uint8_t Renderer::attribution_byte(const Pixel &pa, const Pixel &pb,
+                                        unsigned x, bool shadow_mode,
+                                        bool window_line,
+                                        bool from_sprite) const noexcept {
+  unsigned layer = 0;
+  const Pixel *cell = nullptr;
+  if (pa.opaque && pa.high) {
+    cell = &pa;
+  } else if (pb.opaque && pb.high) {
+    cell = &pb;
+  } else if (pa.opaque) {
+    cell = &pa;
+  } else if (pb.opaque) {
+    cell = &pb;
+  }
+  unsigned bits = from_sprite ? 1U : 0U;
+  if (cell != nullptr) {
+    if (cell == &pb) {
+      layer = 1;
+    } else {
+      const unsigned pair = x / 16U;
+      layer = window_line && pair >= latch_.window_clip[0] &&
+                      pair < latch_.window_clip[1]
+                  ? 3U
+                  : 2U;
+    }
+    bits |=
+        layer << 6 | (cell->high ? 0x20U : 0U) | ((cell->index >> 4) & 3U) << 3;
+    if (shadow_mode && !pa.high && !pb.high)
+      bits |= 1U << 1;
+  }
+  return static_cast<std::uint8_t>(bits);
 }
 
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
@@ -671,11 +824,40 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       std::size_t{line} * width, width);
   const std::uint32_t backdrop_index = vdp.reg(7) & 0x3FU;
   const bool display_on = (vdp.reg(1) & 0x40U) != 0;
+  std::uint8_t *attr = attribution_on_ && attribution_.size() >=
+                                              std::size_t{width} * size_.height
+                           ? attribution_.data() + std::size_t{line} * width
+                           : nullptr;
+  // Whether the window covers part of this line (registers 17 and 18 at the
+  // line start), for the attribution layer.
+  const std::uint8_t reg17 = start_reg(vdp, line, 17);
+  const std::uint8_t reg18 = start_reg(vdp, line, 18);
+  const unsigned v_bound = (reg18 & 0x1FU) * 8U;
+  const bool has_window =
+      (reg17 & 0x1FU) != 0 ||
+      ((reg18 & 0x80U) != 0 ? line >= v_bound : line < v_bound);
   if (!display_on) {
     std::fill(row.begin(), row.end(),
               cram_colour(backdrop_index, Shade::normal));
+    // The display turned off by the line's horizontal interrupt: the picture
+    // is the backdrop, but the attribution still describes the planes as
+    // they were at the line start (measured, raster_bands 5). Sprites are not
+    // parsed here; their bit stays 0 (not measured).
+    if (attr != nullptr && latch_.line == line &&
+        (latch_.regs[1] & 0x40U) != 0) {
+      std::vector<Pixel> a(width), b(width);
+      plane_line(vdp, 0, line, a);
+      plane_line(vdp, 1, line, b);
+      window_line(vdp, line, a);
+      for (unsigned x = 0; x < width; ++x)
+        attr[x] =
+            attribution_byte(a[x], b[x], x, shadow_mode, has_window, false);
+      attribution_drawn_ = true;
+    }
   } else {
     std::vector<Pixel> a(width), b(width), sp(width);
+    if (attr != nullptr)
+      attribution_drawn_ = true;
     if (capture_on_)
       capture_line(vdp, line);
     sprite_line(vdp, line, sp);
@@ -712,20 +894,31 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
         shade = high || ps.high || (ps.index & 15U) == 14U ? Shade::normal
                                                            : Shade::shadow;
       }
+      bool from_sprite = false;
       if (ps.opaque && ps.high) {
         index = ps.index;
+        from_sprite = true;
       } else if (pa.opaque && pa.high) {
         index = pa.index;
       } else if (pb.opaque && pb.high) {
         index = pb.index;
       } else if (ps.opaque) {
         index = ps.index;
+        from_sprite = true;
       } else if (pa.opaque) {
         index = pa.index;
       } else if (pb.opaque) {
         index = pb.index;
       }
       row[x] = cram_colour(index, shade);
+      // A sprite pixel met by a later opaque sprite counts as a sprite even
+      // where a plane with priority hides it (measured, sprite_limits 0, 3,
+      // 9), but not with shadow/highlight on (sprite_limits 201, 205, 207,
+      // 209).
+      if (attr)
+        attr[x] =
+            attribution_byte(pa, pb, x, shadow_mode, has_window,
+                             from_sprite || (sp[x].collided && !shadow_mode));
     }
     if ((vdp.reg(0) & 0x20U) != 0) // left column blank: backdrop
       for (unsigned x = 0; x < 8U && x < width; ++x)

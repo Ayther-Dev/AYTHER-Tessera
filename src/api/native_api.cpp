@@ -609,7 +609,7 @@ const observation::RegionRow &region_row(std::uint32_t id) {
 /// Byte size of the region now: the system's when it varies, else the table's.
 std::uint32_t region_bytes(Session &s, const observation::RegionRow &r) {
   if (const auto *o = s.machine->observation())
-    if (const auto live = o->region_byte_size(r.id); live != 0)
+    if (const auto live = o->region_byte_size(r.id); live != UINT32_MAX)
       return live;
   return r.byte_size;
 }
@@ -647,7 +647,9 @@ tessera_status TESSERA_CALL tessera_observation_region_read_v1(
     auto s = observed_session(session);
     const auto &r = region_row(region_id);
     const std::uint32_t size = region_bytes(*s, r);
-    require(out && (byte_count == 0 || offset < size) &&
+    // A read of 0 bytes may pass no buffer: gpgx answers it with the state of
+    // the subscription (measured, ATTRIBUTION of 0 bytes before any frame).
+    require((out || byte_count == 0) && (byte_count == 0 || offset < size) &&
             std::uint64_t{offset} + byte_count <= size);
     require(expected_generation == UINT64_MAX ||
                 expected_generation == s->generation,
@@ -658,7 +660,7 @@ tessera_status TESSERA_CALL tessera_observation_region_read_v1(
       const auto status = o->read_region(
           region_id, offset, {static_cast<std::uint8_t *>(out), byte_count});
       require(status == TESSERA_OK, status);
-    } else {
+    } else if (byte_count != 0) {
       std::memset(out, 0, byte_count); // regiones fijas: contenido nulo
     }
     if (actual_generation)

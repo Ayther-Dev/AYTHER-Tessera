@@ -27,9 +27,11 @@ inline constexpr std::uint32_t kRegionVsram = 4;
 inline constexpr std::uint32_t kRegionParsedSprites = 13;
 inline constexpr std::uint32_t kRegionParsedSpriteCount = 14;
 inline constexpr std::uint32_t kRegionRasterFallback = 16;
+inline constexpr std::uint32_t kRegionAttribution = 17;
 inline constexpr std::uint32_t kRegionSystem = 18;
 inline constexpr std::uint32_t kRegionLineRegs = 19;
 inline constexpr std::uint32_t kRegionLineCram = 20;
+inline constexpr std::uint32_t kRegionLineCells = 21;
 inline constexpr std::uint32_t kRegionRasterJournal = 22;
 inline constexpr std::uint32_t kRegionPalette = 24;
 inline constexpr std::uint32_t kRegionSpriteOutcome = 25;
@@ -85,18 +87,43 @@ inline bool line_state_unavailable(const System &system) noexcept {
   return double_resolution(system) || (system.vdp().reg(11) & 0x04U) != 0;
 }
 
-/// Current byte size of LINE_REGS or LINE_CRAM (what memory_region returns
-/// for them), or 0 for any other region or in Mode 4 (not served there).
+/// True for the per-line regions LINE_REGS, LINE_CRAM and LINE_CELLS.
+constexpr bool line_region(std::uint32_t id) noexcept {
+  return id == kRegionLineRegs || id == kRegionLineCram ||
+         id == kRegionLineCells;
+}
+
+/// Byte size of one entry of a per-line region.
+constexpr std::uint32_t line_entry_size(std::uint32_t id) noexcept {
+  return id == kRegionLineRegs ? 32U : id == kRegionLineCram ? 128U : 264U;
+}
+
+/// Regions whose size varies with the frame (ATTRIBUTION and the per-line
+/// ones), served in Mode 5 only. Their content may legitimately be empty.
+inline bool variable_region(const System &system, std::uint32_t id) noexcept {
+  return (line_region(id) || id == kRegionAttribution) &&
+         !system.vdp().mode4_active();
+}
+
+/// Current byte size of ATTRIBUTION, LINE_REGS, LINE_CRAM or LINE_CELLS (what
+/// memory_region returns for them), or 0 for any other region or in Mode 4
+/// (not served there).
 inline std::uint32_t line_region_size(const System &system,
                                       std::uint32_t id) noexcept {
-  if ((id != kRegionLineRegs && id != kRegionLineCram) ||
-      system.vdp().mode4_active())
+  if (id == kRegionAttribution) {
+    // One byte per pixel of the drawn frame (57344 in H32, 71680 in H40).
+    if (system.vdp().mode4_active() || !system.renderer().attribution_drawn())
+      return 0;
+    const auto size = system.renderer().size();
+    return size.width * size.height;
+  }
+  if (!line_region(id) || system.vdp().mode4_active())
     return 0;
   if (line_state_unavailable(system))
     return 24U;
   const std::uint32_t lines = system.renderer().size().height;
-  if (id == kRegionLineRegs)
-    return 24U + lines * 32U;
+  if (id != kRegionLineCram)
+    return 24U + lines * line_entry_size(id);
   return 24U + (system.vdp().raster().cram_changed ? lines : 1U) * 128U;
 }
 
@@ -113,17 +140,28 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     word_le(at, static_cast<std::uint16_t>(value));
     word_le(at + 2, static_cast<std::uint16_t>(value >> 16));
   };
-  if (id == kRegionLineRegs || id == kRegionLineCram) {
+  if (id == kRegionAttribution) {
+    if (system.vdp().mode4_active())
+      return {}; // Mode 4 is not served (ABI: Mode 5 merge only)
+    const auto &attribution = system.renderer().attribution();
+    out.assign(line_region_size(system, id), 0); // 0 bytes if nothing drawn
+    std::copy_n(attribution.begin(), std::min(attribution.size(), out.size()),
+                out.begin());
+    return out;
+  }
+  if (line_region(id)) {
     // tessera_obs_line_header_v1 then one entry per visible line. LINE_CRAM
     // shrinks to one entry, with flags 1, when the CRAM did not change on a
-    // visible line; LINE_REGS carries the same flag (measured on gpgx,
-    // raster_bands 0 to 33). Sizes vary: 7192 / 28696 bytes at 224 lines.
+    // visible line; LINE_REGS and LINE_CELLS carry the same flag (measured on
+    // gpgx, raster_bands 0 to 33). Sizes vary: 7192 / 28696 bytes at 224
+    // lines (LINE_CELLS 59160).
     if (system.vdp().mode4_active())
       return {};
     const auto &renderer = system.renderer();
     const std::uint32_t lines = renderer.size().height;
     const bool regs = id == kRegionLineRegs;
-    const std::uint32_t entry = regs ? 32U : 128U;
+    const bool cells = id == kRegionLineCells;
+    const std::uint32_t entry = line_entry_size(id);
     if (line_state_unavailable(system)) {
       // The header alone, count 0 and flags 0 (measured on gpgx, modes_sweep
       // 3, 4, 15, 16 and 23 to 27, sprite_limits 220 to 222).
@@ -135,7 +173,7 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
       return out;
     }
     const bool cram_steady = !system.vdp().raster().cram_changed;
-    const std::uint32_t count = regs || !cram_steady ? lines : 1U;
+    const std::uint32_t count = regs || cells || !cram_steady ? lines : 1U;
     out.assign(24U + std::size_t{count} * entry, 0);
     u32_le(0, 24);
     u32_le(4, entry);
@@ -145,7 +183,9 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     u32_le(20, static_cast<std::uint32_t>(system.frame() >> 32));
     for (std::uint32_t y = 0; y < count; ++y) {
       std::uint8_t *at = out.data() + 24U + std::size_t{y} * entry;
-      if (regs) {
+      if (cells) {
+        std::copy_n(renderer.line_cells()[y].begin(), 264, at);
+      } else if (regs) {
         std::copy_n(renderer.line_regs()[y].begin(), 32, at);
       } else {
         if (cram_steady) {

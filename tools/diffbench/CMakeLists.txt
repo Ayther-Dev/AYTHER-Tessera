@@ -223,7 +223,7 @@ if(TESSERA_BUILD_MEGADRIVE)
             "${CMAKE_CURRENT_SOURCE_DIR}/compare_regions.py"
             $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
             "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/raster-bands-7.bin" 8
-            "${CMAKE_CURRENT_BINARY_DIR}/md-raster-bands-7-regions")
+            "${CMAKE_CURRENT_BINARY_DIR}/md-raster-bands-7-regions" --no-attribution)
         set_tests_properties(integration.md_raster-bands-7_regions PROPERTIES
             FIXTURES_REQUIRED md_raster-bands-7_rom
             FAIL_REGULAR_EXPRESSION "differing=[1-9]|different sizes|tool failed"

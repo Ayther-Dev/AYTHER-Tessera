@@ -53,15 +53,28 @@ Regiones 13 (PARSED_SPRITES), 14 (cuenta) y 25 (SPRITE_OUTCOME), activas con `SP
 - Modo 4 no está cubierto: gpgx lo analiza de otra forma y esas escenas no entran en la comparación de estas regiones.
 - Fuera de la suscripción no se analiza nada. Los datos no van en el savestate.
 
-## Estado por línea y diario raster (TP-203.1, TP-204.1, TP-204.3, medido sobre gpgx r4)
+## Estado por línea y diario raster (TP-203.1, TP-204.1–204.3, medido sobre gpgx r4)
 
-Regiones 16 (RASTER_FALLBACK_REASONS), 19 (LINE_REGS), 20 (LINE_CRAM) y 22 (RASTER_JOURNAL), con `RASTER_TRACKING`, `LINE_STATE` y `LINE_CRAM`. Ajustado por caja negra con `raster_bands` 0–33 (escrituras desde la HINT cada 8 líneas o cada línea), byte a byte:
+Regiones 16 (RASTER_FALLBACK_REASONS), 19 (LINE_REGS), 20 (LINE_CRAM), 21 (LINE_CELLS) y 22 (RASTER_JOURNAL), con `RASTER_TRACKING`, `LINE_STATE`, `LINE_CRAM` y `LINE_CELLS`. Ajustado por caja negra con `raster_bands` 0–33 (escrituras desde la HINT cada 8 líneas o cada línea), byte a byte:
 
-- LINE_REGS y LINE_CRAM: cabecera de 24 bytes (tamaño, tamaño de entrada, `count`, `flags`, frame) y una entrada por línea visible. LINE_CRAM se reduce a una entrada con `flags` 1 si ninguna escritura cambió la CRAM en una línea visible. En entrelazado modo 2 y con scroll vertical de 2 celdas solo hay cabecera (`count` 0). El tamaño varía y la consulta de la región informa el vigente.
-- Los campos de LINE_REGS son los del comienzo de la línea, salvo las bases de los planos y de la ventana (vigentes al dibujar). El recorte de ventana se fija al escribir el registro 17 con columnas distintas de 0 y se conserva. Una línea con la pantalla apagada al comenzar y al dibujar conserva la entrada anterior: las tablas viven entre frames.
+- LINE_REGS, LINE_CRAM y LINE_CELLS: cabecera de 24 bytes (tamaño, tamaño de entrada, `count`, `flags`, frame) y una entrada por línea visible. LINE_CRAM se reduce a una entrada con `flags` 1 si ninguna escritura cambió la CRAM en una línea visible. En entrelazado modo 2 y con scroll vertical de 2 celdas solo hay cabecera (`count` 0). El tamaño varía y la consulta de la región informa el vigente.
+- Los campos de LINE_REGS son los del comienzo de la línea, salvo las bases de los planos y de la ventana (vigentes al dibujar). El scroll vertical de A y B conserva 10 bits (Phantasy Star IV escribe 0x738 y la región dice 0x338). El recorte de ventana se fija al escribir el registro 17 con columnas distintas de 0 y se conserva. Una línea con la pantalla apagada al comenzar y al dibujar conserva la entrada anterior: las tablas viven entre frames.
+- LINE_CELLS (TP-204.2, `modes_sweep` 0–31 y `raster_bands` 0–33): por línea, 21 columnas de 2 celdas para los planos A y B y la ventana; cada `uint32` lleva la palabra de la tabla de nombres de la celda izquierda en la mitad baja y la de la derecha en la alta. Los planos empiezan en el par `((-hscroll) & 0x3FF) >> 4` de la fila de celdas `(línea + vscroll) >> 3`; `shift` = `hscroll & 15`; `row` = `((línea + vscroll) & 7) << 3`; columnas = ancho en pares + 1 si `shift` ≠ 0 (el plano B cuenta con el ancho del frame, el A con el de la línea). Una ventana horizontal descuenta sus pares del plano A; a su derecha y con `shift` ≠ 0, la primera columna de A repite la segunda. Una línea cubierta por la ventana vertical deja el plano A vacío. La ventana lista sus pares desde la fila `línea >> 3`, con `row` = `(línea & 7) << 3`. Lo que queda tras cada cuenta vale 0.
 - La altura del frame (224/240) se fija al comienzo del frame (primera línea del blanking) y rige la imagen, el contador de HINT y el diario.
 - RASTER_JOURNAL: hasta 256 eventos `(v_counter, razón, dirección, dato)` de escrituras que cambian un valor y se ven por primera vez en una línea visible. Razón 1 registro (no el 10, el 15 ni los de DMA), 2 CRAM (dirección = índice de entrada), 4 VSRAM, 8 tabla de scroll H. El resto de la VRAM pone 0x40 en RASTER_FALLBACK_REASONS, el cambio de ancho a media pantalla o el entrelazado modo 2 ponen 0x20, el diario lleno 0x80 y suma `dropped`.
 - Modo 4 no tiene estado por línea. Nada de esto va en el savestate.
+
+## Atribución por píxel (TP-204.4, medida sobre gpgx r4)
+
+Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibujado (ancho × alto). Ajustada byte a byte con `raster_bands` 0–33, `modes_sweep` 0–31, `sprite_limits` y `palette_sweep`, y con el corpus.
+
+- Bits 7-6, capa ganadora de los planos: 0 fondo, 1 B, 2 A, 3 ventana (la línea tiene ventana y la columna cae en el recorte del registro 17). Gana la celda de A con prioridad, luego B con prioridad, luego A, luego B; un píxel transparente de ambos planos es fondo.
+- Bit 5, prioridad de la celda ganadora; bits 4-3, su línea de paleta (0 en el fondo).
+- Bits 2-1, sombra (1) solo en píxeles de plano con sombra/brillo activo y ninguna de las dos celdas con prioridad. Tessera nunca marca brillo (2) y ningún caso medido lo presenta en gpgx.
+- Bit 0, sprite: el píxel visible es de un sprite, o un sprite chocó en esa columna sin sombra/brillo activo.
+- Una línea con la pantalla apagada al dibujar pero encendida al comenzar se atribuye con los planos. Las líneas no dibujadas conservan los bytes del frame anterior: la tabla solo se borra al cambiar de tamaño.
+- Hasta que una línea pasa por la mezcla desde el arranque, la consulta informa 0 bytes y la lectura de 0 bytes (con o sin buffer) responde por la suscripción. Modo 4 no tiene atribución (0 bytes).
+- Corpus sin entrada y con la línea de tiempo de cada juego: idéntico salvo dos casos pendientes de decisión del responsable. Phantasy Star IV en el frame 480, 3 píxeles de la línea 91 (x 242–244), A/paleta 1 en gpgx y fondo en Tessera, con imagen idéntica: la escritura de VRAM cae a mitad de línea. VDP FIFO Testing en todos los puntos: el texto de resultados sale con otra paleta porque la máquina ya diverge (framebuffer declarado en `compare_corpus.py`).
 
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.

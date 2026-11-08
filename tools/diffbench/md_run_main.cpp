@@ -1,8 +1,8 @@
 // Runs a ROM on the native Mega Drive machine and writes its work RAM
 // (spec 008, TP-101.9). The differential bench compares that file with the one
 // gpgx produces (`tessera_diffbench --libretro ... --work-ram-out`).
-//   tessera_md_run --rom <file> [--frames N] [--region a|j|u|e|p] --work-ram-out
-//   <file>
+//   tessera_md_run --rom <file> [--frames N] [--region a|j|u|e|p]
+//   --work-ram-out <file>
 #include "md/cart.hpp"
 #include "md/region.hpp"
 #include "md/regions.hpp"
@@ -18,8 +18,8 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string pad_script, rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
-      regs_path, z80_path, poke_spec, audio_path;
+  std::string pad_script, rom_path, out_path, srm_path, frame_path,
+      palette_path, vram_path, regs_path, z80_path, poke_spec, audio_path;
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
   unsigned frames = 600;
@@ -141,7 +141,8 @@ int main(int argc, char **argv) {
     for (auto i = c1 + 1; i < c2; i += 2)
       poke_bytes.push_back(static_cast<std::uint8_t>(
           std::strtoul(poke_spec.substr(i, 2).c_str(), nullptr, 16)));
-    poke_frame = static_cast<unsigned>(std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
+    poke_frame = static_cast<unsigned>(
+        std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
   }
   // Pad script: from frame N (1 = the first) the pads hold the masks. gpgx
   // reads the pads just before the V-int, which is the first line of its
@@ -156,7 +157,8 @@ int main(int argc, char **argv) {
     PadStep step{};
     if (std::sscanf(pad_script.substr(at, end - at).c_str(), "%u:%lx:%lx",
                     &step.frame, &step.mask[0], &step.mask[1]) != 3) {
-      std::fputs("--pad-script: <frame>:<mask1>:<mask2>[,...]' + chr(92) + 'n", stderr);
+      std::fputs("--pad-script: <frame>:<mask1>:<mask2>[,...]' + chr(92) + 'n",
+                 stderr);
       return 2;
     }
     steps.push_back(step);
@@ -164,9 +166,12 @@ int main(int argc, char **argv) {
   }
   std::vector<tessera::md::AudioEvent> events;
   system.set_audio_events(!events_path.empty());
-  for (const auto &out : region_outs)
+  for (const auto &out : region_outs) {
     if (out.first == 13 || out.first == 14 || out.first == 25)
       system.set_sprite_capture(true); // SPRITE_CAPTURE: what the bench reads
+    if (out.first == 17)
+      system.set_attribution(true); // ATTRIBUTION
+  }
   for (unsigned frame = 0; frame < frames; ++frame) {
     // The RESET button before frame N (1 = the first one), as --reset-at does
     // on the libretro side (TP-110.4).
@@ -199,7 +204,8 @@ int main(int argc, char **argv) {
     eo.write(reinterpret_cast<const char *>(events.data()),
              static_cast<std::streamsize>(events.size() * sizeof(events[0])));
     const auto stats = system.audio_transport_stats();
-    std::ofstream so(events_path + ".stats", std::ios::binary | std::ios::trunc);
+    std::ofstream so(events_path + ".stats",
+                     std::ios::binary | std::ios::trunc);
     const std::int32_t status = 0;
     so.write(reinterpret_cast<const char *>(&status), sizeof status);
     so.write(reinterpret_cast<const char *>(&stats), sizeof stats);
@@ -224,20 +230,20 @@ int main(int argc, char **argv) {
   if (!audio_path.empty()) {
     std::ofstream ao(audio_path, std::ios::binary | std::ios::trunc);
     for (const auto &w : system.audio_writes()) {
-      const unsigned char rec[8] = {
-          static_cast<unsigned char>(w.cycle),
-          static_cast<unsigned char>(w.cycle >> 8),
-          static_cast<unsigned char>(w.cycle >> 16),
-          static_cast<unsigned char>(w.cycle >> 24),
-          static_cast<unsigned char>(w.addr),
-          static_cast<unsigned char>(w.addr >> 8),
-          w.data, w.chip};
+      const unsigned char rec[8] = {static_cast<unsigned char>(w.cycle),
+                                    static_cast<unsigned char>(w.cycle >> 8),
+                                    static_cast<unsigned char>(w.cycle >> 16),
+                                    static_cast<unsigned char>(w.cycle >> 24),
+                                    static_cast<unsigned char>(w.addr),
+                                    static_cast<unsigned char>(w.addr >> 8),
+                                    w.data,
+                                    w.chip};
       ao.write(reinterpret_cast<const char *>(rec), 8);
     }
   }
   for (const auto &[id, path] : region_outs) {
     const auto bytes = tessera::md::memory_region(system, id);
-    if (bytes.empty()) {
+    if (bytes.empty() && !tessera::md::variable_region(system, id)) {
       std::fprintf(stderr, "region %u is not a memory region\n", id);
       return 2;
     }

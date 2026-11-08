@@ -51,8 +51,11 @@ public:
     capture_ = {};
     captured_ = {};
     latch_ = {};
-    line_regs_ = {};
-    line_cram_ = {};
+    line_regs_.assign(240, LineRegs{});
+    line_cram_.assign(240, LineCram{});
+    line_cells_.assign(240, LineCells{});
+    attribution_.clear();
+    attribution_drawn_ = false;
   }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
@@ -78,12 +81,16 @@ public:
   /// had (the arrays live across frames, as in the reference). Not in the
   /// savestate.
   using LineRegs = std::array<std::uint8_t, 32>;
-  const std::array<LineRegs, 240> &line_regs() const noexcept {
-    return line_regs_;
-  }
-  const std::array<std::array<std::uint16_t, 64>, 240> &
-  line_cram() const noexcept {
-    return line_cram_;
+  using LineCram = std::array<std::uint16_t, 64>;
+  // The per-line tables live on the heap (about 100 KB): a System is often
+  // built on the stack.
+  const std::vector<LineRegs> &line_regs() const noexcept { return line_regs_; }
+  const std::vector<LineCram> &line_cram() const noexcept { return line_cram_; }
+  /// LINE_CELLS entries (tessera_obs_line_cells_v1, 261 bytes padded to
+  /// 264), filled with LINE_REGS (capture_line_cells). Not in the savestate.
+  using LineCells = std::array<std::uint8_t, 264>;
+  const std::vector<LineCells> &line_cells() const noexcept {
+    return line_cells_;
   }
 
   /// Sprite flags of the lines drawn since the last call (status register bits
@@ -123,6 +130,20 @@ public:
     std::array<std::uint8_t, 80> outcome{};
   };
   void set_sprite_capture(bool on) noexcept { capture_on_ = on; }
+  /// ATTRIBUTION (RF-3.4): one byte per pixel of the drawn frame, filled
+  /// while on (ABI: bits 7-6 layer 0 backdrop / 1 B / 2 A / 3 window, bit 5
+  /// priority of the winning background cell, bits 4-3 palette line, bits
+  /// 2-1 shadow 1 / highlight 2, bit 0 sprite). Not in the savestate.
+  void set_attribution(bool on) noexcept { attribution_on_ = on; }
+  const std::vector<std::uint8_t> &attribution() const noexcept {
+    return attribution_;
+  }
+  /// False until a line went through the merge since power on: gpgx serves
+  /// ATTRIBUTION with 0 bytes until then (measured, Streets of Rage 2 and
+  /// Gunstar Heroes at frame 120, display never on yet); later frames with
+  /// the display off keep the old bytes (Phantasy Star IV 240, Gunstar Heroes
+  /// 3294).
+  bool attribution_drawn() const noexcept { return attribution_drawn_; }
   const SpriteCapture &sprite_capture() const noexcept { return capture_; }
 
   const std::vector<std::uint32_t> &frame() const noexcept { return frame_; }
@@ -138,6 +159,7 @@ private:
     std::uint8_t index = 0; ///< 0..63 CRAM entry; colour 0 of a line is clear
     bool high = false;      ///< priority bit of the tile
     bool opaque = false;    ///< colour index of the tile pixel is not 0
+    bool collided = false;  ///< sprite pixel met by a later opaque sprite
   };
   unsigned hscroll_value(const Vdp &vdp, unsigned plane,
                          std::uint32_t line) const;
@@ -168,6 +190,9 @@ private:
   /// column counts as a collision (measured, sprite_limits 17 to 25).
   std::array<bool, 512> offscreen_{};
   bool capture_on_ = false;
+  bool attribution_on_ = false;
+  bool attribution_drawn_ = false;
+  std::vector<std::uint8_t> attribution_;
   SpriteCapture capture_;
   std::array<bool, 80> captured_{};
   /// Start of line values (latch_line); used only for the line they belong
@@ -188,8 +213,13 @@ private:
                          unsigned index) const noexcept;
   LineLatch latch_;
   void capture_line_state(const Vdp &vdp, std::uint32_t line);
-  std::array<LineRegs, 240> line_regs_{};
-  std::array<std::array<std::uint16_t, 64>, 240> line_cram_{};
+  std::vector<LineRegs> line_regs_ = std::vector<LineRegs>(240);
+  std::vector<LineCram> line_cram_ = std::vector<LineCram>(240);
+  void capture_line_cells(const Vdp &vdp, std::uint32_t line);
+  std::uint8_t attribution_byte(const Pixel &pa, const Pixel &pb, unsigned x,
+                                bool shadow_mode, bool window_line,
+                                bool from_sprite) const noexcept;
+  std::vector<LineCells> line_cells_ = std::vector<LineCells>(240);
 };
 
 } // namespace tessera::md

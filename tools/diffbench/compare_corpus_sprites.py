@@ -11,9 +11,11 @@ next to the manifest) is played too. Golden Axe, Streets of Rage 2 and
 Phantasy Star IV are identical at 5 points each; Sonic 1 and Gunstar Heroes
 have declared exceptions (DECLARED).
 
+With --attribution it compares ATTRIBUTION (17) instead (TP-204.4).
+
 usage: compare_corpus_sprites.py <md_run> <diffbench> <gpgx_core> <manifest>
                                  <corpus_dir> <out_dir> [--entry ID]
-                                 [--checkpoints N] [--timeline]
+                                 [--checkpoints N] [--timeline] [--attribution]
 exit:  0 identical, 1 different, 2 a tool failed or a ROM is missing
 """
 import os
@@ -95,11 +97,14 @@ def main(argv):
     args = argv[1:]
     options = {"--entry": None, "--checkpoints": "5"}
     timeline = False
+    regions, sub_mask = REGIONS, "2"  # SPRITE_CAPTURE
     positional = []
     while args:
         a = args.pop(0)
         if a == "--timeline":
             timeline = True
+        elif a == "--attribution":
+            regions, sub_mask = [(17, "ATTRIBUTION")], "80"  # ATTRIBUTION
         elif a in options:
             options[a] = args.pop(0)
         else:
@@ -136,16 +141,17 @@ def main(argv):
             mine = [md_run, "--rom", rom, "--frames", str(frames),
                     "--work-ram-out", os.path.join(work, "unused.wram"),
                     ] + pad
-            for rid, _ in REGIONS:
+            for rid, _ in regions:
                 mine += ["--region-out", "%d:%s" % (rid, os.path.join(
                     work, "native.%d" % rid))]
             if subprocess.run(mine, capture_output=True).returncode != 0:
                 print("tool failed:", md_run)
                 return 2
-            for rid, name in REGIONS:
+            for rid, name in regions:
                 theirs = [diffbench, "--libretro", core, "--rom", rom,
                           "--frames", str(frames)] + pad + [
-                          "--sub-mask", "2", "--dump-regions", "--region-out",
+                          "--sub-mask", sub_mask, "--dump-regions",
+                          "--region-out",
                           "%d:%s" % (rid, os.path.join(work, "gpgx.%d" % rid))]
                 if subprocess.run(theirs, capture_output=True).returncode \
                         not in (0, 1):

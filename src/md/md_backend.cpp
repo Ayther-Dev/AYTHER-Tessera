@@ -102,6 +102,8 @@ public:
         subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS));
     system_->set_sprite_capture(
         subscriptions_.active(TESSERA_OBS_SUB_SPRITE_CAPTURE));
+    system_->set_attribution(
+        subscriptions_.active(TESSERA_OBS_SUB_ATTRIBUTION));
     system_->run_frame();
     ++frame_;
     capture_output();
@@ -157,7 +159,7 @@ public:
     if (gate != 0 && !subscriptions_.active(gate))
       return TESSERA_NOT_SUBSCRIBED; // idle: no work at all
     const auto content = memory_region(*system_, id);
-    if (content.empty())
+    if (content.empty() && !variable_region(*system_, id))
       return TESSERA_UNSUPPORTED_CAPABILITY; // not served yet (TP-202 onwards)
     if (offset > content.size() || out.size() > content.size() - offset)
       return TESSERA_INVALID_ARGUMENT;
@@ -167,7 +169,8 @@ public:
   }
   [[nodiscard]] std::uint32_t
   region_byte_size(std::uint32_t id) const override {
-    return line_region_size(*system_, id);
+    return variable_region(*system_, id) ? line_region_size(*system_, id)
+                                         : UINT32_MAX;
   }
   [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
                                                std::uint32_t capacity,
