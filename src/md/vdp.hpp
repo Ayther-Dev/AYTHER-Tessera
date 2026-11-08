@@ -74,6 +74,14 @@ public:
   const std::array<std::uint8_t, 0x10000> &vram() const noexcept {
     return vram_;
   }
+  /// The VRAM as it was when the current line started (begin_line_vram):
+  /// what gpgx draws the planes and the window from (measured, raster_bands
+  /// 23 and 32). Copied on the first VRAM write of a line, so a line without
+  /// writes costs nothing.
+  const std::array<std::uint8_t, 0x10000> &vram_at_line_start() const noexcept {
+    return line_vram_written_ ? line_vram_ : vram_;
+  }
+  void begin_line_vram() noexcept { line_vram_written_ = false; }
   const std::array<std::uint16_t, 64> &cram() const noexcept { return cram_; }
   const std::array<std::uint16_t, 40> &vsram() const noexcept { return vsram_; }
   /// CRAM entries 16, 32 and 48 as they were the last time the limited
@@ -88,6 +96,49 @@ public:
   /// flag (measured on gpgx, raster_bands 7 and 15 to 18; rewriting the same
   /// value does not count).
   bool geometry_changed() const noexcept { return geometry_changed_; }
+
+  /// RASTER_JOURNAL and RASTER_FALLBACK_REASONS of the frame (measured on
+  /// gpgx, raster_bands 0 to 33). A write is an event when it changes a value
+  /// and the line it first shows in (the current line + 1) is a visible line:
+  /// reason 1 a register (all but 10, 15 and the DMA ones; address = index),
+  /// 2 a CRAM entry (address = entry index, data = BBBGGGRRR), 4 a VSRAM
+  /// word (byte address), 8 a word of the horizontal scroll table (VRAM
+  /// address). Other VRAM writes leave no event but set 0x40; a change of
+  /// width sets 0x20 and a full journal 0x80. Observation only: not in the
+  /// savestate.
+  struct RasterEvent {
+    std::uint16_t v_counter = 0;
+    std::uint16_t reason = 0;
+    std::uint16_t address = 0;
+    std::uint16_t data = 0;
+  };
+  struct RasterTracking {
+    std::array<RasterEvent, 256> events{};
+    std::uint32_t count = 0;
+    std::uint32_t dropped = 0;
+    std::uint32_t fallback = 0;
+    bool cram_changed = false; ///< a CRAM change on a visible line
+  };
+  const RasterTracking &raster() const noexcept { return raster_; }
+  /// Called at the first line of a frame, before the CPU runs in it: clears
+  /// the raster tracking and fixes the frame's active height. The horizontal
+  /// interrupt counter and the journal keep that height for the whole frame,
+  /// so V30 set in the vertical interrupt does not turn lines 225 to 239 of
+  /// the blanking into active lines (measured, raster_bands 18).
+  void begin_frame_tracking() noexcept {
+    raster_ = {};
+    frame_active_ = active_lines();
+  }
+  /// Window clip of LINE_REGS (first and end 2-cell column): set when
+  /// register 17 is written with a non-zero column count, whatever the line,
+  /// and kept otherwise, so a write in the last line's horizontal interrupt
+  /// shows in the next frame's first lines (measured, raster_bands 30).
+  /// Observation only: not in the savestate.
+  std::array<std::uint8_t, 2> window_clip() const noexcept {
+    return window_clip_;
+  }
+  /// Active height fixed at the start of the frame (224 or 240).
+  std::uint32_t frame_active_lines() const noexcept { return frame_active_; }
   void clear_geometry_changed() noexcept { geometry_changed_ = false; }
 
   // Line a frame starts at in gpgx: the first line of the vertical blanking,
@@ -138,6 +189,22 @@ private:
     return r;
   }();
   std::array<std::uint8_t, 0x10000> vram_{};
+  void touch_vram() {
+    if (!line_vram_written_) {
+      line_vram_ = vram_;
+      line_vram_written_ = true;
+    }
+  }
+  // Not in the savestate: begin_line_vram resets it before any line is drawn.
+  std::array<std::uint8_t, 0x10000> line_vram_{};
+  bool line_vram_written_ = false;
+  RasterTracking raster_;
+  /// The visible line a write made now first shows in, or -1.
+  int raster_line() const noexcept;
+  void journal(std::uint16_t reason, std::uint16_t address,
+               std::uint16_t data) noexcept;
+  void track_vram_write(std::uint32_t address, std::uint16_t before,
+                        std::uint16_t after) noexcept;
   std::array<std::uint16_t, 64> cram_{};
   std::array<std::uint16_t, 40> vsram_{};
   std::array<std::uint16_t, 3> transparent_cram_{};
@@ -148,6 +215,10 @@ private:
   bool pending_second_ = false;
   bool dma_pending_ = false;
   std::uint32_t line_ = 0;
+  // Not in the savestate: set again at every frame start, and from the
+  // registers on load.
+  std::uint32_t frame_active_ = 224;
+  std::array<std::uint8_t, 2> window_clip_{};
   bool vint_flag_ = false;
   bool odd_field_ = false;
   bool sprite_overflow_ = false;

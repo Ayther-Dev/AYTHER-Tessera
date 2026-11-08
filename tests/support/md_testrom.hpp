@@ -2786,6 +2786,69 @@ inline RasterVariant raster_variant(unsigned id) {
   case 18: // V30 in the vertical interrupt, V28 again at line 7
     fill([](unsigned i, unsigned) { return i == 0 ? 0x816CU : 0x8164U; });
     break;
+  // RASTER_JOURNAL: which writes are events?
+  case 19: // auto-increment (register 15)
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8F04U : 0x8F02U; });
+    break;
+  case 20: // DMA length (register 19)
+    fill([](unsigned i, unsigned) { return 0x9300U | (i & 0xFFU); });
+    break;
+  case 21: // sprite table base (register 5): $F800 and $F000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8578U : 0x857CU; });
+    break;
+  case 22: // VRAM outside every table ($A000)
+    v.command = 0x60000002U;
+    fill([](unsigned i, unsigned) { return i * 3U; });
+    break;
+  case 23: // VRAM in the plane A name table ($C000, first entry)
+    v.command = 0x40000003U;
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x0005U : 0x0003U; });
+    break;
+  case 24: // CRAM entry 0 rewritten with the same colour
+    v.command = kCram0;
+    fill([](unsigned, unsigned) { return 0x0222U; });
+    v.post = {0x22BC, 0xC000, 0x0000, 0x30BC, 0x0222};
+    break;
+  case 25: // VSRAM entries 2 and 3 (2-cell columns, unused in full mode)
+    v.command = 0x40040010U;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) { return (i * (w + 2U)) & 0x3FFU; });
+    break;
+  // LINE_REGS: when is each derived field taken?
+  case 26: // plane B name table (register 4): $E000 and $8000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8404U : 0x8407U; });
+    break;
+  case 27: // horizontal scroll table (register 13): $FC00 and $F400
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8D3DU : 0x8D3FU; });
+    break;
+  case 28: // window name table (register 3): $F000 and $B000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x832CU : 0x833CU; });
+    break;
+  case 29: // plane size (register 16): 64x32 and 32x32
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x9000U : 0x9001U; });
+    break;
+  case 30: // window columns (register 17): none, 10 cells left, 6 right
+    fill([](unsigned i, unsigned) {
+      return i % 3U == 0 ? 0x9100U : i % 3U == 1 ? 0x9105U : 0x9183U;
+    });
+    break;
+  case 31: // window rows (register 18): none, top 12 rows, bottom from row 20
+    fill([](unsigned i, unsigned) {
+      return i % 3U == 0 ? 0x9200U : i % 3U == 1 ? 0x920CU : 0x9294U;
+    });
+    break;
+  case 33: // CRAM entry 5: the journal address of a CRAM write
+    v.command = 0xC00A0000U;
+    fill(
+        [](unsigned i, unsigned) { return (i * 0x0246U + 0x0420U) & 0x0EEEU; });
+    break;
+  case 32: // pattern data: row 7 of tiles 1 to 4 (VRAM $003C, $005C, ...)
+    v.command = 0x403C0000U;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (i & 1U) ? (w ? 0x2345U : 0x6789U) : (w ? 0xABCDU : 0xEF12U);
+    });
+    break;
   default:
     fill([&](unsigned i, unsigned) { return colour(i); });
     v.command = kCram0;
@@ -2796,7 +2859,7 @@ inline RasterVariant raster_variant(unsigned id) {
 
 /// Number of `raster_bands` variants; mirrored in
 /// tools/diffbench/CMakeLists.txt.
-inline unsigned raster_variant_count() { return 19; }
+inline unsigned raster_variant_count() { return 34; }
 
 inline std::vector<std::uint8_t> raster_bands_rom(const RasterVariant &v) {
   std::vector<std::uint16_t> c = {

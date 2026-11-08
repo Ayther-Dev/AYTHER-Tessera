@@ -196,12 +196,14 @@ void System::run_frame() {
       // first line on (measured, raster_bands 18: a change before line 0
       // still sets it).
       vdp_.clear_geometry_changed();
+      vdp_.begin_frame_tracking();
     }
     if (line == 0)
       renderer_.begin_frame(vdp_);
     if (line == 0)
       vdp_.set_odd_field(renderer_.field() == 1);
     renderer_.latch_line(vdp_, line);
+    vdp_.begin_line_vram();
     if (index == 0 && frame_ != 0) {
       // The vertical interrupt comes vint_cycle cycles after the frame start
       // (gpgx), so a horizontal interrupt of that same line is served first.

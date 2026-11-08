@@ -98,6 +98,11 @@ std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept {
 
 void Renderer::begin_frame(const Vdp &vdp) {
   size_ = frame_size(vdp);
+  // The width is the one at line 0, the height the one fixed at the start of
+  // the frame (the vertical blanking): V30 set in the vertical interrupt
+  // leaves a 224-line picture (measured, raster_bands 16 and 18).
+  if (!vdp.mode4_active())
+    size_.height = vdp.frame_active_lines();
   field_ ^= 1U;
   double_res_ = (vdp.reg(12) & 0x06U) == 0x06U;
   frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
@@ -228,7 +233,7 @@ unsigned Renderer::hscroll_value(const Vdp &vdp, unsigned plane,
 void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
                           std::span<Pixel> out) const {
   const unsigned columns = static_cast<unsigned>(out.size()) / 8U;
-  const std::uint8_t size_reg = vdp.reg(16);
+  const std::uint8_t size_reg = start_reg(vdp, line, 16);
   const unsigned cells_x = (size_reg & 3U) == 0   ? 32U
                            : (size_reg & 3U) == 1 ? 64U
                                                   : 128U;
@@ -238,12 +243,16 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
   const std::uint32_t table = plane == 0
                                   ? (std::uint32_t{vdp.reg(2) & 0x38U} << 10)
                                   : (std::uint32_t{vdp.reg(4) & 0x07U} << 13);
-  const auto &vram = vdp.vram();
+  // The VRAM at the line start when the line was latched (System), else the
+  // live one (a renderer driven alone, as in the unit tests).
+  const auto &vram =
+      latch_.line == line ? vdp.vram_at_line_start() : vdp.vram();
   const bool latched = latch_.line == line;
   const unsigned hscroll =
       latched ? latch_.hscroll[plane] : hscroll_value(vdp, plane, line);
   const auto &vsram = latched ? latch_.vsram : vdp.vsram();
-  const bool two_cell_v = (vdp.reg(11) & 0x04U) != 0;
+  const bool two_cell_v = (start_reg(vdp, line, 11) & 0x04U) != 0;
+  const std::uint8_t reg17 = start_reg(vdp, line, 17);
   const unsigned pixels_x = cells_x * 8U;
   const unsigned cell_h = double_res_ ? 16U : 8U;
   const unsigned pixels_y = cells_y * cell_h;
@@ -269,9 +278,8 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
     // Left window: for the first (hscroll & 15) pixels after the boundary
     // plane A shows the tiles two columns on (measured on gpgx).
     unsigned skew = 0;
-    if (plane == 0 && (vdp.reg(17) & 0x80U) == 0 &&
-        (vdp.reg(17) & 0x1FU) != 0) {
-      const unsigned edge = (vdp.reg(17) & 0x1FU) * 16U;
+    if (plane == 0 && (reg17 & 0x80U) == 0 && (reg17 & 0x1FU) != 0) {
+      const unsigned edge = (reg17 & 0x1FU) * 16U;
       if (x >= edge && x < edge + (hscroll & 15U))
         skew = 16U;
     }
@@ -307,15 +315,20 @@ void Renderer::window_line(const Vdp &vdp, std::uint32_t line,
                            std::span<Pixel> a) const {
   const unsigned columns = static_cast<unsigned>(a.size()) / 8U;
   const bool h40 = columns == 40U;
-  const unsigned h_bound = (vdp.reg(17) & 0x1FU) * 2U; // in cells
-  const bool h_right = (vdp.reg(17) & 0x80U) != 0;
-  const unsigned v_bound = (vdp.reg(18) & 0x1FU) * 8U; // in lines
-  const bool v_below = (vdp.reg(18) & 0x80U) != 0;
+  const std::uint8_t reg17 = start_reg(vdp, line, 17);
+  const std::uint8_t reg18 = start_reg(vdp, line, 18);
+  const unsigned h_bound = (reg17 & 0x1FU) * 2U; // in cells
+  const bool h_right = (reg17 & 0x80U) != 0;
+  const unsigned v_bound = (reg18 & 0x1FU) * 8U; // in lines
+  const bool v_below = (reg18 & 0x80U) != 0;
   const bool v_covers = v_below ? line >= v_bound : line < v_bound;
   const std::uint32_t table = std::uint32_t{vdp.reg(3) & (h40 ? 0x3CU : 0x3EU)}
                               << 10;
   const unsigned stride = h40 ? 64U : 32U;
-  const auto &vram = vdp.vram();
+  // The VRAM at the line start when the line was latched (System), else the
+  // live one (a renderer driven alone, as in the unit tests).
+  const auto &vram =
+      latch_.line == line ? vdp.vram_at_line_start() : vdp.vram();
   for (unsigned x = 0; x < columns * 8U; ++x) {
     const unsigned column = x / 8U;
     const bool h_covers = h_right ? column >= h_bound : column < h_bound;
@@ -559,6 +572,77 @@ void Renderer::latch_line(const Vdp &vdp, std::uint32_t line) {
   latch_.hscroll = {hscroll_value(vdp, 0, line), hscroll_value(vdp, 1, line)};
   latch_.vsram = vdp.vsram();
   latch_.shadow = (vdp.reg(12) & 0x08U) != 0;
+  for (unsigned i = 0; i < latch_.regs.size(); ++i)
+    latch_.regs[i] = vdp.reg(i);
+  latch_.cram = vdp.cram();
+  latch_.window_clip = vdp.window_clip();
+}
+
+void Renderer::capture_line_state(const Vdp &vdp, std::uint32_t line) {
+  if (line >= line_regs_.size() || latch_.line != line)
+    return;
+  const auto &r = latch_.regs;
+  // A line is captured when the display is on at its start or when it is
+  // drawn: a write in its horizontal interrupt that turns the display off
+  // (line 7) or on (line 15) still leaves an entry, with register 1 as it
+  // was while on (measured, raster_bands 5). Otherwise the entry keeps what
+  // it had.
+  const bool on_at_start = (r[1] & 0x40U) != 0;
+  if (!on_at_start && (vdp.reg(1) & 0x40U) == 0)
+    return;
+  const bool h40 = (r[12] & 0x81U) != 0;
+  // Plane A clip in 2-cell units from register 17 at the line start
+  // (raster_bands 30, 31).
+  const std::uint8_t width = h40 ? 20U : 16U;
+  const std::uint8_t split =
+      static_cast<std::uint8_t>(std::min<unsigned>(r[17] & 0x1FU, width));
+  std::uint8_t a_start = 0, a_end = width, flags = 0;
+  if ((r[17] & 0x1FU) != 0) {
+    flags = 1;
+    if ((r[17] & 0x80U) != 0) // window on the right
+      a_end = split;
+    else
+      a_start = split;
+  }
+  const auto clip_w = latch_.window_clip;
+  LineRegs &e = line_regs_[line];
+  const auto put16 = [&](std::size_t at, std::uint32_t value) {
+    e[at] = static_cast<std::uint8_t>(value);
+    e[at + 1] = static_cast<std::uint8_t>(value >> 8);
+  };
+  put16(0, latch_.hscroll[0]);
+  put16(2, latch_.hscroll[1]);
+  put16(4, latch_.vsram[0]);
+  put16(6, latch_.vsram[1]);
+  put16(8, std::uint32_t{vdp.reg(2) & 0x38U} << 10);
+  put16(10, std::uint32_t{vdp.reg(4) & 0x07U} << 13);
+  put16(12, std::uint32_t{vdp.reg(3) & (h40 ? 0x3CU : 0x3EU)} << 10);
+  put16(14, std::uint32_t{r[13] & 0x3FU} << 10);
+  put16(16, std::uint32_t{r[5] & (h40 ? 0x7EU : 0x7FU)} << 9);
+  e[18] = on_at_start ? r[1] : vdp.reg(1);
+  e[19] = r[7];
+  e[20] = r[11];
+  e[21] = r[12];
+  e[22] = r[13];
+  e[23] = r[16];
+  e[24] = r[17];
+  e[25] = r[18];
+  e[26] = a_start;
+  e[27] = a_end;
+  e[28] = clip_w[0];
+  e[29] = clip_w[1];
+  e[30] = flags;
+  e[31] = 0;
+  for (unsigned i = 0; i < 64U; ++i) {
+    const std::uint16_t c = latch_.cram[i];
+    line_cram_[line][i] = static_cast<std::uint16_t>(
+        ((c >> 9 & 7U) << 6) | ((c >> 5 & 7U) << 3) | (c >> 1 & 7U));
+  }
+}
+
+std::uint8_t Renderer::start_reg(const Vdp &vdp, std::uint32_t line,
+                                 unsigned index) const noexcept {
+  return latch_.line == line ? latch_.regs[index & 31U] : vdp.reg(index);
 }
 
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
@@ -569,6 +653,7 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
     render_line_m4(vdp, line);
     return;
   }
+  capture_line_state(vdp, line);
   // Register 0 bit 2 clear (limited palette): gpgx keeps only the lowest bit
   // of each 3-bit channel (color_update_m5, data &= 0x49).
   const bool limited = (vdp.reg(0) & 0x04U) == 0;

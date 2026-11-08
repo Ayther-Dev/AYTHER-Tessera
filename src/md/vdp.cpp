@@ -1,5 +1,7 @@
 #include "md/vdp.hpp"
 
+#include <algorithm>
+
 namespace tessera::md {
 
 std::uint32_t Vdp::active_lines() const noexcept {
@@ -38,8 +40,27 @@ void Vdp::write_control(std::uint16_t value) {
         static_cast<std::uint8_t>((regs_[0] & 0x04U) | (regs_[12] & 0x08U));
     const std::uint8_t geometry_before =
         static_cast<std::uint8_t>((regs_[12] & 0x81U) | (regs_[1] & 0x08U));
-    if (index <= 10 || (regs_[1] & 0x04U) != 0)
+    const std::uint8_t old_value = regs_[index];
+    if (index <= 10 || (regs_[1] & 0x04U) != 0) {
       regs_[index] = static_cast<std::uint8_t>(value);
+      // Not events: the line counter (10), the auto-increment (15) and the
+      // DMA registers (19 and up) (measured, raster_bands 11, 19, 20).
+      if (regs_[index] != old_value && index != 10 && index != 15 &&
+          index < 19) {
+        journal(1, static_cast<std::uint16_t>(index), regs_[index]);
+        if (index == 12 && ((old_value ^ regs_[index]) & 0x81U) != 0 &&
+            raster_line() >= 0)
+          raster_.fallback |= 0x20U; // width change
+      }
+      if (index == 17 && (regs_[17] & 0x1FU) != 0) {
+        const std::uint8_t width = (regs_[12] & 0x81U) != 0 ? 20U : 16U;
+        const auto split = static_cast<std::uint8_t>(
+            std::min<unsigned>(regs_[17] & 0x1FU, width));
+        window_clip_ = (regs_[17] & 0x80U) != 0
+                           ? std::array<std::uint8_t, 2>{split, width}
+                           : std::array<std::uint8_t, 2>{0, split};
+      }
+    }
     if (((regs_[12] & 0x81U) | (regs_[1] & 0x08U)) != geometry_before)
       geometry_changed_ = true;
     if (((regs_[0] & 0x04U) | (regs_[12] & 0x08U)) != palette_bits_before) {
@@ -51,6 +72,7 @@ void Vdp::write_control(std::uint16_t value) {
     if (was_mode4 && !mode4()) {
       // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
       // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
+      touch_vram();
       std::array<std::uint8_t, 0x10000> spread{};
       for (unsigned w = 0; w < 0x2000U; ++w) {
         spread[w * 4U] = vram_[w * 2U];
@@ -88,6 +110,7 @@ void Vdp::put(std::uint16_t value) {
     // Mode 4 VRAM write (gpgx vdp_68k_data_w_m4): the word goes to the even
     // address, byte swapped when the address is odd, and the address steps by
     // register 15 + 1.
+    touch_vram();
     const std::uint32_t a = address_ & 0x3FFFU;
     const std::uint32_t index = a & 0x3FFEU;
     const auto word = static_cast<std::uint16_t>(
@@ -100,7 +123,11 @@ void Vdp::put(std::uint16_t value) {
     return;
   }
   switch (code_ & 0x0FU) {
-  case 1:                       // VRAM write
+  case 1: { // VRAM write
+    touch_vram();
+    const std::uint32_t word_at = address_ & 0xFFFEU;
+    const auto before = static_cast<std::uint16_t>(
+        (std::uint32_t{vram_[word_at]} << 8) | vram_[word_at + 1U]);
     if ((address_ & 1U) != 0) { // odd address: bytes swapped
       vram_[address_] = static_cast<std::uint8_t>(value >> 8);
       vram_[address_ ^ 1U] = static_cast<std::uint8_t>(value);
@@ -108,18 +135,77 @@ void Vdp::put(std::uint16_t value) {
       vram_[address_] = static_cast<std::uint8_t>(value >> 8);
       vram_[address_ + 1U] = static_cast<std::uint8_t>(value);
     }
+    track_vram_write(
+        word_at, before,
+        static_cast<std::uint16_t>((std::uint32_t{vram_[word_at]} << 8) |
+                                   vram_[word_at + 1U]));
     break;
-  case 3:
-    cram_[(address_ >> 1) & 0x3FU] = value & 0x0EEEU;
+  }
+  case 3: {
+    auto &entry = cram_[(address_ >> 1) & 0x3FU];
+    const auto colour = static_cast<std::uint16_t>(value & 0x0EEEU);
+    if (entry != colour) {
+      entry = colour;
+      const auto packed = static_cast<std::uint16_t>(((colour >> 9 & 7U) << 6) |
+                                                     ((colour >> 5 & 7U) << 3) |
+                                                     (colour >> 1 & 7U));
+      if (raster_line() >= 0)
+        raster_.cram_changed = true;
+      // The address of a CRAM event is the entry index (raster_bands 33).
+      journal(2, static_cast<std::uint16_t>((address_ >> 1) & 0x3FU), packed);
+    }
     break;
+  }
   case 5:
-    if (((address_ >> 1) & 0x7FU) < vsram_.size())
-      vsram_[(address_ >> 1) & 0x7FU] = value & 0x07FFU;
+    if (((address_ >> 1) & 0x7FU) < vsram_.size()) {
+      auto &entry = vsram_[(address_ >> 1) & 0x7FU];
+      const auto word = static_cast<std::uint16_t>(value & 0x07FFU);
+      if (entry != word) {
+        entry = word;
+        journal(4, static_cast<std::uint16_t>(address_ & 0x7EU), word);
+      }
+    }
     break;
   default:
     break;
   }
   address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
+}
+
+int Vdp::raster_line() const noexcept {
+  const std::uint32_t total = lines_per_frame(standard_);
+  const std::uint32_t v = (line_ + 1U) % total;
+  return v < frame_active_ ? static_cast<int>(v) : -1;
+}
+
+void Vdp::journal(std::uint16_t reason, std::uint16_t address,
+                  std::uint16_t data) noexcept {
+  const int v = raster_line();
+  if (v < 0 || mode4())
+    return;
+  raster_.fallback |= reason;
+  if (raster_.count < raster_.events.size()) {
+    raster_.events[raster_.count++] = {static_cast<std::uint16_t>(v), reason,
+                                       address, data};
+  } else {
+    ++raster_.dropped;
+    raster_.fallback |= 0x80U;
+  }
+}
+
+void Vdp::track_vram_write(std::uint32_t address, std::uint16_t before,
+                           std::uint16_t after) noexcept {
+  if (raster_line() < 0 || mode4())
+    return;
+  // The horizontal scroll table: up to 240 lines of two words (assumed
+  // extent; raster_bands 3 and 10 write its first entry).
+  const std::uint32_t table = std::uint32_t{regs_[13] & 0x3FU} << 10;
+  if (address >= table && address < table + 240U * 4U) {
+    if (before != after)
+      journal(8, static_cast<std::uint16_t>(address), after);
+  } else {
+    raster_.fallback |= 0x40U; // raster_bands 22, 23, 32
+  }
 }
 
 void Vdp::write_data(std::uint16_t value) {
@@ -327,12 +413,18 @@ void Vdp::run_dma(std::uint16_t first_data) {
   if (mode == 2) { // VRAM fill: the data word, then its high byte
     put(first_data);
     const auto byte = static_cast<std::uint8_t>(first_data >> 8);
+    touch_vram();
+    if (length != 0 && raster_line() >= 0)
+      raster_.fallback |= 0x40U;
     for (std::uint32_t i = 0; i < length; ++i) {
       vram_[address_ ^ 1U] = byte;
       address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
     }
   } else { // VRAM copy
     auto from = static_cast<std::uint16_t>(source >> 1);
+    touch_vram();
+    if (length != 0 && raster_line() >= 0)
+      raster_.fallback |= 0x40U;
     for (std::uint32_t i = 0; i < length; ++i) {
       vram_[address_ ^ 1U] = vram_[from ^ 1U];
       ++from;
@@ -449,7 +541,7 @@ void Vdp::begin_line(std::uint32_t line, bool raise_vint) {
     hint_counter_ = regs_[10];
   // The counter runs on the lines 0..active inclusive (gpgx); in the rest of
   // the blanking it is reloaded on every line.
-  if (line <= active_lines()) {
+  if (line <= frame_active_) {
     if (hint_counter_ == 0) {
       hint_flag_ = true;
       hint_counter_ = regs_[10];
@@ -512,6 +604,8 @@ void Vdp::save(StateWriter &w) const {
 void Vdp::load(StateReader &r) {
   r.array(regs_);
   r.array(vram_);
+  line_vram_written_ = false;
+  raster_ = {};
   r.array(cram_);
   r.array(vsram_);
   r.array(transparent_cram_);
@@ -522,6 +616,7 @@ void Vdp::load(StateReader &r) {
   pending_second_ = r.boolean();
   dma_pending_ = r.boolean();
   line_ = r.u32();
+  frame_active_ = active_lines();
   vint_flag_ = r.boolean();
   odd_field_ = r.boolean();
   sprite_overflow_ = r.boolean();

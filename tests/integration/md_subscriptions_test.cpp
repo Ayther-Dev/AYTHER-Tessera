@@ -169,11 +169,13 @@ tessera_status expected_status(int reference) {
          : reference == -9 ? TESSERA_NOT_SUBSCRIBED
                            : reference;
 }
-/// Regions the native machine serves today (TP-201.1/.2 and PALETTE).
+/// Regions the native machine serves today (TP-201.1/.2, PALETTE and the raster
+/// regions of TP-203/204).
 bool served(unsigned region) {
   return region == 1 || region == 2 || region == 3 || region == 4 ||
          region == 13 || region == 14 || region == 18 || region == 24 ||
-         region == 25 || region == 26;
+         region == 25 || region == 26 || region == 16 || region == 19 ||
+         region == 20 || region == 22;
 }
 } // namespace
 

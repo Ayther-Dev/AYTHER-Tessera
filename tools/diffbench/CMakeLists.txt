@@ -203,13 +203,14 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(variant IN LISTS sprite_variants)
             list(APPEND frame_roms sprite-limits-${variant})
         endforeach()
-        # raster_bands (TP-106.4, TP-201.2): writes to the VDP from the
-        # horizontal interrupt, every 8 lines or every line; the list is
-        # raster_variant() in tests/support/md_testrom.hpp. Variant 7 (H32
+        # raster_bands (TP-106.4, TP-201.2, TP-203.1, TP-204.1, TP-204.3):
+        # writes to the VDP from the horizontal interrupt, every 8 lines or
+        # every line; the list is raster_variant() in
+        # tests/support/md_testrom.hpp. Variant 7 (H32
         # and H40 bands) only compares its regions: on its H32 lines gpgx
         # fills columns 256 to 319 with pixels that are not drawn from the
         # scene (open question, see tasks.md TP-106.4).
-        foreach(variant RANGE 0 18)
+        foreach(variant RANGE 0 33)
             if(NOT variant EQUAL 7)
                 list(APPEND frame_roms raster-bands-${variant})
             endif()

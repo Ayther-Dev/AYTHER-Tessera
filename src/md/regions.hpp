@@ -26,7 +26,11 @@ inline constexpr std::uint32_t kRegionVdpRegs = 3;
 inline constexpr std::uint32_t kRegionVsram = 4;
 inline constexpr std::uint32_t kRegionParsedSprites = 13;
 inline constexpr std::uint32_t kRegionParsedSpriteCount = 14;
+inline constexpr std::uint32_t kRegionRasterFallback = 16;
 inline constexpr std::uint32_t kRegionSystem = 18;
+inline constexpr std::uint32_t kRegionLineRegs = 19;
+inline constexpr std::uint32_t kRegionLineCram = 20;
+inline constexpr std::uint32_t kRegionRasterJournal = 22;
 inline constexpr std::uint32_t kRegionPalette = 24;
 inline constexpr std::uint32_t kRegionSpriteOutcome = 25;
 inline constexpr std::uint32_t kRegionZ80Ram = 26;
@@ -48,8 +52,12 @@ constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {
     return 1280;
   case kRegionParsedSpriteCount:
     return 1;
+  case kRegionRasterFallback:
+    return 4;
   case kRegionSystem:
     return 44;
+  case kRegionRasterJournal:
+    return 2064;
   case kRegionSpriteOutcome:
     return 80;
   case kRegionPalette:
@@ -63,6 +71,35 @@ constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {
   }
 }
 
+/// Interlace mode 2 in force (register 12 bits 1 and 2).
+inline bool double_resolution(const System &system) noexcept {
+  return (system.vdp().reg(12) & 0x06U) == 0x06U;
+}
+
+/// gpgx leaves LINE_REGS and LINE_CRAM without entries in double resolution
+/// and with the 2-cell vertical scroll (register 11 bit 2) (measured,
+/// modes_sweep 3, 4, 15, 16, 23 to 27). Taken from the registers in force when
+/// the region is read; a mode switched on and off within one frame is not
+/// measured.
+inline bool line_state_unavailable(const System &system) noexcept {
+  return double_resolution(system) || (system.vdp().reg(11) & 0x04U) != 0;
+}
+
+/// Current byte size of LINE_REGS or LINE_CRAM (what memory_region returns
+/// for them), or 0 for any other region or in Mode 4 (not served there).
+inline std::uint32_t line_region_size(const System &system,
+                                      std::uint32_t id) noexcept {
+  if ((id != kRegionLineRegs && id != kRegionLineCram) ||
+      system.vdp().mode4_active())
+    return 0;
+  if (line_state_unavailable(system))
+    return 24U;
+  const std::uint32_t lines = system.renderer().size().height;
+  if (id == kRegionLineRegs)
+    return 24U + lines * 32U;
+  return 24U + (system.vdp().raster().cram_changed ? lines : 1U) * 128U;
+}
+
 /// Whole content of a memory region as the contract lays it out. Empty for an
 /// id that is not a memory region.
 inline std::vector<std::uint8_t> memory_region(const System &system,
@@ -72,7 +109,88 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     out[at] = static_cast<std::uint8_t>(value);
     out[at + 1] = static_cast<std::uint8_t>(value >> 8);
   };
+  const auto u32_le = [&](std::size_t at, std::uint32_t value) {
+    word_le(at, static_cast<std::uint16_t>(value));
+    word_le(at + 2, static_cast<std::uint16_t>(value >> 16));
+  };
+  if (id == kRegionLineRegs || id == kRegionLineCram) {
+    // tessera_obs_line_header_v1 then one entry per visible line. LINE_CRAM
+    // shrinks to one entry, with flags 1, when the CRAM did not change on a
+    // visible line; LINE_REGS carries the same flag (measured on gpgx,
+    // raster_bands 0 to 33). Sizes vary: 7192 / 28696 bytes at 224 lines.
+    if (system.vdp().mode4_active())
+      return {};
+    const auto &renderer = system.renderer();
+    const std::uint32_t lines = renderer.size().height;
+    const bool regs = id == kRegionLineRegs;
+    const std::uint32_t entry = regs ? 32U : 128U;
+    if (line_state_unavailable(system)) {
+      // The header alone, count 0 and flags 0 (measured on gpgx, modes_sweep
+      // 3, 4, 15, 16 and 23 to 27, sprite_limits 220 to 222).
+      out.assign(24U, 0);
+      u32_le(0, 24);
+      u32_le(4, entry);
+      u32_le(16, static_cast<std::uint32_t>(system.frame()));
+      u32_le(20, static_cast<std::uint32_t>(system.frame() >> 32));
+      return out;
+    }
+    const bool cram_steady = !system.vdp().raster().cram_changed;
+    const std::uint32_t count = regs || !cram_steady ? lines : 1U;
+    out.assign(24U + std::size_t{count} * entry, 0);
+    u32_le(0, 24);
+    u32_le(4, entry);
+    u32_le(8, count);
+    u32_le(12, cram_steady ? 1U : 0U);
+    u32_le(16, static_cast<std::uint32_t>(system.frame()));
+    u32_le(20, static_cast<std::uint32_t>(system.frame() >> 32));
+    for (std::uint32_t y = 0; y < count; ++y) {
+      std::uint8_t *at = out.data() + 24U + std::size_t{y} * entry;
+      if (regs) {
+        std::copy_n(renderer.line_regs()[y].begin(), 32, at);
+      } else {
+        if (cram_steady) {
+          // One entry: the CRAM of the whole frame.
+          const auto &live = system.vdp().cram();
+          for (unsigned i = 0; i < 64U; ++i) {
+            const std::uint16_t c = live[i];
+            const auto packed = static_cast<std::uint16_t>(
+                ((c >> 9 & 7U) << 6) | ((c >> 5 & 7U) << 3) | (c >> 1 & 7U));
+            at[2 * i] = static_cast<std::uint8_t>(packed);
+            at[2 * i + 1] = static_cast<std::uint8_t>(packed >> 8);
+          }
+        } else {
+          const auto &cram = renderer.line_cram()[y];
+          for (unsigned i = 0; i < 64U; ++i) {
+            at[2 * i] = static_cast<std::uint8_t>(cram[i]);
+            at[2 * i + 1] = static_cast<std::uint8_t>(cram[i] >> 8);
+          }
+        }
+      }
+    }
+    return out;
+  }
   switch (id) {
+  case kRegionRasterFallback:
+    // 0x20 also stands for a double resolution frame (modes_sweep 23 to 27).
+    u32_le(0, system.vdp().raster().fallback |
+                  (double_resolution(system) ? 0x20U : 0U));
+    break;
+  case kRegionRasterJournal: {
+    // tessera_obs_journal_v1: version, size, count, dropped, 256 events.
+    const auto &raster = system.vdp().raster();
+    u32_le(0, 1);
+    u32_le(4, 2064);
+    u32_le(8, raster.count);
+    u32_le(12, raster.dropped);
+    for (std::uint32_t i = 0; i < raster.count; ++i) {
+      const auto &e = raster.events[i];
+      word_le(16 + 8 * i, e.v_counter);
+      word_le(18 + 8 * i, e.reason);
+      word_le(20 + 8 * i, e.address);
+      word_le(22 + 8 * i, e.data);
+    }
+    break;
+  }
   case kRegionVram: {
     const auto &vram = system.vdp().vram();
     // Mode 4 keeps its data in the layout of the reference buffer (the low

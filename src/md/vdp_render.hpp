@@ -51,6 +51,8 @@ public:
     capture_ = {};
     captured_ = {};
     latch_ = {};
+    line_regs_ = {};
+    line_cram_ = {};
   }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
@@ -60,11 +62,29 @@ public:
   /// Draws `line` (0 based). Lines outside the active display are ignored.
   void render_line(const Vdp &vdp, std::uint32_t line);
   /// Takes what gpgx reads at the start of `line`, before the CPU runs in it:
-  /// the horizontal scroll of both planes, the VSRAM and the shadow/highlight
-  /// bit. A write in that line (its horizontal interrupt) shows from the next
-  /// one; CRAM and the other registers are read when the line is drawn
-  /// (measured, raster_bands 0 to 11).
+  /// the horizontal scroll of both planes, the VSRAM, the shadow/highlight
+  /// bit, the scroll mode, plane size and window registers and (through
+  /// Vdp::vram_at_line_start) the VRAM the planes and the window read. A
+  /// write in that line (its horizontal interrupt) shows from the next one;
+  /// CRAM, the name table bases, the backdrop and display enable are read
+  /// when the line is drawn (measured, raster_bands 0 to 32).
   void latch_line(const Vdp &vdp, std::uint32_t line);
+
+  /// LINE_REGS (tessera_obs_line_regs_v1) and LINE_CRAM entries of each
+  /// line, filled when the line is drawn (measured on gpgx, raster_bands):
+  /// the name table bases are the live ones, every other field the one at
+  /// the start of the line, the window clip included (Vdp::window_clip); a line
+  /// with the display off both at its start and when drawn keeps the entry it
+  /// had (the arrays live across frames, as in the reference). Not in the
+  /// savestate.
+  using LineRegs = std::array<std::uint8_t, 32>;
+  const std::array<LineRegs, 240> &line_regs() const noexcept {
+    return line_regs_;
+  }
+  const std::array<std::array<std::uint16_t, 64>, 240> &
+  line_cram() const noexcept {
+    return line_cram_;
+  }
 
   /// Sprite flags of the lines drawn since the last call (status register bits
   /// 6 overflow and 5 collision); reading clears them.
@@ -157,8 +177,19 @@ private:
     std::array<unsigned, 2> hscroll{};
     std::array<std::uint16_t, 40> vsram{};
     bool shadow = false;
+    std::array<std::uint8_t, 32> regs{};
+    std::array<std::uint16_t, 64> cram{};
+    std::array<std::uint8_t, 2> window_clip{};
   };
+  /// Register `index` as it was at the start of `line` (latch_line), or the
+  /// live one when the line was not latched. The planes and the window take
+  /// registers 11, 16, 17 and 18 from here (measured, raster_bands 29-31).
+  std::uint8_t start_reg(const Vdp &vdp, std::uint32_t line,
+                         unsigned index) const noexcept;
   LineLatch latch_;
+  void capture_line_state(const Vdp &vdp, std::uint32_t line);
+  std::array<LineRegs, 240> line_regs_{};
+  std::array<std::array<std::uint16_t, 64>, 240> line_cram_{};
 };
 
 } // namespace tessera::md

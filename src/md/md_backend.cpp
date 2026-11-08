@@ -165,6 +165,10 @@ public:
     work_ += out.size();
     return TESSERA_OK;
   }
+  [[nodiscard]] std::uint32_t
+  region_byte_size(std::uint32_t id) const override {
+    return line_region_size(*system_, id);
+  }
   [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
                                                std::uint32_t capacity,
                                                std::uint32_t event_size,

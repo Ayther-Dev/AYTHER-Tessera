@@ -53,6 +53,16 @@ Regiones 13 (PARSED_SPRITES), 14 (cuenta) y 25 (SPRITE_OUTCOME), activas con `SP
 - Modo 4 no está cubierto: gpgx lo analiza de otra forma y esas escenas no entran en la comparación de estas regiones.
 - Fuera de la suscripción no se analiza nada. Los datos no van en el savestate.
 
+## Estado por línea y diario raster (TP-203.1, TP-204.1, TP-204.3, medido sobre gpgx r4)
+
+Regiones 16 (RASTER_FALLBACK_REASONS), 19 (LINE_REGS), 20 (LINE_CRAM) y 22 (RASTER_JOURNAL), con `RASTER_TRACKING`, `LINE_STATE` y `LINE_CRAM`. Ajustado por caja negra con `raster_bands` 0–33 (escrituras desde la HINT cada 8 líneas o cada línea), byte a byte:
+
+- LINE_REGS y LINE_CRAM: cabecera de 24 bytes (tamaño, tamaño de entrada, `count`, `flags`, frame) y una entrada por línea visible. LINE_CRAM se reduce a una entrada con `flags` 1 si ninguna escritura cambió la CRAM en una línea visible. En entrelazado modo 2 y con scroll vertical de 2 celdas solo hay cabecera (`count` 0). El tamaño varía y la consulta de la región informa el vigente.
+- Los campos de LINE_REGS son los del comienzo de la línea, salvo las bases de los planos y de la ventana (vigentes al dibujar). El recorte de ventana se fija al escribir el registro 17 con columnas distintas de 0 y se conserva. Una línea con la pantalla apagada al comenzar y al dibujar conserva la entrada anterior: las tablas viven entre frames.
+- La altura del frame (224/240) se fija al comienzo del frame (primera línea del blanking) y rige la imagen, el contador de HINT y el diario.
+- RASTER_JOURNAL: hasta 256 eventos `(v_counter, razón, dirección, dato)` de escrituras que cambian un valor y se ven por primera vez en una línea visible. Razón 1 registro (no el 10, el 15 ni los de DMA), 2 CRAM (dirección = índice de entrada), 4 VSRAM, 8 tabla de scroll H. El resto de la VRAM pone 0x40 en RASTER_FALLBACK_REASONS, el cambio de ancho a media pantalla o el entrelazado modo 2 ponen 0x20, el diario lleno 0x80 y suma `dropped`.
+- Modo 4 no tiene estado por línea. Nada de esto va en el savestate.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

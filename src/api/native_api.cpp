@@ -606,6 +606,13 @@ const observation::RegionRow &region_row(std::uint32_t id) {
   require(id >= 1 && id <= observation::kRegionCount);
   return observation::kRegions[id - 1];
 }
+/// Byte size of the region now: the system's when it varies, else the table's.
+std::uint32_t region_bytes(Session &s, const observation::RegionRow &r) {
+  if (const auto *o = s.machine->observation())
+    if (const auto live = o->region_byte_size(r.id); live != 0)
+      return live;
+  return r.byte_size;
+}
 } // namespace
 extern "C" {
 tessera_status TESSERA_CALL tessera_observation_region_query_v1(
@@ -623,7 +630,9 @@ tessera_status TESSERA_CALL tessera_observation_region_query_v1(
     info.data_version = r.data_version;
     info.element_size = r.element_size;
     info.capacity = r.capacity;
-    info.byte_size = r.byte_size;
+    info.byte_size = region_bytes(*s, r);
+    if (r.element_size == 1)
+      info.capacity = info.byte_size;
     info.access_flags = r.access_flags;
     info.legacy_memory_id = r.legacy_id;
     *out = info;
@@ -637,8 +646,9 @@ tessera_status TESSERA_CALL tessera_observation_region_read_v1(
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
     auto s = observed_session(session);
     const auto &r = region_row(region_id);
-    require(out && (byte_count == 0 || offset < r.byte_size) &&
-            std::uint64_t{offset} + byte_count <= r.byte_size);
+    const std::uint32_t size = region_bytes(*s, r);
+    require(out && (byte_count == 0 || offset < size) &&
+            std::uint64_t{offset} + byte_count <= size);
     require(expected_generation == UINT64_MAX ||
                 expected_generation == s->generation,
             TESSERA_STALE_EPOCH);
