@@ -48,6 +48,8 @@ public:
     field_ = 0;
     double_res_ = false;
     offscreen_ = {};
+    capture_ = {};
+    captured_ = {};
   }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
@@ -68,6 +70,33 @@ public:
     flags_ = {};
     return flags;
   }
+
+  /// Sprites the renderer parsed in the frame being drawn (TP-202.1/.2, regions
+  /// PARSED_SPRITES and SPRITE_OUTCOME). `sprites` keeps the leftovers of
+  /// earlier frames past `count`, as the reference does. It only runs while
+  /// enabled: nobody subscribed means no work. Not part of the savestate.
+  struct ParsedSprite {
+    std::uint16_t yr = 0; ///< y field of the table entry (10 or 11 bits)
+    std::uint16_t xr = 0; ///< x field (9 bits)
+    std::uint16_t attr = 0;
+    std::uint8_t w = 0; ///< cells
+    std::uint8_t h = 0;
+    std::uint8_t sat_idx = 0;
+    std::uint8_t chain_pos = 0;
+  };
+  /// Outcome bits of a slot, accumulated over the frame.
+  static constexpr std::uint8_t kOutcomeParsed = 1;    ///< entered a line list
+  static constexpr std::uint8_t kOutcomeDrawn = 2;     ///< a visible column
+  static constexpr std::uint8_t kOutcomeLineFull = 4;  ///< line limit
+  static constexpr std::uint8_t kOutcomePixelFull = 8; ///< pixel limit reached
+  static constexpr std::uint8_t kOutcomeMasked = 16;   ///< masked by X = 0
+  struct SpriteCapture {
+    std::array<ParsedSprite, 80> sprites{};
+    unsigned count = 0;
+    std::array<std::uint8_t, 80> outcome{};
+  };
+  void set_sprite_capture(bool on) noexcept { capture_on_ = on; }
+  const SpriteCapture &sprite_capture() const noexcept { return capture_; }
 
   const std::vector<std::uint32_t> &frame() const noexcept { return frame_; }
 
@@ -95,6 +124,8 @@ private:
   /// fills `out` (one entry per visible column) with the first opaque pixel
   /// of each column, in list order.
   void sprite_line(const Vdp &vdp, std::uint32_t line, std::span<Pixel> out);
+  /// Parse phase of `line` for the capture (see SpriteCapture).
+  void capture_line(const Vdp &vdp, std::uint32_t line);
   /// Mode 4 (TP-105.10): background, sprites and CRAM of the SMS VDP.
   void render_line_m4(const Vdp &vdp, std::uint32_t line);
   std::vector<std::uint32_t> frame_;
@@ -109,6 +140,9 @@ private:
   /// gpgx never clears them, so a later opaque sprite pixel on the same
   /// column counts as a collision (measured, sprite_limits 17 to 25).
   std::array<bool, 512> offscreen_{};
+  bool capture_on_ = false;
+  SpriteCapture capture_;
+  std::array<bool, 80> captured_{};
 };
 
 } // namespace tessera::md

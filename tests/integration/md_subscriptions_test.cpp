@@ -172,7 +172,8 @@ tessera_status expected_status(int reference) {
 /// Regions the native machine serves today (TP-201.1/.2 and PALETTE).
 bool served(unsigned region) {
   return region == 1 || region == 2 || region == 3 || region == 4 ||
-         region == 18 || region == 24 || region == 26;
+         region == 13 || region == 14 || region == 18 || region == 24 ||
+         region == 25 || region == 26;
 }
 } // namespace
 

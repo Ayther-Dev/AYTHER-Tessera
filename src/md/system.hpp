@@ -162,6 +162,11 @@ public:
     audio_events_on_ = on;
   }
   bool audio_events() const noexcept { return audio_events_on_; }
+  /// The renderer parses the sprites for the PARSED_SPRITES and
+  /// SPRITE_OUTCOME regions only while this is on (SPRITE_CAPTURE).
+  void set_sprite_capture(bool on) noexcept {
+    renderer_.set_sprite_capture(on);
+  }
   std::size_t poll_audio_events(std::span<AudioEvent> out) noexcept {
     return audio_events_ ? audio_events_->poll(out) : 0;
   }

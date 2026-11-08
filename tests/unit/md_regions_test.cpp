@@ -134,3 +134,36 @@ TEST_CASE("SYSTEM describes the machine in the layout of the contract") {
   CHECK(u16(20) == 320);
   CHECK(u16(22) == 240);
 }
+
+TEST_CASE(
+    "parsed sprites: only while captured, and as the reference sees them") {
+  const auto rom =
+      tessera::testrom::sprite_limits_rom(tessera::testrom::sprite_variant(3));
+  const auto run = [&](bool capture) {
+    auto s =
+        std::make_unique<System>(rom, MachineConfig::for_region(Region::usa));
+    s->reset();
+    s->set_sprite_capture(capture);
+    for (unsigned i = 0; i < 8; ++i)
+      s->run_frame();
+    return s;
+  };
+  const auto off = run(false);
+  CHECK(memory_region(*off, kRegionParsedSpriteCount)[0] == 0);
+  CHECK(memory_region(*off, kRegionParsedSprites).size() == 1280);
+
+  const auto on = run(true);
+  // sprite_limits 3 on gpgx r4: 39 of the 40 chained sprites reach a line
+  // (the one at y = -11 never does), sorted by the first line they appear on
+  CHECK(memory_region(*on, kRegionParsedSpriteCount)[0] == 39);
+  const auto sprites = memory_region(*on, kRegionParsedSprites);
+  CHECK(sprites[0] == 0x7A); // yr of the first one (sat 10)
+  CHECK(sprites[8] == 10);   // sat_idx
+  CHECK(sprites[9] == 10);   // chain_pos
+  const auto outcome = memory_region(*on, kRegionSpriteOutcome);
+  CHECK(outcome.size() == 80);
+  CHECK(outcome[14] == 0); // y = -11: never on a line
+  CHECK(outcome[24] == 1); // wholly left of the screen: listed, not drawn
+  CHECK(outcome[0] == 3);  // listed and drawn
+  CHECK(outcome[50] == 0); // not in the chain
+}

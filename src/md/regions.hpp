@@ -24,8 +24,11 @@ inline constexpr std::uint32_t kRegionVram = 1;
 inline constexpr std::uint32_t kRegionCram = 2;
 inline constexpr std::uint32_t kRegionVdpRegs = 3;
 inline constexpr std::uint32_t kRegionVsram = 4;
+inline constexpr std::uint32_t kRegionParsedSprites = 13;
+inline constexpr std::uint32_t kRegionParsedSpriteCount = 14;
 inline constexpr std::uint32_t kRegionSystem = 18;
 inline constexpr std::uint32_t kRegionPalette = 24;
+inline constexpr std::uint32_t kRegionSpriteOutcome = 25;
 inline constexpr std::uint32_t kRegionZ80Ram = 26;
 /// The work RAM has no AYTHER region id: it is the legacy system memory.
 inline constexpr std::uint32_t kRegionWorkRam = 0x1000;
@@ -41,8 +44,14 @@ constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {
     return 32;
   case kRegionVsram:
     return 128;
+  case kRegionParsedSprites:
+    return 1280;
+  case kRegionParsedSpriteCount:
+    return 1;
   case kRegionSystem:
     return 44;
+  case kRegionSpriteOutcome:
+    return 80;
   case kRegionPalette:
     return 512;
   case kRegionZ80Ram:
@@ -96,6 +105,32 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
   case kRegionZ80Ram: {
     const auto ram = system.z80_ram();
     std::copy(ram.begin(), ram.end(), out.begin());
+    break;
+  }
+  case kRegionParsedSprites: {
+    // tessera_obs_sprite_v1 x 128, little endian, 10 bytes each
+    const auto &capture = system.renderer().sprite_capture();
+    // all the slots: past the count they hold what earlier frames left
+    for (unsigned i = 0; i < capture.sprites.size(); ++i) {
+      const auto &s = capture.sprites[i];
+      const std::size_t at = std::size_t{i} * 10U;
+      word_le(at, s.yr);
+      word_le(at + 2, s.xr);
+      word_le(at + 4, s.attr);
+      out[at + 6] = s.w;
+      out[at + 7] = s.h;
+      out[at + 8] = s.sat_idx;
+      out[at + 9] = s.chain_pos;
+    }
+    break;
+  }
+  case kRegionParsedSpriteCount:
+    out[0] =
+        static_cast<std::uint8_t>(system.renderer().sprite_capture().count);
+    break;
+  case kRegionSpriteOutcome: {
+    const auto &outcome = system.renderer().sprite_capture().outcome;
+    std::copy(outcome.begin(), outcome.end(), out.begin());
     break;
   }
   case kRegionPalette: {

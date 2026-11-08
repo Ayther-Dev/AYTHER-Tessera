@@ -217,16 +217,20 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_REQUIRED md_${mode}_rom
                 PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
         endforeach()
-        # TP-201.1: the memory regions (VRAM, CRAM, VDP_REGS, VSRAM, Z80_RAM)
-        # and the work RAM of the same ROMs, byte for byte.
+        # TP-201.1, TP-202: the memory regions (VRAM, CRAM, VDP_REGS, VSRAM,
+        # Z80_RAM, PARSED_SPRITES and SPRITE_OUTCOME) and the work RAM of the
+        # same ROMs, byte for byte.
         foreach(mode IN LISTS frame_roms)
-            if(mode MATCHES "^(palette|modes|mode4)-")
+            if(mode MATCHES "^(palette|modes|mode4|sprite-limits)-")
                 # gpgx answers PAL to palette-sweep-5 although its header says
                 # U (its own choice, not the header rule): the native machine
                 # is told so, to compare the PAL SYSTEM too.
                 set(region_args)
                 if(mode STREQUAL "palette-sweep-5")
                     set(region_args --region e)
+                endif()
+                if(mode MATCHES "^mode4-")
+                    list(APPEND region_args --no-sprites)
                 endif()
                 add_test(NAME integration.md_${mode}_regions COMMAND ${Python3_EXECUTABLE} -I
                     "${CMAKE_CURRENT_SOURCE_DIR}/compare_regions.py"
@@ -394,6 +398,15 @@ if(TESSERA_BUILD_MEGADRIVE)
             "${TESSERA_DIFFBENCH_CORPUS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/md-corpus"
             --planes framebuffer)
         set_tests_properties(integration.md_corpus PROPERTIES
+            PASS_REGULAR_EXPRESSION "result=identical"
+            LABELS "integration;phase1;md;local" TIMEOUT 1800)
+        # TP-202.1/.2: parsed sprites and their outcome in the corpus games.
+        add_test(NAME integration.md_corpus_sprites COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_corpus_sprites.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}"
+            "${TESSERA_DIFFBENCH_CORPUS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/md-corpus-sprites")
+        set_tests_properties(integration.md_corpus_sprites PROPERTIES
             PASS_REGULAR_EXPRESSION "result=identical"
             LABELS "integration;phase1;md;local" TIMEOUT 1800)
         # TP-108.4: PAL flag and lines per frame of every corpus game.

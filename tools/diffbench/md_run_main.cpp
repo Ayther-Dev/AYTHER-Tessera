@@ -164,6 +164,9 @@ int main(int argc, char **argv) {
   }
   std::vector<tessera::md::AudioEvent> events;
   system.set_audio_events(!events_path.empty());
+  for (const auto &out : region_outs)
+    if (out.first == 13 || out.first == 14 || out.first == 25)
+      system.set_sprite_capture(true); // SPRITE_CAPTURE: what the bench reads
   for (unsigned frame = 0; frame < frames; ++frame) {
     // The RESET button before frame N (1 = the first one), as --reset-at does
     // on the libretro side (TP-110.4).

@@ -101,6 +101,104 @@ void Renderer::begin_frame(const Vdp &vdp) {
   field_ ^= 1U;
   double_res_ = (vdp.reg(12) & 0x06U) == 0x06U;
   frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
+  // The entries beyond the count keep what earlier frames left there, as in
+  // the reference (measured: Golden Axe 600); only the count and the outcome
+  // start over.
+  capture_.count = 0;
+  capture_.outcome = {};
+  captured_ = {};
+}
+
+// Measured on gpgx r4 (sprite_limits, 109 scenes, regions 13, 14 and 25): the
+// parse phase lists, per line, the sprites of the chain that cross it, up to
+// the line limit; the pixel budget cuts the list; X = 0 masks what follows a
+// sprite with another X. A sprite is captured on the first line it enters a
+// list, even if the budget or the mask then keep it from drawing.
+void Renderer::capture_line(const Vdp &vdp, std::uint32_t line) {
+  const bool h40 = size_.width == 320U;
+  const unsigned max_frame = h40 ? 80U : 64U;
+  const unsigned max_line = h40 ? 20U : 16U;
+  const unsigned width_px = size_.width;
+  const std::uint32_t table = std::uint32_t{vdp.reg(5) & (h40 ? 0x7EU : 0x7FU)}
+                              << 9;
+  const auto &vram = vdp.vram();
+  const auto byte = [&](std::uint32_t at) { return vram[at & 0xFFFFU]; };
+  const unsigned cell_h = double_res_ ? 16U : 8U;
+  const int scan = static_cast<int>(double_res_ ? line * 2U + field_ : line);
+  struct Listed {
+    unsigned index;
+    int x;
+    unsigned columns;
+  };
+  std::array<Listed, 20> list{};
+  unsigned listed = 0;
+  unsigned pixels = 0;
+  unsigned index = 0;
+  for (unsigned walked = 0; walked < max_frame; ++walked) {
+    const std::uint32_t at = table + index * 8U;
+    const unsigned yr =
+        ((byte(at) << 8) | byte(at + 1U)) & (double_res_ ? 0x7FFU : 0x3FFU);
+    const unsigned size = byte(at + 2U) & 0x0FU;
+    const unsigned link = byte(at + 3U) & 0x7FU;
+    const unsigned rows = (size & 3U) + 1U;
+    const unsigned columns = ((size >> 2) & 3U) + 1U;
+    const int row = scan - (static_cast<int>(yr) - (double_res_ ? 256 : 128));
+    if (row >= 0 && row < static_cast<int>(rows * cell_h)) {
+      std::uint8_t &bits = capture_.outcome[index];
+      if (listed >= max_line) {
+        bits |= kOutcomeLineFull;
+      } else {
+        const unsigned xr = ((byte(at + 6U) << 8) | byte(at + 7U)) & 0x1FFU;
+        if (!captured_[index]) {
+          captured_[index] = true;
+          capture_.sprites[capture_.count++] = {
+              static_cast<std::uint16_t>(yr),
+              static_cast<std::uint16_t>(xr),
+              static_cast<std::uint16_t>((byte(at + 4U) << 8) | byte(at + 5U)),
+              static_cast<std::uint8_t>(columns),
+              static_cast<std::uint8_t>(rows),
+              static_cast<std::uint8_t>(index),
+              static_cast<std::uint8_t>(walked)};
+        }
+        if (pixels >= width_px) {
+          bits |= kOutcomePixelFull;
+        } else {
+          bits |= kOutcomeParsed;
+          list[listed++] = {index, static_cast<int>(xr) - 128, columns};
+          pixels += columns * 8U;
+          if (pixels >= width_px)
+            bits |= kOutcomePixelFull;
+        }
+      }
+    }
+    if (link == 0 || link >= max_frame)
+      break;
+    index = link;
+  }
+  // Draw phase over the list: X = 0 masks the sprites after one with another X.
+  bool seen_x = false;
+  bool masked = false;
+  unsigned used = 0;
+  for (unsigned i = 0; i < listed; ++i) {
+    const Listed &entry = list[i];
+    std::uint8_t &bits = capture_.outcome[entry.index];
+    if (entry.x == -128) {
+      masked = masked || seen_x;
+    } else {
+      seen_x = true;
+    }
+    if (masked) {
+      bits |= kOutcomeMasked;
+      continue;
+    }
+    const unsigned width = entry.columns * 8U;
+    const unsigned drawn =
+        std::min(width, width_px > used ? width_px - used : 0U);
+    used += width;
+    if (drawn > 0 && entry.x + static_cast<int>(width) > 0 &&
+        entry.x < static_cast<int>(width_px))
+      bits |= kOutcomeDrawn;
+  }
 }
 
 unsigned Renderer::hscroll_value(const Vdp &vdp, unsigned plane,
@@ -482,6 +580,8 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
               cram_colour(backdrop_index, Shade::normal));
   } else {
     std::vector<Pixel> a(width), b(width), sp(width);
+    if (capture_on_)
+      capture_line(vdp, line);
     sprite_line(vdp, line, sp);
     plane_line(vdp, 0, line, a);
     plane_line(vdp, 1, line, b);

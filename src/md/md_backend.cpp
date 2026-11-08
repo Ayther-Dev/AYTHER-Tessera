@@ -100,6 +100,8 @@ public:
     subscriptions_.begin_frame();
     system_->set_audio_events(
         subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS));
+    system_->set_sprite_capture(
+        subscriptions_.active(TESSERA_OBS_SUB_SPRITE_CAPTURE));
     system_->run_frame();
     ++frame_;
     capture_output();

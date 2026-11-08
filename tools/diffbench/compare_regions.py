@@ -2,7 +2,8 @@
 
 Runs a ROM on the native machine (tessera_md_run --region-out) and on gpgx
 (tessera_diffbench --dump-regions --region-out) and compares, byte for byte,
-VRAM (1), CRAM (2), VDP_REGS (3), VSRAM (4), SYSTEM (18) and Z80_RAM (26) as the ABI hands
+VRAM (1), CRAM (2), VDP_REGS (3), VSRAM (4), PARSED_SPRITES (13) and its count (14),
+SYSTEM (18), PALETTE (24), SPRITE_OUTCOME (25) and Z80_RAM (26) as the ABI hands
 them out, plus the work RAM (the legacy memory, id 0x1000 here).
 
 usage: compare_regions.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
@@ -13,12 +14,19 @@ import os
 import subprocess
 import sys
 
-REGIONS = [(1, "VRAM"), (2, "CRAM"), (3, "VDP_REGS"), (4, "VSRAM"), (18, "SYSTEM"),
-           (24, "PALETTE"), (26, "Z80_RAM")]
+REGIONS = [(1, "VRAM"), (2, "CRAM"), (3, "VDP_REGS"), (4, "VSRAM"),
+           (13, "PARSED_SPRITES"), (14, "PARSED_SPRITE_COUNT"), (18, "SYSTEM"),
+           (24, "PALETTE"), (25, "SPRITE_OUTCOME"), (26, "Z80_RAM")]
 WORK_RAM = 0x1000
 
 
 def main(argv):
+    global REGIONS
+    if "--no-sprites" in argv:
+        # Mode 4 parses sprites in its own way (TP-105.10 scenes); the Mode 5
+        # model of PARSED_SPRITES / SPRITE_OUTCOME does not cover it.
+        argv = [a for a in argv if a != "--no-sprites"]
+        REGIONS = [r for r in REGIONS if r[0] not in (13, 14, 25)]
     md_run, diffbench, core, rom, frames, out_dir = argv[1:7]
     os.makedirs(out_dir, exist_ok=True)
     native, oracle = {}, {}
@@ -40,7 +48,7 @@ def main(argv):
     # region is smaller than announced: only a missing output file is a failure.
     for rid, _ in REGIONS:
         theirs = [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
-                  "--dump-regions", "--region-out", "%d:%s" % (rid, oracle[rid])]
+                  "--sub-mask", "3", "--dump-regions", "--region-out", "%d:%s" % (rid, oracle[rid])]
         if subprocess.run(theirs, capture_output=True).returncode not in (0, 1):
             print("tool failed:", diffbench)
             return 2

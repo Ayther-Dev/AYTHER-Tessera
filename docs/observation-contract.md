@@ -43,6 +43,16 @@ Medida por caja negra con `tools/diffbench/measure_subscriptions.py`; la matriz 
 - Contador de trabajo (`observation_work`, solo para pruebas y TP-208): bytes que la observación entregó. Sin suscripciones activas y sin lecturas queda en 0.
 - Sin medir: momento exacto de la desactivación a mitad de partida y `activation_frame` tras cargar un savestate.
 
+## Sprites analizados y su resultado (TP-202, medido sobre gpgx r4)
+
+Regiones 13 (PARSED_SPRITES), 14 (cuenta) y 25 (SPRITE_OUTCOME), activas con `SPRITE_CAPTURE`. Modelo ajustado por caja negra sobre las 109 escenas de `sprite_limits` (byte a byte) y comprobado en el arranque de los juegos del corpus hasta el frame 600:
+
+- Por cada línea activa se recorre la cadena de enlaces (64 pasos en H32, 80 en H40). Un sprite que cruza la línea entra en la lista de esa línea si caben menos de 16 (H32) o 20 (H40); si no cabe, su resultado recibe el bit 4 y no se captura por eso.
+- PARSED_SPRITES lista cada sprite una sola vez por frame, en el orden de la primera línea en que entra en una lista y, dentro de la línea, el de la cadena. Entrada de 10 bytes: `yr` (campo Y de la SAT, 10 bits), `xr` (9 bits), `attr`, `w` y `h` en celdas, `sat_idx`, `chain_pos` (paso de la cadena). La cuenta es un byte. Pasada la cuenta, las ranuras conservan lo que dejaron frames anteriores.
+- SPRITE_OUTCOME, un byte por posición de la SAT, acumulado en el frame: 1 entró en una lista; 2 dibujó alguna columna visible; 4 quedó fuera por el límite de la línea; 8 el presupuesto de píxeles (256 o 320) se agotó con él o antes; 16 enmascarado por un sprite con X = 0 anterior. Nunca aparece el bit de supresión (PQ-1).
+- Modo 4 no está cubierto: gpgx lo analiza de otra forma y esas escenas no entran en la comparación de estas regiones.
+- Fuera de la suscripción no se analiza nada. Los datos no van en el savestate.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 
