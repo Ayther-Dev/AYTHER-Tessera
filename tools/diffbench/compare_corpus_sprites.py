@@ -7,9 +7,9 @@ already differ in the picture, see integration.md_corpus), on the native machine
 PARSED_SPRITES (13), its count (14) and SPRITE_OUTCOME (25).
 
 With --timeline the pad timeline of the game (tools/timelines/<id>.timeline
-next to the manifest) is played too. Today the two machines drift apart a
-frame after a button press in Golden Axe (frame 605 of its timeline; found
-while writing this, not diagnosed), so that mode is for investigation only.
+next to the manifest) is played too. Golden Axe, Streets of Rage 2 and
+Phantasy Star IV are identical at 5 points each; Sonic 1 and Gunstar Heroes
+have declared exceptions (DECLARED).
 
 usage: compare_corpus_sprites.py <md_run> <diffbench> <gpgx_core> <manifest>
                                  <corpus_dir> <out_dir> [--entry ID]
@@ -26,6 +26,12 @@ import compare_corpus  # noqa: E402
 REGIONS = [(13, "PARSED_SPRITES"), (14, "PARSED_SPRITE_COUNT"),
            (25, "SPRITE_OUTCOME")]
 FPS = 59.9227
+# Divergences of the --timeline mode declared by the owner (2026-11-07). Cause
+# NOT diagnosed, revisit before G1 closes. Sonic 1: the VRAM already differs
+# from frame 1206 (machine divergence, before the sprites are read). Gunstar
+# Heroes: at frame 4392 only the leftover slots past the count differ.
+DECLARED = {("sonic1-usa-eur", 1807), ("sonic1-usa-eur", 2410),
+            ("sonic1-usa-eur", 3013), ("gunstar-heroes-usa", 4392)}
 # Mega Drive pad order of the bench: up down left right B C A start X Y Z mode
 BUTTONS = {"up": 0, "down": 1, "left": 2, "right": 3, "b": 4, "c": 5, "a": 6,
            "start": 7, "x": 8, "y": 9, "z": 10, "mode": 11}
@@ -151,7 +157,7 @@ def main(argv):
                     b = f.read()
                 if rid == 14 and a[0] > 0:
                     with_sprites += 1
-                if a != b:
+                if a != b and (entry["id"], frames) not in DECLARED:
                     different.append((frames, name))
         print("%s: checkpoints=%d with_sprites=%d divergences=%d" %
               (entry["id"], len(points), with_sprites, len(different)))
