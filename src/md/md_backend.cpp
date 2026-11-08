@@ -172,6 +172,27 @@ public:
     return variable_region(*system_, id) ? line_region_size(*system_, id)
                                          : UINT32_MAX;
   }
+  [[nodiscard]] std::int32_t recompose(std::span<std::uint16_t> out,
+                                       std::uint32_t /*flags*/,
+                                       std::uint32_t &width,
+                                       std::uint32_t &height) override {
+    width = height = 0;
+    if (!subscriptions_.active(TESSERA_OBS_SUB_RECOMPOSITION))
+      return TESSERA_NOT_SUBSCRIBED;
+    FrameSize size;
+    const auto frame = system_->renderer().recompose(system_->vdp(), size);
+    // gpgx refuses interlace mode 2 (AYTHER_STATUS_RC_INTERLACE2) and a
+    // buffer smaller than the frame (RC_INVALID_PARAMS).
+    if (frame.empty())
+      return TESSERA_WRONG_STATE;
+    if (out.size() < frame.size())
+      return TESSERA_INVALID_ARGUMENT;
+    std::transform(frame.begin(), frame.end(), out.begin(), rgba_to_565);
+    width = size.width;
+    height = size.height;
+    work_ += frame.size() * sizeof(std::uint16_t);
+    return TESSERA_OK;
+  }
   [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
                                                std::uint32_t capacity,
                                                std::uint32_t event_size,

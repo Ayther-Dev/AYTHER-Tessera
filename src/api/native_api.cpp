@@ -749,6 +749,29 @@ tessera_status TESSERA_CALL tessera_observation_audio_events_poll_v1(
     return TESSERA_OK;
   });
 }
+tessera_status TESSERA_CALL tessera_observation_recompose_v1(
+    tessera_session session, std::uint16_t *out_pixels,
+    std::uint32_t pixel_capacity, std::uint32_t flags, std::uint32_t *out_width,
+    std::uint32_t *out_height, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out_pixels && out_width && out_height && pixel_capacity != 0 &&
+            std::uint64_t{pixel_capacity} * 2 <= byte_limit);
+    c.range(out_pixels, std::uint64_t{pixel_capacity} * 2,
+            alignof(std::uint16_t));
+    c.range(out_width, sizeof(*out_width), alignof(std::uint32_t));
+    c.range(out_height, sizeof(*out_height), alignof(std::uint32_t));
+    c.start();
+    std::uint32_t width = 0, height = 0;
+    const auto status =
+        o.recompose({out_pixels, pixel_capacity}, flags, width, height);
+    *out_width = width;
+    *out_height = height;
+    require(status == TESSERA_OK, status);
+    return TESSERA_OK;
+  });
+}
 tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
     tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
     std::uint32_t out_size, tessera_context_v1 *ctx) {

@@ -270,6 +270,20 @@ if(TESSERA_BUILD_MEGADRIVE)
                     LABELS "integration;phase1;md;local" TIMEOUT 120)
             endif()
         endforeach()
+        # TP-205.1: recompose_frame after the last frame (status, size and
+        # pixels), raster_bands 7 included: its recomposition is the frame
+        # drawn again from the final state, with no H32 band.
+        foreach(mode IN LISTS frame_roms ITEMS raster-bands-7)
+            add_test(NAME integration.md_${mode}_recompose COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_recompose.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}-recompose")
+            set_tests_properties(integration.md_${mode}_recompose PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                PASS_REGULAR_EXPRESSION "^identical"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region

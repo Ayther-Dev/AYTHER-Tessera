@@ -76,6 +76,16 @@ Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibuja
 - Hasta que una línea pasa por la mezcla desde el arranque, la consulta informa 0 bytes y la lectura de 0 bytes (con o sin buffer) responde por la suscripción. Modo 4 no tiene atribución (0 bytes).
 - Corpus sin entrada y con la línea de tiempo de cada juego: idéntico salvo dos excepciones aprobadas (EXC-005 y EXC-006 de `docs/parity-exceptions.md`). Phantasy Star IV en el frame 480, 3 píxeles de la línea 91 (x 242–244), A/paleta 1 en gpgx y fondo en Tessera, con imagen idéntica: la escritura de VRAM cae a mitad de línea. VDP FIFO Testing en todos los puntos: el texto de resultados sale con otra paleta porque la máquina ya diverge (framebuffer declarado en `compare_corpus.py`).
 
+## Recomposición del frame (TP-205.1, medida sobre gpgx r4)
+
+`tessera_observation_recompose_v1` (en gpgx, `recompose_frame`) vuelve a dibujar el último frame con el estado del VDP al terminarlo, sin cambios raster: cada línea usa los registros, la CRAM, la VSRAM, la tabla de scroll y la VRAM finales. Trabaja sobre copias y no cambia la máquina. Ajustada píxel a píxel con `raster_bands` 0–33, `modes_sweep` 0–31, `palette_sweep` 0–8, `mode4_scene` 1–11 y `sprite_limits`, y con el corpus en 5 puntos (6 ROM idénticas; VDP FIFO Testing hereda la divergencia de máquina ya declarada).
+
+- Necesita la suscripción `RECOMPOSITION` (bit 5), activa desde el frame siguiente a pedirla; sin ella, `TESSERA_NOT_SUBSCRIBED` (gpgx -9).
+- Devuelve RGB565 del tamaño del frame emitido (el ancho de la línea 0 y el alto fijado al comenzar el frame), no del que dicen los registros al final (`raster_bands` 16). Mode 4 se recompone igual.
+- Los `flags` no cambian nada: ningún bit altera el estado ni los píxeles.
+- Entrelazado modo 2: rechazo (gpgx `RC_INTERLACE2`, -21), en Tessera `TESSERA_WRONG_STATE`. Capacidad menor que el frame: rechazo (gpgx `RC_INVALID_PARAMS`, -23), en Tessera `TESSERA_INVALID_ARGUMENT`. Traducción provisional, pendiente del responsable.
+- En el frame en que el ancho pasa de H40 a H32, las columnas 256–319 no coinciden con gpgx: es la misma pregunta abierta de `raster_bands` 7.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

@@ -12,6 +12,7 @@
 
 #include "domain/wire.hpp"
 #include "md/regions.hpp"
+#include "md/vdp_render.hpp"
 #include "session/session.hpp"
 #include "support/md_testrom.hpp"
 #include <tessera/tessera.h>
@@ -284,6 +285,42 @@ TEST_CASE("reading does not change the machine") {
   observed.step(10);
   control.step(10);
   CHECK(observed.checkpoint() == control.checkpoint());
+}
+
+TEST_CASE("recompose_frame draws the last frame again (TP-205.1)") {
+  Observed s(rom_idle());
+  std::vector<std::uint16_t> pixels(320 * 240);
+  std::uint32_t width = 0, height = 0;
+  const auto recompose = [&](std::uint32_t capacity) {
+    return tessera_observation_recompose_v1(s.handle, pixels.data(), capacity,
+                                            0, &width, &height, &s.context);
+  };
+  s.step(3);
+  CHECK(recompose(320 * 240) == TESSERA_NOT_SUBSCRIBED);
+  REQUIRE(s.set(TESSERA_OBS_SUB_RECOMPOSITION) == TESSERA_OK);
+  CHECK(recompose(320 * 240) == TESSERA_NOT_SUBSCRIBED); // from the next frame
+  s.step();
+  const auto before = s.checkpoint();
+  REQUIRE(recompose(320 * 240) == TESSERA_OK);
+  const auto frame = s.original();
+  // A ROM with no raster change recomposes to the frame it emitted.
+  REQUIRE(frame.size() >= std::size_t{width} * height * 4);
+  CHECK(width == 256); // vint_counter is H32
+  CHECK(height == 224);
+  bool same = true;
+  for (std::size_t i = 0; i < std::size_t{width} * height; ++i) {
+    const std::uint32_t c =
+        frame[4 * i] | frame[4 * i + 1] << 8 | frame[4 * i + 2] << 16;
+    same = same && pixels[i] == tessera::md::rgba_to_565(c);
+  }
+  CHECK(same);
+  // A buffer smaller than the frame is refused (gpgx: RC_INVALID_PARAMS) and
+  // nothing changes in the machine.
+  CHECK(recompose(width * height - 1) == TESSERA_INVALID_ARGUMENT);
+  CHECK(tessera_observation_recompose_v1(s.handle, nullptr, 320 * 240, 0,
+                                         &width, &height, &s.context) ==
+        TESSERA_INVALID_ARGUMENT);
+  CHECK(s.checkpoint() == before);
 }
 
 TEST_CASE("the audio event transport only runs while subscribed") {

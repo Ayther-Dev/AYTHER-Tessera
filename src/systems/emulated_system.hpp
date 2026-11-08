@@ -79,6 +79,15 @@ public:
   region_byte_size(std::uint32_t /*id*/) const {
     return UINT32_MAX;
   }
+  /// recompose_frame (TP-205.1): the last frame drawn again from the state
+  /// after it, as RGB565 in `out`; `width` x `height` pixels written.
+  [[nodiscard]] virtual std::int32_t recompose(std::span<std::uint16_t> /*out*/,
+                                               std::uint32_t /*flags*/,
+                                               std::uint32_t &width,
+                                               std::uint32_t &height) {
+    width = height = 0;
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
   /// `event_size` bytes per event; `count` events written (0 if none).
   [[nodiscard]] virtual std::int32_t
   poll_audio_events(std::span<std::uint8_t> out, std::uint32_t capacity,

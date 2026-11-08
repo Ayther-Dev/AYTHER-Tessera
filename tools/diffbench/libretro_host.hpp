@@ -96,6 +96,10 @@ void set_reset_at(unsigned frame);
 /// Drains poll_audio_events after every retro_run and appends the 80 byte
 /// records to `path`; the transport stats go to `path` + ".stats" (TP-107.6).
 void set_audio_events_out(const std::string &path);
+/// After the run, calls recompose_frame with `flags` and writes the status,
+/// the size and the pixels to `path` (TP-205.1).
+void set_recompose_out(const std::string &path, uint32_t flags,
+                       uint32_t capacity);
 /// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
 /// 0 subscribes to nothing, 1 to every region (the full set).
 void set_bench(bool on, int observation);

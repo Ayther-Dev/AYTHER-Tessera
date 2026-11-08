@@ -35,6 +35,13 @@ std::uint16_t colour_to_565(std::uint16_t cram, Shade shade) noexcept;
 std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept;
 std::uint32_t colour_to_rgba(std::uint16_t cram,
                              Shade shade = Shade::normal) noexcept;
+/// Back from a frame pixel to the 565 it was widened from (exact: the
+/// widening replicates bits).
+constexpr std::uint16_t rgba_to_565(std::uint32_t c) noexcept {
+  return static_cast<std::uint16_t>(((c >> 3) & 0x1FU) << 11 |
+                                    ((c >> 10) & 0x3FU) << 5 |
+                                    ((c >> 19) & 0x1FU));
+}
 
 class Renderer {
 public:
@@ -147,6 +154,15 @@ public:
   const SpriteCapture &sprite_capture() const noexcept { return capture_; }
 
   const std::vector<std::uint32_t> &frame() const noexcept { return frame_; }
+  /// recompose_frame (TP-205.1): the last frame drawn again, every line from
+  /// the VDP state as it is now (after the frame), with no raster change. It
+  /// works on copies: neither the machine nor this renderer changes. `size`
+  /// is the size of the picture returned: the emitted frame's. Empty in
+  /// interlace mode 2, which gpgx refuses (measured, modes_sweep 23 to 27).
+  /// The flags of the call change nothing (measured, every bit). On the frame
+  /// where the width goes from H40 to H32, columns 256 to 319 are not the ones
+  /// gpgx returns (the open question of raster_bands 7).
+  std::vector<std::uint32_t> recompose(const Vdp &vdp, FrameSize &size) const;
 
   /// Savestate: what carries from one frame to the next (the frame itself is
   /// drawn again).

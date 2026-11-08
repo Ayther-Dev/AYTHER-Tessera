@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
   unsigned soft_reset_at = 0, hard_reset_at = 0;
   std::string events_path;
   std::vector<std::pair<std::uint32_t, std::string>> region_outs;
+  std::string recompose_path;
   bool print_region = false;
   // a = from the ROM header (default), j, u, e, p = Japan PAL
   tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
@@ -75,6 +76,10 @@ int main(int argc, char **argv) {
       region_outs.emplace_back(
           static_cast<std::uint32_t>(std::strtoul(spec.c_str(), nullptr, 10)),
           spec.substr(colon + 1));
+    } else if (arg == "--recompose-out" && has_value) {
+      // status, width, height (int32, uint32, uint32), then the RGB565 pixels
+      // of recompose_frame, as tessera_diffbench writes them for gpgx
+      recompose_path = argv[++i];
     } else if (arg == "--audio-events-out" && has_value) {
       events_path = argv[++i]; // 80 byte ayther_audio_event_v1 records
     } else if (arg == "--soft-reset-at" && has_value) {
@@ -250,6 +255,21 @@ int main(int argc, char **argv) {
     std::ofstream ro(path, std::ios::binary | std::ios::trunc);
     ro.write(reinterpret_cast<const char *>(bytes.data()),
              static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!recompose_path.empty()) {
+    tessera::md::FrameSize size;
+    const auto frame = system.renderer().recompose(system.vdp(), size);
+    std::vector<std::uint16_t> pixels(frame.size());
+    std::transform(frame.begin(), frame.end(), pixels.begin(),
+                   tessera::md::rgba_to_565);
+    // Tessera statuses: 0 or TESSERA_WRONG_STATE (interlace mode 2)
+    const std::int32_t status = frame.empty() ? -5 : 0;
+    std::ofstream ro(recompose_path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(&status), 4);
+    ro.write(reinterpret_cast<const char *>(&size.width), 4);
+    ro.write(reinterpret_cast<const char *>(&size.height), 4);
+    ro.write(reinterpret_cast<const char *>(pixels.data()),
+             static_cast<std::streamsize>(pixels.size() * 2));
   }
   if (!regs_path.empty()) {
     std::ofstream ro(regs_path, std::ios::binary | std::ios::trunc);

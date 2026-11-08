@@ -231,6 +231,17 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
+  if (args.count("--recompose-out"))
+    diffbench::set_recompose_out(
+        args["--recompose-out"],
+        args.count("--recompose-flags")
+            ? static_cast<uint32_t>(
+                  std::strtoul(args["--recompose-flags"].c_str(), nullptr, 16))
+            : 0u,
+        args.count("--recompose-capacity")
+            ? static_cast<uint32_t>(std::strtoul(
+                  args["--recompose-capacity"].c_str(), nullptr, 10))
+            : 320u * 240u);
   if (args.count("--audio-events-out"))
     diffbench::set_audio_events_out(args["--audio-events-out"]);
   if (args.count("--reset-at"))

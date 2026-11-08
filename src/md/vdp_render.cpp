@@ -947,4 +947,31 @@ void Renderer::load(StateReader &r) {
     b = r.boolean();
 }
 
+std::vector<std::uint32_t> Renderer::recompose(const Vdp &vdp,
+                                               FrameSize &size) const {
+  size = {0, 0};
+  if (!vdp.mode4_active() && (vdp.reg(12) & 0x06U) == 0x06U)
+    return {};
+  Renderer copy = *this;
+  copy.hook_ = {};
+  copy.capture_on_ = false;
+  copy.attribution_on_ = false;
+  Vdp state = vdp;
+  state.begin_line_vram();
+  copy.field_ ^= 1U; // begin_frame turns it back to the field just drawn
+  copy.begin_frame(state);
+  // The size is the emitted frame's, not the one the registers give now
+  // (measured, raster_bands 16: H32 at line 0, H40 from line 7).
+  if (copy.size_.width != size_.width || copy.size_.height != size_.height) {
+    copy.size_ = size_;
+    copy.frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
+  }
+  for (std::uint32_t line = 0; line < copy.size_.height; ++line) {
+    copy.latch_line(state, line);
+    copy.render_line(state, line);
+  }
+  size = copy.size_;
+  return std::move(copy.frame_);
+}
+
 } // namespace tessera::md

@@ -4,6 +4,7 @@
 
 #include "tessera/tessera_observation.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -42,7 +43,8 @@ struct AytherInterface {
   int32_t(__cdecl *write_control)(uint32_t, uint32_t, const void *, uint32_t,
                                   uint64_t, uint64_t *);
   void *capture_snapshot;
-  void *recompose_frame;
+  int32_t(__cdecl *recompose_frame)(uint16_t *, uint32_t, uint32_t, uint32_t *,
+                                    uint32_t *);
   uint32_t audio_event_size, audio_transport_stats_size;
   void *poll_audio_events;
   void *get_audio_transport_stats;
@@ -177,6 +179,15 @@ unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
 static std::string g_audio_events_out;
 void set_audio_events_out(const std::string &path) { g_audio_events_out = path; }
+static std::string g_recompose_out;
+static uint32_t g_recompose_flags = 0;
+static uint32_t g_recompose_capacity = 320u * 240u;
+void set_recompose_out(const std::string &path, uint32_t flags,
+                       uint32_t capacity) {
+  g_recompose_out = path;
+  g_recompose_flags = flags;
+  g_recompose_capacity = capacity;
+}
 static unsigned g_reset_at = 0;
 void set_reset_at(unsigned frame) { g_reset_at = frame; }
 static bool g_bench = false;
@@ -266,7 +277,7 @@ RunResult run_libretro(const std::string &core_path,
     const bool want_iface =
         dump_regions || poke != nullptr || g_bench_observation >= 0 ||
         g_sub_mask >= 0 ||
-        !g_audio_events_out.empty();
+        !g_audio_events_out.empty() || !g_recompose_out.empty();
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -408,6 +419,26 @@ RunResult run_libretro(const std::string &core_path,
         }
         result.regions.push_back(d);
       }
+    }
+    if (!g_recompose_out.empty()) {
+      // TP-205.1: status, width, height (int32, uint32, uint32), then the
+      // width x height RGB565 pixels recompose_frame returned.
+      std::vector<uint16_t> pixels((std::max)(g_recompose_capacity, 1u));
+      int32_t status = -8; // AYTHER_STATUS_UNSUPPORTED: no recompose_frame
+      uint32_t width = 0, height = 0;
+      if (iface && iface->recompose_frame)
+        status = iface->recompose_frame(pixels.data(), g_recompose_capacity,
+                                        g_recompose_flags, &width, &height);
+      std::ofstream out(g_recompose_out, std::ios::binary);
+      out.write(reinterpret_cast<const char *>(&status), 4);
+      out.write(reinterpret_cast<const char *>(&width), 4);
+      out.write(reinterpret_cast<const char *>(&height), 4);
+      if (status == 0)
+        out.write(reinterpret_cast<const char *>(pixels.data()),
+                  static_cast<std::streamsize>(
+                      (std::min<size_t>)(size_t{width} * height,
+                                         pixels.size()) *
+                      2));
     }
     using MemSize = size_t(__cdecl *)(unsigned);
     using MemData = void *(__cdecl *)(unsigned);
