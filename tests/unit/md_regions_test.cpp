@@ -127,12 +127,24 @@ TEST_CASE("SYSTEM describes the machine in the layout of the contract") {
   CHECK(u16(24) == (7670453 & 0xFFFF));
   CHECK(u16(40) + (u16(42) << 16) == rom.size());
 
+  CHECK(sys[35] == 0); // no GEOMETRY_PENDING
+
+  // A size change describes the frame already drawn and raises
+  // GEOMETRY_PENDING; the next frame takes the new size (gpgx, raster_bands).
   s->write16(0xC00004, 0x8C81); // register 12: H40
   s->write16(0xC00004, 0x817C); // register 1: V30 (bit 3)
+  sys = memory_region(*s, kRegionSystem);
+  CHECK(sys[12] == 0);
+  CHECK(u16(20) == 256);
+  CHECK(u16(22) == 224);
+  CHECK(sys[35] == 1);
+  s->run_frame();
+  s->run_frame();
   sys = memory_region(*s, kRegionSystem);
   CHECK(sys[12] == 1);
   CHECK(u16(20) == 320);
   CHECK(u16(22) == 240);
+  CHECK(sys[35] == 0);
 }
 
 TEST_CASE(

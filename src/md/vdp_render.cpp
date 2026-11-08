@@ -85,7 +85,7 @@ std::array<std::uint16_t, 256> palette_565(const Vdp &vdp) noexcept {
     if (i == 0)
       value = vdp.cram()[vdp.reg(7) & 0x3FU];
     else if ((i & 15U) == 0)
-      value = 0;
+      value = vdp.transparent_cram()[i / 16U - 1U];
     if (limited)
       value &= 0x0222U;
     table[64U + i] = colour_to_565(value, Shade::normal);
@@ -239,7 +239,10 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
                                   ? (std::uint32_t{vdp.reg(2) & 0x38U} << 10)
                                   : (std::uint32_t{vdp.reg(4) & 0x07U} << 13);
   const auto &vram = vdp.vram();
-  const unsigned hscroll = hscroll_value(vdp, plane, line);
+  const bool latched = latch_.line == line;
+  const unsigned hscroll =
+      latched ? latch_.hscroll[plane] : hscroll_value(vdp, plane, line);
+  const auto &vsram = latched ? latch_.vsram : vdp.vsram();
   const bool two_cell_v = (vdp.reg(11) & 0x04U) != 0;
   const unsigned pixels_x = cells_x * 8U;
   const unsigned cell_h = double_res_ ? 16U : 8U;
@@ -253,15 +256,15 @@ void Renderer::plane_line(const Vdp &vdp, unsigned plane, std::uint32_t line,
     const unsigned phase = hscroll & 15U;
     unsigned vscroll = 0;
     if (!two_cell_v) {
-      vscroll = vdp.vsram()[plane] & vmask;
+      vscroll = vsram[plane] & vmask;
     } else {
       // The partial band left of the first edge scrolls by 0 in H32 and by
       // the AND of the last pair in H40 (measured).
       const int pair = static_cast<int>((x + 16U - phase) / 16U) - 1;
       if (pair >= 0 && pair < 20)
-        vscroll = vdp.vsram()[static_cast<unsigned>(pair) * 2U + plane] & vmask;
+        vscroll = vsram[static_cast<unsigned>(pair) * 2U + plane] & vmask;
       else if (pair < 0 && columns == 40U)
-        vscroll = (vdp.vsram()[38] & vdp.vsram()[39]) & vmask;
+        vscroll = (vsram[38] & vsram[39]) & vmask;
     }
     // Left window: for the first (hscroll & 15) pixels after the boundary
     // plane A shows the tiles two columns on (measured on gpgx).
@@ -551,6 +554,13 @@ void Renderer::render_line_m4(const Vdp &vdp, std::uint32_t line) {
     hook_(line, row);
 }
 
+void Renderer::latch_line(const Vdp &vdp, std::uint32_t line) {
+  latch_.line = line;
+  latch_.hscroll = {hscroll_value(vdp, 0, line), hscroll_value(vdp, 1, line)};
+  latch_.vsram = vdp.vsram();
+  latch_.shadow = (vdp.reg(12) & 0x08U) != 0;
+}
+
 void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (line >= size_.height ||
       frame_.size() < std::size_t{size_.width} * size_.height)
@@ -569,7 +579,8 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       value &= 0x0222U;
     return colour_to_rgba(value, shade);
   };
-  const bool shadow_mode = (vdp.reg(12) & 0x08U) != 0;
+  const bool shadow_mode =
+      latch_.line == line ? latch_.shadow : (vdp.reg(12) & 0x08U) != 0;
   const unsigned width = size_.width;
   const auto row = std::span<std::uint32_t>(frame_).subspan(
       std::size_t{line} * width, width);

@@ -203,6 +203,31 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(variant IN LISTS sprite_variants)
             list(APPEND frame_roms sprite-limits-${variant})
         endforeach()
+        # raster_bands (TP-106.4, TP-201.2): writes to the VDP from the
+        # horizontal interrupt, every 8 lines or every line; the list is
+        # raster_variant() in tests/support/md_testrom.hpp. Variant 7 (H32
+        # and H40 bands) only compares its regions: on its H32 lines gpgx
+        # fills columns 256 to 319 with pixels that are not drawn from the
+        # scene (open question, see tasks.md TP-106.4).
+        foreach(variant RANGE 0 18)
+            if(NOT variant EQUAL 7)
+                list(APPEND frame_roms raster-bands-${variant})
+            endif()
+        endforeach()
+        add_test(NAME integration.md_raster-bands-7_rom COMMAND tessera_md_testrom
+            raster-bands-7 "${CMAKE_CURRENT_BINARY_DIR}/raster-bands-7.bin")
+        set_tests_properties(integration.md_raster-bands-7_rom PROPERTIES
+            FIXTURES_SETUP md_raster-bands-7_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+        add_test(NAME integration.md_raster-bands-7_regions COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_regions.py"
+            $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/raster-bands-7.bin" 8
+            "${CMAKE_CURRENT_BINARY_DIR}/md-raster-bands-7-regions")
+        set_tests_properties(integration.md_raster-bands-7_regions PROPERTIES
+            FIXTURES_REQUIRED md_raster-bands-7_rom
+            FAIL_REGULAR_EXPRESSION "differing=[1-9]|different sizes|tool failed"
+            PASS_REGULAR_EXPRESSION "WORK_RAM bytes=65536 differing=0"
+            LABELS "integration;phase1;md;local" TIMEOUT 120)
         foreach(mode IN LISTS frame_roms)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
                 "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
@@ -221,7 +246,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # Z80_RAM, PARSED_SPRITES and SPRITE_OUTCOME) and the work RAM of the
         # same ROMs, byte for byte.
         foreach(mode IN LISTS frame_roms)
-            if(mode MATCHES "^(palette|modes|mode4|sprite-limits)-")
+            if(mode MATCHES "^(palette|modes|mode4|sprite-limits|raster-bands)-")
                 # gpgx answers PAL to palette-sweep-5 although its header says
                 # U (its own choice, not the header rule): the native machine
                 # is told so, to compare the PAL SYSTEM too.

@@ -70,6 +70,9 @@ int main(int argc, char **argv) {
   else if (std::strncmp(argv[1], "sprite-limits-", 14) == 0)
     rom = tessera::testrom::sprite_limits_rom(tessera::testrom::sprite_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10))));
+  else if (std::strncmp(argv[1], "raster-bands-", 13) == 0)
+    rom = tessera::testrom::raster_bands_rom(tessera::testrom::raster_variant(
+        static_cast<unsigned>(std::strtoul(argv[1] + 13, nullptr, 10))));
   else if (std::strncmp(argv[1], "mode4-scene-", 12) == 0) {
     rom = tessera::testrom::mode4_scene_rom(tessera::testrom::mode4_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));

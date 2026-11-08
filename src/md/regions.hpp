@@ -146,8 +146,11 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     const bool pal = system.config().standard == Standard::pal;
     const bool mode4 = vdp.mode4_active();
     const unsigned r12 = vdp.reg(12);
-    const bool h40 = !mode4 && (r12 & 0x01U) != 0;
-    const bool v30 = !mode4 && (vdp.reg(1) & 0x08U) != 0;
+    // Geometry of the frame drawn (fixed at line 0), not of the registers in
+    // force; any size change during the frame sets GEOMETRY_PENDING
+    // (measured on gpgx, raster_bands 7 and 15 to 18).
+    const FrameSize frame = system.renderer().size();
+    const bool h40 = !mode4 && frame.width == 320U;
     const auto u32 = [&](std::size_t at, std::uint32_t value) {
       word_le(at, static_cast<std::uint16_t>(value));
       word_le(at + 2, static_cast<std::uint16_t>(value >> 16));
@@ -158,19 +161,19 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     out[9] = pal ? 1 : 0;    // region_pal
     out[10] = mode4 ? 0 : 5; // vdp_mode
     out[11] = mode4 ? 0 : (r12 & 0x02U) != 0 ? ((r12 & 0x04U) != 0 ? 2 : 1) : 0;
-    out[12] = h40 ? 1 : 0;                          // h40
-    out[13] = !mode4 && (r12 & 0x08U) != 0 ? 1 : 0; // shadow_highlight
-    word_le(14, pal ? 313 : 262);                   // lines_per_frame
-    word_le(16, 0);                                 // viewport_x
-    word_le(18, 0);                                 // viewport_y
-    word_le(20, h40 ? 320 : 256);                   // viewport_w
-    word_le(22, mode4 ? 192 : v30 ? 240 : 224);     // viewport_h
-    u32(24, pal ? 7600489U : 7670453U);             // cpu_clock
-    u32(28, pal ? 53203424U : 53693175U);           // master_clock
-    out[32] = 0;                                    // fm_core
-    out[33] = 1;                                    // psg_present
-    out[34] = 0;                                    // pcm_present
-    out[35] = 0;                                    // flags
+    out[12] = h40 ? 1 : 0;                                 // h40
+    out[13] = !mode4 && (r12 & 0x08U) != 0 ? 1 : 0;        // shadow_highlight
+    word_le(14, pal ? 313 : 262);                          // lines_per_frame
+    word_le(16, 0);                                        // viewport_x
+    word_le(18, 0);                                        // viewport_y
+    word_le(20, static_cast<std::uint16_t>(frame.width));  // viewport_w
+    word_le(22, static_cast<std::uint16_t>(frame.height)); // viewport_h
+    u32(24, pal ? 7600489U : 7670453U);                    // cpu_clock
+    u32(28, pal ? 53203424U : 53693175U);                  // master_clock
+    out[32] = 0;                                           // fm_core
+    out[33] = 1;                                           // psg_present
+    out[34] = 0;                                           // pcm_present
+    out[35] = vdp.geometry_changed() ? 1 : 0; // flags: GEOMETRY_PENDING
     u32(36, system.rom_crc32());
     u32(40, system.rom_bytes());
     break;

@@ -50,6 +50,7 @@ public:
     offscreen_ = {};
     capture_ = {};
     captured_ = {};
+    latch_ = {};
   }
   /// Sizes the frame for the mode in force and clears it.
   void begin_frame(const Vdp &vdp);
@@ -58,6 +59,12 @@ public:
   unsigned field() const noexcept { return field_; }
   /// Draws `line` (0 based). Lines outside the active display are ignored.
   void render_line(const Vdp &vdp, std::uint32_t line);
+  /// Takes what gpgx reads at the start of `line`, before the CPU runs in it:
+  /// the horizontal scroll of both planes, the VSRAM and the shadow/highlight
+  /// bit. A write in that line (its horizontal interrupt) shows from the next
+  /// one; CRAM and the other registers are read when the line is drawn
+  /// (measured, raster_bands 0 to 11).
+  void latch_line(const Vdp &vdp, std::uint32_t line);
 
   /// Sprite flags of the lines drawn since the last call (status register bits
   /// 6 overflow and 5 collision); reading clears them.
@@ -143,6 +150,15 @@ private:
   bool capture_on_ = false;
   SpriteCapture capture_;
   std::array<bool, 80> captured_{};
+  /// Start of line values (latch_line); used only for the line they belong
+  /// to, so nothing carries over a savestate taken between frames.
+  struct LineLatch {
+    std::uint32_t line = ~0U;
+    std::array<unsigned, 2> hscroll{};
+    std::array<std::uint16_t, 40> vsram{};
+    bool shadow = false;
+  };
+  LineLatch latch_;
 };
 
 } // namespace tessera::md

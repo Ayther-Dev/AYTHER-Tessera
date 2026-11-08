@@ -34,8 +34,20 @@ void Vdp::write_control(std::uint16_t value) {
     const unsigned index = (value >> 8) & 0x1FU;
     // In mode 4 (register 1 bit 2 clear) registers above 10 do not exist.
     const bool was_mode4 = mode4();
+    const std::uint8_t palette_bits_before =
+        static_cast<std::uint8_t>((regs_[0] & 0x04U) | (regs_[12] & 0x08U));
+    const std::uint8_t geometry_before =
+        static_cast<std::uint8_t>((regs_[12] & 0x81U) | (regs_[1] & 0x08U));
     if (index <= 10 || (regs_[1] & 0x04U) != 0)
       regs_[index] = static_cast<std::uint8_t>(value);
+    if (((regs_[12] & 0x81U) | (regs_[1] & 0x08U)) != geometry_before)
+      geometry_changed_ = true;
+    if (((regs_[0] & 0x04U) | (regs_[12] & 0x08U)) != palette_bits_before) {
+      // gpgx refreshes its whole palette when the limited palette or the
+      // shadow/highlight bit changes; only then do the transparent entries
+      // of palettes 1 to 3 take the CRAM value (measured, raster_bands 12-14).
+      transparent_cram_ = {cram_[16], cram_[32], cram_[48]};
+    }
     if (was_mode4 && !mode4()) {
       // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
       // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
@@ -471,6 +483,8 @@ void Vdp::save(StateWriter &w) const {
   w.array(vram_);
   w.array(cram_);
   w.array(vsram_);
+  w.array(transparent_cram_);
+  w.boolean(geometry_changed_);
   w.u8(code_);
   w.u16(address_);
   w.u16(first_word_);
@@ -500,6 +514,8 @@ void Vdp::load(StateReader &r) {
   r.array(vram_);
   r.array(cram_);
   r.array(vsram_);
+  r.array(transparent_cram_);
+  geometry_changed_ = r.boolean();
   code_ = r.u8();
   address_ = r.u16();
   first_word_ = r.u16();

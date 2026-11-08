@@ -76,7 +76,19 @@ public:
   }
   const std::array<std::uint16_t, 64> &cram() const noexcept { return cram_; }
   const std::array<std::uint16_t, 40> &vsram() const noexcept { return vsram_; }
+  /// CRAM entries 16, 32 and 48 as they were the last time the limited
+  /// palette or shadow/highlight bit changed (0 until then): what gpgx shows
+  /// for them in the PALETTE region; later CRAM writes do not reach it.
+  const std::array<std::uint16_t, 3> &transparent_cram() const noexcept {
+    return transparent_cram_;
+  }
   std::uint32_t line() const noexcept { return line_; }
+  /// The width (register 12) or the V30 bit changed since the frame started
+  /// (its first line, in the vertical blanking): the SYSTEM GEOMETRY_PENDING
+  /// flag (measured on gpgx, raster_bands 7 and 15 to 18; rewriting the same
+  /// value does not count).
+  bool geometry_changed() const noexcept { return geometry_changed_; }
+  void clear_geometry_changed() noexcept { geometry_changed_ = false; }
 
   // Line a frame starts at in gpgx: the first line of the vertical blanking,
   // i.e. the active height (192 in Mode 4, 224 or 240 in Mode 5).
@@ -128,6 +140,8 @@ private:
   std::array<std::uint8_t, 0x10000> vram_{};
   std::array<std::uint16_t, 64> cram_{};
   std::array<std::uint16_t, 40> vsram_{};
+  std::array<std::uint16_t, 3> transparent_cram_{};
+  bool geometry_changed_ = false;
   std::uint8_t code_ = 0;
   std::uint16_t address_ = 0;
   std::uint16_t first_word_ = 0;
