@@ -348,14 +348,10 @@ RunResult run_libretro(const std::string &core_path,
     }
     if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
       result.error = "el core no exporta retro_reset";
-    if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
-      result.error = "el core no exporta retro_reset";
     if (!g_stats_script.empty() && !reset_core)
       sym(core, "retro_reset", reset_core);
     std::vector<Poke> no_pokes;
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
-      if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
-        reset_core();
       if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
         reset_core();
       for (Poke &poke : pokes ? *pokes : no_pokes) {
