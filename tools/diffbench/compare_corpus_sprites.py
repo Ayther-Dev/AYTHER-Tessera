@@ -11,7 +11,8 @@ next to the manifest) is played too. Golden Axe, Streets of Rage 2 and
 Phantasy Star IV are identical at 5 points each; Sonic 1 and Gunstar Heroes
 have declared exceptions (DECLARED).
 
-With --attribution it compares ATTRIBUTION (17) instead (TP-204.4).
+With --attribution it compares ATTRIBUTION (17) instead (TP-204.4), with its
+own declared divergences (DECLARED_ATTRIBUTION).
 
 usage: compare_corpus_sprites.py <md_run> <diffbench> <gpgx_core> <manifest>
                                  <corpus_dir> <out_dir> [--entry ID]
@@ -34,6 +35,15 @@ FPS = 59.9227
 # Heroes: at frame 4392 only the leftover slots past the count differ.
 DECLARED = {("sonic1-usa-eur", 1807), ("sonic1-usa-eur", 2410),
             ("sonic1-usa-eur", 3013), ("gunstar-heroes-usa", 4392)}
+# EXC-005/006 of docs/parity-exceptions.md: ATTRIBUTION divergences declared
+# by the owner (2026-11-08), runs from power on without input. Phantasy Star
+# IV 480: 3 pixels of line 91 (x 242-244), a VRAM write in the middle of the
+# line; the picture is identical. Cause NOT diagnosed, revisit before G1
+# closes. VDP FIFO Testing: inherited from the framebuffer divergence
+# declared in compare_corpus.py (the machine already differs, the result
+# text takes another palette).
+DECLARED_ATTRIBUTION = {("phantasy-star-iv-usa", 480)} | {
+    ("vdp-fifo-testing", f) for f in range(120, 601, 120)}
 # Mega Drive pad order of the bench: up down left right B C A start X Y Z mode
 BUTTONS = {"up": 0, "down": 1, "left": 2, "right": 3, "b": 4, "c": 5, "a": 6,
            "start": 7, "x": 8, "y": 9, "z": 10, "mode": 11}
@@ -98,6 +108,7 @@ def main(argv):
     options = {"--entry": None, "--checkpoints": "5"}
     timeline = False
     regions, sub_mask = REGIONS, "2"  # SPRITE_CAPTURE
+    declared = DECLARED
     positional = []
     while args:
         a = args.pop(0)
@@ -105,6 +116,7 @@ def main(argv):
             timeline = True
         elif a == "--attribution":
             regions, sub_mask = [(17, "ATTRIBUTION")], "80"  # ATTRIBUTION
+            declared = DECLARED_ATTRIBUTION
         elif a in options:
             options[a] = args.pop(0)
         else:
@@ -163,7 +175,7 @@ def main(argv):
                     b = f.read()
                 if rid == 14 and a[0] > 0:
                     with_sprites += 1
-                if a != b and (entry["id"], frames) not in DECLARED:
+                if a != b and (entry["id"], frames) not in declared:
                     different.append((frames, name))
         print("%s: checkpoints=%d with_sprites=%d divergences=%d" %
               (entry["id"], len(points), with_sprites, len(different)))
