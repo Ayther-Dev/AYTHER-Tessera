@@ -805,10 +805,10 @@ TEST_CASE("frame_delta answers as gpgx did (TP-205.4)") {
   CHECK(check_stats_fixture("frame-delta.txt") == 20);
 }
 
-// Open with the owner (TP-205.4): the CPU writes a few VRAM words more per
-// frame than on gpgx, so the dirty rows next to a frame boundary differ. It
-// runs and shows the differences without failing the suite.
-TEST_CASE("frame_delta at a frame boundary (TP-205.4, open)" *
+// EXC-007 (docs/parity-exceptions.md): the CPU writes a few VRAM words more
+// per frame than on gpgx, so the dirty rows next to a frame boundary differ.
+// It runs and shows the differences without failing the suite.
+TEST_CASE("frame_delta at a frame boundary (TP-205.4, EXC-007)" *
           doctest::may_fail()) {
   CHECK(check_stats_fixture("frame-delta-timing.txt") == 5);
 }

@@ -3,7 +3,7 @@
 # or the parsed sprite count of a frame that rewrites the sprite table differ.
 # Measured as a write throughput of 2554 VRAM words a frame against 2550 with
 # the display on (delta-probe-3) and one word at the end of the scene load
-# (sprite-limits-0, mode4-scene-0). Not a frame delta rule: pending the owner.
+# (sprite-limits-0, mode4-scene-0). Not a frame delta rule: declared EXC-007.
 # Same format as frame-delta.txt, written by compare_recompose_stats.py.
 
 case delta-probe-0 ff 0:d;1:d;3:d;5:d;12:d 13
