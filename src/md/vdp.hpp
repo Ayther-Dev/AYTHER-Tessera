@@ -204,8 +204,8 @@ private:
   RasterTracking raster_;
   /// The visible line a write made now first shows in, or -1.
   int raster_line() const noexcept;
-  void journal(std::uint16_t reason, std::uint16_t address,
-               std::uint16_t data) noexcept;
+  void journal(std::uint16_t reason, std::uint16_t address, std::uint16_t data,
+               bool display_toggle = false) noexcept;
   void track_vram_write(std::uint32_t address, std::uint16_t before,
                         std::uint16_t after) noexcept;
   std::array<std::uint16_t, 64> cram_{};

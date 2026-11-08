@@ -321,6 +321,18 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_REQUIRED md_${mode}_rom
                 LABELS "integration;phase1;md;local" TIMEOUT 300)
         endforeach()
+        # TP-205.3: gpgx still answers the recompose_stats scripts of the
+        # fixture as recorded; integration.md_subscriptions runs the same
+        # scripts on the native machine.
+        add_test(NAME integration.md_recompose_stats_reference COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/compare_recompose_stats.py"
+            $<TARGET_FILE:tessera_md_testrom> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}"
+            "${PROJECT_SOURCE_DIR}/tests/fixtures/diffbench/recompose-stats.txt"
+            "${CMAKE_CURRENT_BINARY_DIR}/md-recompose-stats")
+        set_tests_properties(integration.md_recompose_stats_reference PROPERTIES
+            PASS_REGULAR_EXPRESSION "^identical: 16 cases"
+            LABELS "integration;phase1;md;local" TIMEOUT 300)
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region

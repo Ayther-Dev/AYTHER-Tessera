@@ -147,6 +147,8 @@ public:
     layer_mask_ = controls[0];
     layer_dim_ = controls[1];
     apply_controls();
+    // A restore empties the recomposition caches; the counters go on (gpgx).
+    single_cache_.valid = multilayer_cache_.valid = false;
     pixels_.clear();
     pcm_.clear();
     refresh_frame_geometry();
@@ -159,6 +161,14 @@ public:
   }
 
   [[nodiscard]] IObservable *observation() noexcept override { return this; }
+  void keep_observation(IEmulatedSystem &previous) override {
+    auto *old = dynamic_cast<NativeBackend *>(&previous);
+    if (old == nullptr)
+      return;
+    subscriptions_ = old->subscriptions_;
+    stats_ = old->stats_; // the caches start empty
+    apply_controls();
+  }
 
   bool set_subscriptions(std::uint32_t mask) override {
     return subscriptions_.request(mask);
@@ -196,7 +206,7 @@ public:
                                          : UINT32_MAX;
   }
   [[nodiscard]] std::int32_t recompose(std::span<std::uint16_t> out,
-                                       std::uint32_t /*flags*/,
+                                       std::uint32_t flags,
                                        std::uint32_t &width,
                                        std::uint32_t &height) override {
     width = height = 0;
@@ -214,11 +224,12 @@ public:
     width = size.width;
     height = size.height;
     work_ += frame.size() * sizeof(std::uint16_t);
+    count(single_cache_, flags, stats_.single_calls, stats_.single_hits);
     return TESSERA_OK;
   }
   [[nodiscard]] std::int32_t
   recompose_layers(std::array<std::span<std::uint16_t>, 5> out,
-                   std::uint32_t /*flags*/, std::uint32_t &width,
+                   std::uint32_t flags, std::uint32_t &width,
                    std::uint32_t &height) override {
     width = height = 0;
     if (!subscriptions_.active(TESSERA_OBS_SUB_RECOMPOSITION))
@@ -242,6 +253,14 @@ public:
     width = size.width;
     height = size.height;
     work_ += 5U * layers[0].size() * sizeof(std::uint16_t);
+    count(multilayer_cache_, flags, stats_.multilayer_calls,
+          stats_.multilayer_hits);
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t
+  recompose_stats(RecomposeStats &out) const override {
+    out = stats_;
+    out.controls_fingerprint = controls_fingerprint();
     return TESSERA_OK;
   }
   [[nodiscard]] std::int32_t
@@ -302,6 +321,37 @@ private:
            : Renderer::kLayerAll,
         on && layer_dim_ != 0);
   }
+  /// gpgx's recomposition cache: one entry per kind, keyed on the frame, the
+  /// flags and the controls (TP-205.3). Only accepted calls count.
+  struct RecomposeCache {
+    bool valid = false;
+    std::uint64_t frame = 0, fingerprint = 0;
+    std::uint32_t flags = 0;
+  };
+  void count(RecomposeCache &cache, std::uint32_t flags, std::uint64_t &calls,
+             std::uint64_t &hits) const {
+    const auto fingerprint = controls_fingerprint();
+    ++calls;
+    if (cache.valid && cache.frame == frame_ && cache.flags == flags &&
+        cache.fingerprint == fingerprint)
+      ++hits;
+    cache = {true, frame_, fingerprint, flags};
+  }
+  /// FNV-1a 64 over what gpgx hashes, as measured: RENDER_CONTROLS active,
+  /// LAYER_MASK and LAYER_DIM as written, then the suppression state (a flag
+  /// and 16 + 512 + 3072 bytes), which Tessera does not take (PQ-1): zeros.
+  [[nodiscard]] std::uint64_t controls_fingerprint() const {
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    const auto mix = [&hash](std::uint8_t byte) {
+      hash = (hash ^ byte) * 0x100000001b3ULL;
+    };
+    mix(subscriptions_.active(TESSERA_OBS_SUB_RENDER_CONTROLS) ? 1 : 0);
+    mix(layer_mask_);
+    mix(layer_dim_);
+    for (unsigned i = 0; i < 1U + 16U + 512U + 3072U; ++i)
+      mix(0);
+    return hash;
+  }
   void refresh_frame_geometry() {
     const auto size = system_->renderer().size();
     width_ = size.width;
@@ -327,6 +377,8 @@ private:
   std::uint8_t layer_mask_ = 0xFF; ///< LAYER_MASK as written (gpgx: 0xFF)
   std::uint8_t layer_dim_ = 0;     ///< LAYER_DIM as written
   std::uint64_t work_ = 0; ///< bytes the observation delivered (TP-201.3)
+  RecomposeStats stats_{};
+  RecomposeCache single_cache_, multilayer_cache_;
 };
 } // namespace
 

@@ -97,6 +97,16 @@ public:
     width = height = 0;
     return -6; // TESSERA_UNSUPPORTED_CAPABILITY
   }
+  /// recompose_stats (TP-205.3): accepted recompositions and how many of them
+  /// were the same frame asked again with the same flags and controls.
+  struct RecomposeStats {
+    std::uint64_t single_calls, single_hits, multilayer_calls, multilayer_hits,
+        controls_fingerprint;
+  };
+  [[nodiscard]] virtual std::int32_t
+  recompose_stats(RecomposeStats & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
   /// write_control (TP-205.2): INVALID_ARGUMENT for a value the control
   /// refuses, UNSUPPORTED for a region the system does not control.
   [[nodiscard]] virtual std::int32_t
@@ -144,6 +154,11 @@ public:
   regions(std::uint64_t mask) const = 0;
   /// Null when the system serves no observation (the default).
   [[nodiscard]] virtual IObservable *observation() noexcept { return nullptr; }
+  /// A restore builds a new machine; what the consumer asked of the
+  /// observation (subscriptions, recompose counters) is not machine state and
+  /// carries over from the machine it replaces (gpgx keeps it through
+  /// retro_unserialize, TP-205.3).
+  virtual void keep_observation(IEmulatedSystem & /*previous*/) {}
 };
 
 } // namespace tessera

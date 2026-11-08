@@ -105,6 +105,9 @@ void set_recompose_out(const std::string &path, uint32_t flags,
 /// After the run, calls recompose_multilayer (with the flags and capacity of
 /// set_recompose_out) and writes status, size and the five layers (TP-205.2).
 void set_multilayer_out(const std::string &path);
+/// TP-205.3: recompose calls, stats reads and control writes after given
+/// frames (`--stats-script`), one text line per operation in `out`.
+void set_stats_script(const std::string &script, const std::string &out);
 /// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
 /// 0 subscribes to nothing, 1 to every region (the full set).
 void set_bench(bool on, int observation);

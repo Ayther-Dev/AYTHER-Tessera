@@ -233,6 +233,10 @@ int main(int argc, char **argv) {
   }
   if (args.count("--multilayer-out"))
     diffbench::set_multilayer_out(args["--multilayer-out"]);
+  if (args.count("--stats-script"))
+    diffbench::set_stats_script(args["--stats-script"],
+                                args.count("--stats-out") ? args["--stats-out"]
+                                                          : "stats.txt");
   if (args.count("--recompose-out") || args.count("--multilayer-out"))
     diffbench::set_recompose_out(
         args.count("--recompose-out") ? args["--recompose-out"] : "",

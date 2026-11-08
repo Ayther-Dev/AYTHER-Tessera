@@ -557,3 +557,158 @@ TEST_CASE("the answers match the matrix measured on the reference core") {
           expected_status(std::get<2>(answer)));
   }
 }
+
+namespace {
+/// The test ROMs of tests/fixtures/diffbench/recompose-stats.txt by the name
+/// tessera_md_testrom gives them.
+Bytes rom_named(const std::string &name) {
+  namespace rom = tessera::testrom;
+  const auto number = [&](std::size_t prefix) {
+    return static_cast<unsigned>(std::stoul(name.substr(prefix)));
+  };
+  if (name.rfind("modes-sweep-", 0) == 0)
+    return rom::modes_sweep_rom(rom::modes_variant(number(12)));
+  if (name.rfind("raster-bands-", 0) == 0)
+    return rom::raster_bands_rom(rom::raster_variant(number(13)));
+  if (name.rfind("mode4-scene-", 0) == 0)
+    return rom::mode4_scene_rom(rom::mode4_variant(number(12)));
+  FAIL("unknown test rom " << name);
+  return {};
+}
+
+/// A gpgx status in the fixture as Tessera returns it (the bench mapping).
+std::string native_statuses(const std::string &line) {
+  const auto at = line.find("status=");
+  if (at == std::string::npos)
+    return line;
+  const auto end = line.find(' ', at);
+  const int reference = std::stoi(line.substr(at + 7, end - at - 7));
+  const int native = reference == -20 || reference == -21 || reference == -24
+                         ? TESSERA_WRONG_STATE
+                     : reference == -23 ? TESSERA_INVALID_ARGUMENT
+                     : reference == -9  ? TESSERA_NOT_SUBSCRIBED
+                                        : reference;
+  return line.substr(0, at + 7) + std::to_string(native) +
+         (end == std::string::npos ? "" : line.substr(end));
+}
+
+/// Runs a stats script (see compare_recompose_stats.py) on the native machine
+/// through the public API and answers as tessera_diffbench does on gpgx.
+std::vector<std::string>
+run_stats_script(Observed &s, const std::string &script, unsigned frames) {
+  std::map<unsigned, std::vector<std::string>> steps;
+  std::istringstream per_frame(script);
+  for (std::string part; std::getline(per_frame, part, ';');) {
+    const auto colon = part.find(':');
+    std::istringstream ops(part.substr(colon + 1));
+    auto &list =
+        steps[static_cast<unsigned>(std::stoul(part.substr(0, colon)))];
+    for (std::string op; std::getline(ops, op, '.');)
+      list.push_back(op);
+  }
+  std::vector<std::string> out;
+  const std::uint32_t full = 320 * 240;
+  std::vector<std::uint16_t> layers(5u * full);
+  for (unsigned i = 0; i < frames; ++i) {
+    s.step();
+    for (const auto &op : steps[i]) {
+      const auto at = op.find('@');
+      const std::uint32_t capacity =
+          at == std::string::npos
+              ? full
+              : static_cast<std::uint32_t>(std::stoul(op.substr(at + 1)));
+      const auto argument =
+          op.substr(1, at == std::string::npos ? std::string::npos : at - 1);
+      const auto hex = [&] {
+        return argument.empty() ? 0u
+                                : static_cast<std::uint32_t>(
+                                      std::stoul(argument, nullptr, 16));
+      };
+      std::ostringstream line;
+      line << "frame=" << i << " ";
+      tessera_status status = TESSERA_UNSUPPORTED_CAPABILITY;
+      std::uint32_t width = 0, height = 0;
+      if (op[0] == 'g') {
+        tessera_obs_recompose_stats_v1 st{};
+        status = tessera_observation_recompose_stats_v1(
+            s.handle, &st,
+            argument.empty() ? sizeof(st)
+                             : static_cast<std::uint32_t>(std::stoul(argument)),
+            &s.context);
+        line << "stats status=" << status << " size=" << st.struct_size
+             << " single=" << st.single_calls << "/" << st.single_hits
+             << " multi=" << st.multilayer_calls << "/" << st.multilayer_hits
+             << " fingerprint=" << std::hex << st.controls_fingerprint;
+        out.push_back(line.str());
+        continue;
+      }
+      if (op[0] == 's') {
+        status = tessera_observation_recompose_v1(s.handle, layers.data(),
+                                                  capacity, hex(), &width,
+                                                  &height, &s.context);
+      } else if (op[0] == 'm') {
+        auto *l = layers.data();
+        status = tessera_observation_recompose_multilayer_v1(
+            s.handle, l, l + full, l + 2 * full, l + 3 * full, l + 4 * full,
+            capacity, hex(), &width, &height, &s.context);
+      } else if (op[0] == 'p') {
+        const auto eq = op.find('=');
+        const auto byte = static_cast<std::uint8_t>(
+            std::stoul(op.substr(eq + 1), nullptr, 16));
+        std::uint64_t generation = 0;
+        status = tessera_observation_write_control_v1(
+            s.handle,
+            static_cast<std::uint32_t>(std::stoul(op.substr(1, eq - 1))), 0,
+            &byte, 1, UINT64_MAX, &generation, &s.context);
+      } else if (op[0] == 'u') {
+        status = s.set(hex());
+      } else if (op == "x") {
+        status = s.restore(s.checkpoint());
+      }
+      line << op << " status=" << status;
+      out.push_back(line.str());
+    }
+  }
+  return out;
+}
+} // namespace
+
+TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
+  std::ifstream fixture(std::string(TESSERA_SOURCE_DIR) +
+                        "/tests/fixtures/diffbench/recompose-stats.txt");
+  REQUIRE(fixture.good());
+  std::string header;
+  std::vector<std::string> expected;
+  unsigned cases = 0;
+  for (std::string line; std::getline(fixture, line);) {
+    if (!line.empty() && line.back() == '\r')
+      line.pop_back();
+    if (line.empty() || line[0] == '#')
+      continue;
+    if (line.rfind("case ", 0) == 0) {
+      header = line;
+      expected.clear();
+      continue;
+    }
+    if (line != "end") {
+      expected.push_back(native_statuses(line));
+      continue;
+    }
+    std::istringstream fields(header.substr(5));
+    std::string rom, sub, script;
+    fields >> rom >> sub >> script;
+    CAPTURE(header);
+    Observed s(rom_named(rom));
+    REQUIRE(s.set(static_cast<std::uint32_t>(std::stoul(sub, nullptr, 16))) ==
+            TESSERA_OK);
+    const auto got = run_stats_script(s, script, 5);
+    CHECK(got == expected);
+    for (std::size_t i = 0; i < got.size() && i < expected.size(); ++i)
+      if (got[i] != expected[i]) {
+        MESSAGE("native: " << got[i] << " | gpgx: " << expected[i]);
+        break;
+      }
+    ++cases;
+  }
+  CHECK(cases == 16);
+}

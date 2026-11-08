@@ -47,9 +47,10 @@ void Vdp::write_control(std::uint16_t value) {
       // DMA registers (19 and up) (measured, raster_bands 11, 19, 20).
       if (regs_[index] != old_value && index != 10 && index != 15 &&
           index < 19) {
-        journal(1, static_cast<std::uint16_t>(index), regs_[index]);
+        journal(1, static_cast<std::uint16_t>(index), regs_[index],
+                index == 1 && ((old_value ^ regs_[index]) & 0x40U) != 0);
         if (index == 12 && ((old_value ^ regs_[index]) & 0x81U) != 0 &&
-            raster_line() >= 0)
+            raster_line() >= 0 && (regs_[1] & 0x40U) != 0)
           raster_.fallback |= 0x20U; // width change
       }
       if (index == 17 && (regs_[17] & 0x1FU) != 0) {
@@ -203,9 +204,16 @@ int Vdp::raster_line() const noexcept {
 }
 
 void Vdp::journal(std::uint16_t reason, std::uint16_t address,
-                  std::uint16_t data) noexcept {
+                  std::uint16_t data, bool display_toggle) noexcept {
   const int v = raster_line();
   if (v < 0 || mode4())
+    return;
+  // With the display off a line is the backdrop: only what changes it is an
+  // event, register 7, its CRAM entry and the display bit itself (measured on
+  // gpgx while the test ROMs load their scene, TP-205.3).
+  if ((regs_[1] & 0x40U) == 0 && !display_toggle &&
+      !(reason == 1 && address == 7) &&
+      !(reason == 2 && address == (regs_[7] & 0x3FU)))
     return;
   raster_.fallback |= reason;
   if (raster_.count < raster_.events.size()) {
@@ -219,7 +227,9 @@ void Vdp::journal(std::uint16_t reason, std::uint16_t address,
 
 void Vdp::track_vram_write(std::uint32_t address, std::uint16_t before,
                            std::uint16_t after) noexcept {
-  if (raster_line() < 0 || mode4())
+  // With the display off no VRAM write is an event nor a fallback reason
+  // (measured on gpgx, see journal()).
+  if (raster_line() < 0 || mode4() || (regs_[1] & 0x40U) == 0)
     return;
   // The horizontal scroll table: up to 240 lines of two words (assumed
   // extent; raster_bands 3 and 10 write its first entry).

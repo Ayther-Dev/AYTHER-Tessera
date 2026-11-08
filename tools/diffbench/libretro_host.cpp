@@ -10,6 +10,10 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace diffbench {
 namespace {
@@ -193,6 +197,25 @@ static uint32_t g_recompose_flags = 0;
 static uint32_t g_recompose_capacity = 320u * 240u;
 static std::string g_multilayer_out;
 void set_multilayer_out(const std::string &path) { g_multilayer_out = path; }
+static std::map<unsigned, std::vector<std::string>> g_stats_script;
+static std::string g_stats_out;
+void set_stats_script(const std::string &script, const std::string &out) {
+  // <frame>:<op>.<op>...;<frame>:... with s = recompose_frame, m =
+  // recompose_multilayer, g = get_recompose_stats, p<region>=<hex byte> =
+  // write_control, run after that frame (0 = the first).
+  std::stringstream entries(script);
+  for (std::string entry; std::getline(entries, entry, ';');) {
+    const auto colon = entry.find(':');
+    if (colon == std::string::npos)
+      continue;
+    auto &ops = g_stats_script[static_cast<unsigned>(
+        std::stoul(entry.substr(0, colon)))];
+    std::stringstream list(entry.substr(colon + 1));
+    for (std::string op; std::getline(list, op, '.');)
+      ops.push_back(op);
+  }
+  g_stats_out = out;
+}
 void set_recompose_out(const std::string &path, uint32_t flags,
                        uint32_t capacity) {
   g_recompose_out = path;
@@ -289,7 +312,7 @@ RunResult run_libretro(const std::string &core_path,
         dump_regions || pokes != nullptr || g_bench_observation >= 0 ||
         g_sub_mask >= 0 ||
         !g_audio_events_out.empty() || !g_recompose_out.empty() ||
-        !g_multilayer_out.empty();
+        !g_multilayer_out.empty() || !g_stats_script.empty();
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -327,6 +350,8 @@ RunResult run_libretro(const std::string &core_path,
       result.error = "el core no exporta retro_reset";
     if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
       result.error = "el core no exporta retro_reset";
+    if (!g_stats_script.empty() && !reset_core)
+      sym(core, "retro_reset", reset_core);
     std::vector<Poke> no_pokes;
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
       if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
@@ -367,6 +392,89 @@ RunResult run_libretro(const std::string &core_path,
         run();
       }
       drain_audio_events();
+      // TP-205.3: the stats script after this frame.
+      const auto ops = g_stats_script.find(i);
+      if (iface && ops != g_stats_script.end()) {
+        std::ofstream so(g_stats_out, std::ios::app);
+        std::vector<uint16_t> layers(5u * 320u * 240u);
+        for (const auto &op : ops->second) {
+          uint32_t w = 0, h = 0;
+          int32_t status = -8;
+          // s/m take optional "<flags hex>@<capacity>"; g takes "<out_size>";
+          // u<hex> sets subscriptions; r resets the core.
+          const auto arg = [&](size_t from, uint32_t def, int base) {
+            return op.size() > from ? static_cast<uint32_t>(std::stoul(
+                                          op.substr(from), nullptr, base))
+                                    : def;
+          };
+          const auto at = op.find('@');
+          const uint32_t cap =
+              at == std::string::npos
+                  ? 320u * 240u
+                  : static_cast<uint32_t>(std::stoul(op.substr(at + 1)));
+          const uint32_t flags =
+              op.size() > 1 && op[1] != '@'
+                  ? static_cast<uint32_t>(std::stoul(
+                        op.substr(1, at == std::string::npos ? std::string::npos
+                                                             : at - 1),
+                        nullptr, 16))
+                  : 0u;
+          if (op[0] == 'u') {
+            status = iface->set_subscriptions(arg(1, 0, 16));
+          } else if (op == "x") {
+            // serialize and restore the same state
+            size_t(__cdecl * ssize)() = nullptr;
+            bool(__cdecl * ser)(void *, size_t) = nullptr;
+            bool(__cdecl * unser)(const void *, size_t) = nullptr;
+            if (sym(core, "retro_serialize_size", ssize) &&
+                sym(core, "retro_serialize", ser) &&
+                sym(core, "retro_unserialize", unser)) {
+              std::vector<uint8_t> state(ssize());
+              status = ser(state.data(), state.size()) &&
+                               unser(state.data(), state.size())
+                           ? 0
+                           : -1;
+            }
+          } else if (op == "r" && reset_core) {
+            reset_core();
+            status = 0;
+          } else if (op[0] == 's' && iface->recompose_frame) {
+            status = iface->recompose_frame(layers.data(), cap, flags, &w, &h);
+          } else if (op[0] == 'm' &&
+                     iface->struct_size >=
+                         offsetof(AytherInterface, recompose_multilayer) +
+                             sizeof(iface->recompose_multilayer) &&
+                     iface->recompose_multilayer) {
+            uint16_t *l = layers.data();
+            const uint32_t n = 320u * 240u;
+            status = iface->recompose_multilayer(l, l + n, l + 2 * n, l + 3 * n,
+                                                 l + 4 * n, cap, flags, &w, &h);
+          } else if (op[0] == 'g' &&
+                     iface->struct_size >=
+                         offsetof(AytherInterface, get_recompose_stats) +
+                             sizeof(iface->get_recompose_stats) &&
+                     iface->get_recompose_stats) {
+            tessera_obs_recompose_stats_v1 st{};
+            status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                iface->get_recompose_stats)(&st, arg(1, sizeof(st), 10));
+            so << "frame=" << i << " stats status=" << status
+               << " size=" << st.struct_size << " single=" << st.single_calls
+               << "/" << st.single_hits << " multi=" << st.multilayer_calls
+               << "/" << st.multilayer_hits << " fingerprint=" << std::hex
+               << st.controls_fingerprint << std::dec << "\n";
+            continue;
+          } else if (op.size() > 2 && op[0] == 'p') {
+            const auto eq = op.find('=');
+            const uint8_t byte =
+                static_cast<uint8_t>(std::stoul(op.substr(eq + 1), nullptr, 16));
+            uint64_t generation = 0;
+            status = iface->write_control(
+                static_cast<uint32_t>(std::stoul(op.substr(1, eq - 1))), 0,
+                &byte, 1, UINT64_MAX, &generation);
+          }
+          so << "frame=" << i << " " << op << " status=" << status << "\n";
+        }
+      }
     }
     if (!g_audio_events_out.empty() && iface &&
         iface->get_audio_transport_stats) {

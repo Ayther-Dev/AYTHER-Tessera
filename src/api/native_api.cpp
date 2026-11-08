@@ -809,6 +809,31 @@ tessera_status TESSERA_CALL tessera_observation_recompose_multilayer_v1(
     return TESSERA_OK;
   });
 }
+tessera_status TESSERA_CALL tessera_observation_recompose_stats_v1(
+    tessera_session session, tessera_obs_recompose_stats_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    // gpgx answers BUFFER_TOO_SMALL below the 48 bytes, with or without
+    // subscriptions, and ok for a larger size (TP-205.3).
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_recompose_stats_v1));
+    c.start();
+    IObservable::RecomposeStats stats{};
+    const auto status = o.recompose_stats(stats);
+    require(status == TESSERA_OK, status);
+    *out = {sizeof(*out),
+            0,
+            stats.single_calls,
+            stats.single_hits,
+            stats.multilayer_calls,
+            stats.multilayer_hits,
+            stats.controls_fingerprint};
+    return TESSERA_OK;
+  });
+}
 tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
     tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
     std::uint32_t out_size, tessera_context_v1 *ctx) {
