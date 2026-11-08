@@ -333,6 +333,22 @@ if(TESSERA_BUILD_MEGADRIVE)
         set_tests_properties(integration.md_recompose_stats_reference PROPERTIES
             PASS_REGULAR_EXPRESSION "^identical: 16 cases"
             LABELS "integration;phase1;md;local" TIMEOUT 300)
+        # TP-205.4: frame_delta and frame_delta_since, the same way (the
+        # timing fixture holds the cases still open on the native side).
+        foreach(fixture IN ITEMS frame-delta:20 frame-delta-timing:5)
+            string(REPLACE ":" ";" parts "${fixture}")
+            list(GET parts 0 name)
+            list(GET parts 1 count)
+            add_test(NAME integration.md_${name}_reference COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_recompose_stats.py"
+                $<TARGET_FILE:tessera_md_testrom> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${PROJECT_SOURCE_DIR}/tests/fixtures/diffbench/${name}.txt"
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${name}")
+            set_tests_properties(integration.md_${name}_reference PROPERTIES
+                PASS_REGULAR_EXPRESSION "^identical: ${count} cases"
+                LABELS "integration;phase1;md;local" TIMEOUT 300)
+        endforeach()
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region

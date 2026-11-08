@@ -79,7 +79,8 @@ void Vdp::write_control(std::uint16_t value) {
         spread[w * 4U] = vram_[w * 2U];
         spread[w * 4U + 1U] = vram_[w * 2U + 1U];
       }
-      vram_ = spread;
+      for (std::uint32_t i = 0; i < spread.size(); ++i)
+        set_vram(i, spread[i]);
     }
     if ((regs_[0] & 0x02U) == 0)
       hv_latched_ = false; // clearing the latch enable releases the counter
@@ -118,8 +119,8 @@ void Vdp::put(std::uint16_t value) {
         (a & 1U) != 0 ? ((value >> 8) | (value << 8)) : value);
     // gpgx keeps the low byte at the even address (SMS layout; measured on
     // its VRAM region with mode4_scene).
-    vram_[index] = static_cast<std::uint8_t>(word);
-    vram_[index + 1U] = static_cast<std::uint8_t>(word >> 8);
+    set_vram(index, static_cast<std::uint8_t>(word));
+    set_vram(index + 1U, static_cast<std::uint8_t>(word >> 8));
     address_ = static_cast<std::uint16_t>((a + regs_[15] + 1U) & 0x3FFFU);
     return;
   }
@@ -129,13 +130,9 @@ void Vdp::put(std::uint16_t value) {
     const std::uint32_t word_at = address_ & 0xFFFEU;
     const auto before = static_cast<std::uint16_t>(
         (std::uint32_t{vram_[word_at]} << 8) | vram_[word_at + 1U]);
-    if ((address_ & 1U) != 0) { // odd address: bytes swapped
-      vram_[address_] = static_cast<std::uint8_t>(value >> 8);
-      vram_[address_ ^ 1U] = static_cast<std::uint8_t>(value);
-    } else {
-      vram_[address_] = static_cast<std::uint8_t>(value >> 8);
-      vram_[address_ + 1U] = static_cast<std::uint8_t>(value);
-    }
+    // odd address: bytes swapped (address ^ 1 is then address - 1)
+    set_vram(address_, static_cast<std::uint8_t>(value >> 8));
+    set_vram(address_ ^ 1U, static_cast<std::uint8_t>(value));
     track_vram_write(
         word_at, before,
         static_cast<std::uint16_t>((std::uint32_t{vram_[word_at]} << 8) |
@@ -451,7 +448,7 @@ void Vdp::run_dma(std::uint16_t first_data) {
     if (length != 0 && raster_line() >= 0)
       raster_.fallback |= 0x40U;
     for (std::uint32_t i = 0; i < length; ++i) {
-      vram_[address_ ^ 1U] = byte;
+      set_vram(address_ ^ 1U, byte, true);
       address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
     }
   } else { // VRAM copy
@@ -460,7 +457,7 @@ void Vdp::run_dma(std::uint16_t first_data) {
     if (length != 0 && raster_line() >= 0)
       raster_.fallback |= 0x40U;
     for (std::uint32_t i = 0; i < length; ++i) {
-      vram_[address_ ^ 1U] = vram_[from ^ 1U];
+      set_vram(address_ ^ 1U, vram_[from ^ 1U], true);
       ++from;
       address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
     }

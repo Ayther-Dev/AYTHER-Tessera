@@ -107,6 +107,24 @@ public:
   recompose_stats(RecomposeStats & /*out*/) const {
     return -6; // TESSERA_UNSUPPORTED_CAPABILITY
   }
+  /// frame_delta (TP-205.4): the delta of the last frame, frozen when it
+  /// ended; `generation` counts the frames run. `dirty` has one byte per VRAM
+  /// pattern, a bit per row changed.
+  struct FrameDelta {
+    std::uint64_t generation;
+    std::uint32_t raster_events, parsed_sprites, audio_writes, raster_dropped;
+    std::array<std::uint8_t, 2048> dirty;
+  };
+  [[nodiscard]] virtual std::int32_t frame_delta(FrameDelta & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// The dirty patterns of every frame after generation `from`, OR-ed, with
+  /// the counters of the last frame. A generation out of the history gives
+  /// everything dirty and a non-zero status (gpgx DELTA_HISTORY_LOST).
+  [[nodiscard]] virtual std::int32_t
+  frame_delta_since(std::uint64_t /*from*/, FrameDelta & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
   /// write_control (TP-205.2): INVALID_ARGUMENT for a value the control
   /// refuses, UNSUPPORTED for a region the system does not control.
   [[nodiscard]] virtual std::int32_t

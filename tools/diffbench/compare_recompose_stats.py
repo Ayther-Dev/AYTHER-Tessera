@@ -1,12 +1,17 @@
-"""recompose_stats of gpgx against the recorded fixture (spec 008, TP-205.3).
+"""recompose_stats and frame_delta of gpgx against a recorded fixture (spec
+008, TP-205.3 and TP-205.4).
 
-Each case of the fixture is a test ROM, a subscription mask (hex) and a stats
-script that tessera_diffbench runs on gpgx (--stats-script, see main.cpp):
+Each case of the fixture is a test ROM, a subscription mask (hex), a stats
+script and optionally the frames to run (5 if absent); tessera_diffbench runs
+the script on gpgx (--stats-script, see main.cpp):
 after frame N, in order, s/m recompose (single/multilayer, optional
 "<flags hex>@<capacity>"), g reads the stats (optional out_size), p<region>=<hex>
 writes a control, u<hex> sets the subscriptions, x saves and restores the
-state. The fixture keeps what gpgx answered; the native side runs the same
-cases through the public API in tests/integration/md_subscriptions_test.cpp.
+state, S/L save a state and restore it later, d[out_size] polls the frame
+delta, D<generation>[,out_size] asks for the delta since a generation (TP-205.4;
+"D-<n>" counts back from the last poll). The fixture keeps what gpgx
+answered; the native side runs the same cases through the public API in
+tests/integration/md_subscriptions_test.cpp.
 
 usage: compare_recompose_stats.py <testrom> <diffbench> <gpgx_core> <fixture>
                                   <out_dir> [--update]
@@ -35,7 +40,7 @@ def cases(path):
     return result
 
 
-def run(testrom, diffbench, core, out_dir, rom, sub, script):
+def run(testrom, diffbench, core, out_dir, rom, sub, script, frames):
     rom_path = os.path.join(out_dir, rom + ".bin")
     if not os.path.exists(rom_path):
         if subprocess.run([testrom, rom, rom_path],
@@ -45,7 +50,7 @@ def run(testrom, diffbench, core, out_dir, rom, sub, script):
     if os.path.exists(out):
         os.remove(out)
     subprocess.run([diffbench, "--libretro", core, "--rom", rom_path,
-                    "--frames", FRAMES, "--sub-mask", sub,
+                    "--frames", frames, "--sub-mask", sub,
                     "--stats-script", script, "--stats-out", out],
                    capture_output=True)
     if not os.path.exists(out):
@@ -64,8 +69,9 @@ def main(argv):
     recorded = cases(fixture)
     worst, rewritten = 0, []
     for header, expected in recorded:
-        _, rom, sub, script = header.split(" ")
-        got = run(testrom, diffbench, core, out_dir, rom, sub, script)
+        _, rom, sub, script, *frames = header.split(" ")
+        got = run(testrom, diffbench, core, out_dir, rom, sub, script,
+                  frames[0] if frames else FRAMES)
         if got is None:
             print("tool failed:", header)
             return 2

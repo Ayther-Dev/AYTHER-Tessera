@@ -1,0 +1,50 @@
+# frame_delta cases where Tessera and gpgx split the CPU write stream at a
+# different point of the frame (TP-205.4): the dirty rows near a frame boundary
+# or the parsed sprite count of a frame that rewrites the sprite table differ.
+# Measured as a write throughput of 2554 VRAM words a frame against 2550 with
+# the display on (delta-probe-3) and one word at the end of the scene load
+# (sprite-limits-0, mode4-scene-0). Not a frame delta rule: pending the owner.
+# Same format as frame-delta.txt, written by compare_recompose_stats.py.
+
+case delta-probe-0 ff 0:d;1:d;3:d;5:d;12:d 13
+frame=0 d status=0 size=2080 version=1 generation=1 raster=2 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=1 audio=0 dropped=0 dirty=0:01
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=1 audio=0 dropped=0 dirty=1:80,2047:80
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=1 audio=0 dropped=0 dirty=8:ff
+frame=12 d status=0 size=2080 version=1 generation=13 raster=0 sprites=1 audio=0 dropped=0 dirty=0-63:ff
+end
+
+case delta-probe-3 1 1:d;2:d;3:d;4:d;5:d;6:d;7:d;8:d;9:d;10:d 11
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-158:ff
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=158:80,159-317:ff,318:07
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=318:fc,319-476:ff,477:3f
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=0 audio=0 dropped=0 dirty=477:e0,478-636:ff,637:01
+frame=6 d status=0 size=2080 version=1 generation=7 raster=0 sprites=0 audio=0 dropped=0 dirty=637-795:ff,796:0f
+frame=7 d status=0 size=2080 version=1 generation=8 raster=0 sprites=0 audio=0 dropped=0 dirty=796:f8,797-954:ff,955:7f
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=955:c0,956-1114:ff,1115:03
+frame=9 d status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=1115:fe,1116-1273:ff,1274:1f
+frame=10 d status=0 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=1274:f0,1275-1433:ff
+end
+
+case sprite-limits-0 ff 1:d;2:d;3:d.D1.x.d;4:d 5
+frame=1 d status=0 size=2080 version=1 generation=2 raster=2 sprites=3 audio=0 dropped=0 dirty=80:e0,81-127:ff,512-575:ff,1536-1599:ff,1792:ff,1793:0f
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=6 audio=0 dropped=0 dirty=none
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=6 audio=0 dropped=0 dirty=none
+frame=3 D1 status=0 size=2080 version=1 generation=4 raster=0 sprites=6 audio=0 dropped=0 dirty=80:e0,81-127:ff,512-575:ff,1536-1599:ff,1792:ff,1793:0f
+frame=3 x status=0
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=6 audio=0 dropped=0 dirty=0-2047:ff
+end
+
+case sprite-limits-0 1 1:d;2:d 3
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=80:e0,81-127:ff,512-575:ff,1536-1599:ff,1792:ff,1793:0f
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case mode4-scene-0 1 0:d;1:d;2:d;3:d 4
+frame=0 d status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=272:c0,273-319:ff,448-505:ff,506:0f
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end

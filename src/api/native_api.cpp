@@ -834,6 +834,57 @@ tessera_status TESSERA_CALL tessera_observation_recompose_stats_v1(
     return TESSERA_OK;
   });
 }
+} // extern "C"
+namespace {
+/// poll_frame_delta and frame_delta_since (TP-205.4): no subscription needed;
+/// below the 2080 bytes gpgx answers BUFFER_TOO_SMALL and leaves `out` as it
+/// was. A generation out of the history is STALE_EPOCH (gpgx
+/// DELTA_HISTORY_LOST), with `out` filled: everything dirty.
+template <typename Ask>
+tessera_status
+frame_delta_call(tessera_session session, tessera_obs_frame_delta_v1 *out,
+                 std::uint32_t out_size, tessera_context_v1 *ctx, Ask ask) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_frame_delta_v1));
+    c.start();
+    IObservable::FrameDelta delta{};
+    const std::int32_t status = ask(o, delta);
+    require(status == TESSERA_OK || status == TESSERA_STALE_EPOCH, status);
+    out->struct_size = sizeof(*out);
+    out->delta_version = 1;
+    out->frame_generation = delta.generation;
+    out->raster_event_count = delta.raster_events;
+    out->parsed_sprite_count = delta.parsed_sprites;
+    out->audio_write_count = delta.audio_writes;
+    out->raster_events_dropped = delta.raster_dropped;
+    std::memcpy(out->dirty_patterns, delta.dirty.data(), delta.dirty.size());
+    return static_cast<tessera_status>(status);
+  });
+}
+} // namespace
+extern "C" {
+tessera_status TESSERA_CALL tessera_observation_frame_delta_poll_v1(
+    tessera_session session, tessera_obs_frame_delta_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return frame_delta_call(session, out, out_size, ctx,
+                          [](IObservable &o, IObservable::FrameDelta &delta) {
+                            return o.frame_delta(delta);
+                          });
+}
+tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
+    tessera_session session, std::uint64_t generation_from,
+    tessera_obs_frame_delta_v1 *out, std::uint32_t out_size,
+    tessera_context_v1 *ctx) {
+  return frame_delta_call(
+      session, out, out_size, ctx,
+      [generation_from](IObservable &o, IObservable::FrameDelta &delta) {
+        return o.frame_delta_since(generation_from, delta);
+      });
+}
 tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
     tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
     std::uint32_t out_size, tessera_context_v1 *ctx) {

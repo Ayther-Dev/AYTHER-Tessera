@@ -1,5 +1,6 @@
 // Writes the synthetic Mega Drive test ROMs (spec 008, TP-101.10).
 //   tessera_md_testrom bus-sweep|ssf2-sweep|vint-counter <out.bin>
+#include "support/md_delta_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 
@@ -76,6 +77,9 @@ int main(int argc, char **argv) {
   else if (std::strncmp(argv[1], "mode4-scene-", 12) == 0) {
     rom = tessera::testrom::mode4_scene_rom(tessera::testrom::mode4_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
+  } else if (std::strncmp(argv[1], "delta-probe-", 12) == 0) {
+    rom = tessera::testrom::delta_probe_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10)));
   } else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else if (std::strncmp(argv[1], "dma-timing-", 11) == 0) {

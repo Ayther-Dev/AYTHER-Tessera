@@ -109,6 +109,21 @@ Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibuja
 - Las suscripciones son del consumidor, no de la máquina: sobreviven a una restauración, como en gpgx a `retro_unserialize`.
 - Banco: `tessera_diffbench --stats-script` y `--stats-out`.
 
+## Delta de frame (TP-205.4, medido sobre gpgx r4)
+
+`tessera_observation_frame_delta_poll_v1` (`poll_frame_delta`) y `tessera_observation_frame_delta_since_v1` (`frame_delta_since`) devuelven `tessera_obs_frame_delta_v1`, 2080 bytes: `struct_size` 2080, `delta_version` 1, `frame_generation`, cuatro contadores y `dirty_patterns[2048]`. Ninguna exige suscripción. Ajustado con 20 guiones sobre una ROM propia que escribe la VRAM desde una tabla por frame (`delta_probe`, `tests/support/md_delta_testrom.hpp`), `raster_bands`, `fm_psg_sweep` y `modes_sweep` (`tests/fixtures/diffbench/frame-delta.txt`), que corren igual en gpgx y en Tessera por la API pública.
+
+- `frame_generation` cuenta los frames ejecutados desde el encendido (1 tras el primero). Una restauración no la cambia, aunque el estado sea de un frame anterior: es del consumidor, no de la máquina.
+- `dirty_patterns`: un byte por patrón de 32 bytes de la VRAM; el bit n indica que cambió algún byte de su fila n (4 bytes). Por el puerto de datos y por DMA desde el 68000, reescribir el mismo valor no marca nada; el relleno y la copia de VRAM marcan todo lo que tocan, cambie o no. CRAM, VSRAM y los registros no marcan nada.
+- Se acumula del final de un frame al final del siguiente y se congela ahí: leerlo no lo consume y dos lecturas dan lo mismo.
+- Se acumula mientras está activa `VDP_MEMORY` o `RASTER_TRACKING`; si no, el delta va vacío. El primer frame tras el encendido, el primero en que vuelve a estar activa y el siguiente a una restauración dan todo sucio (0xFF), porque antes no se siguió nada.
+- Contadores del frame: `raster_event_count` y `raster_events_dropped` (el diario raster, con `RASTER_TRACKING`), `parsed_sprite_count` (con `SPRITE_CAPTURE`) y `audio_write_count` (con `AUDIO_WRITES`); 0 si su suscripción no está activa.
+- Una restauración marca todo sucio también en el delta ya congelado, y deja sus contadores a 0.
+- `frame_delta_since(g)`: OR de los deltas de las generaciones posteriores a `g`, con la generación y los contadores del último frame. Con `g` igual o posterior a la generación actual, el del último frame. Se guardan 8 frames: si `g` queda a más de 8 generaciones, todo sucio y `TESSERA_STALE_EPOCH` (gpgx `AYTHER_STATUS_DELTA_HISTORY_LOST`, -10; Tessera no tiene ese código y lo traduce, como los demás). La salida se rellena aunque el estado no sea `TESSERA_OK`.
+- `out_size` menor de 2080: `TESSERA_BUFFER_TOO_SMALL` (gpgx -3) y la salida no se toca; mayor: se escriben 2080.
+- Pendiente (decisión del responsable): cinco guiones en los que la CPU de Tessera escribe la VRAM a un ritmo algo distinto que gpgx (2554 palabras por frame con la pantalla encendida, frente a 2550; una palabra al final de cargar la escena con la pantalla apagada). Cambian las filas sucias junto al límite de un frame y el recuento de sprites del frame que reescribe la tabla de sprites. No es una regla del delta. Están en `frame-delta-timing.txt`; el test nativo los ejecuta sin fallar la suite.
+- Banco: operaciones `d[out_size]`, `D<generación>[,out_size]` (`D-<n>` cuenta hacia atrás desde la última lectura), `S` y `L` (guardar y restaurar más tarde) en `--stats-script`.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

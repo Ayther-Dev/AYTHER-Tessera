@@ -95,6 +95,8 @@ public:
     return bus_.work_ram();
   }
   const Vdp &vdp() const noexcept { return vdp_; }
+  /// The VRAM dirty patterns gathered since the last call (TP-205.4).
+  Vdp::DirtyPatterns take_vram_dirty() noexcept { return vdp_.take_dirty(); }
   /// Frame drawn by the last run_frame (RGBA8, `renderer().size()`).
   const Renderer &renderer() const noexcept { return renderer_; }
   const Sram &sram() const noexcept { return sram_; }

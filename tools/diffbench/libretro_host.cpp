@@ -64,7 +64,33 @@ struct AytherInterface {
   int32_t(__cdecl *recompose_multilayer)(uint16_t *, uint16_t *, uint16_t *,
                                          uint16_t *, uint16_t *, uint32_t,
                                          uint32_t, uint32_t *, uint32_t *);
+  // ABI 1.4
+  int32_t(__cdecl *frame_delta_since)(uint64_t, void *, uint32_t);
 };
+
+/// The dirty bytes of a frame delta as runs "first-last:value" (one index
+/// alone as "index:value"), comma separated; "none" when nothing is dirty.
+std::string dirty_runs(const uint8_t *dirty, size_t count) {
+  std::string out;
+  char buffer[32];
+  for (size_t i = 0; i < count;) {
+    if (dirty[i] == 0) {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j + 1 < count && dirty[j + 1] == dirty[i])
+      ++j;
+    if (j == i)
+      std::snprintf(buffer, sizeof(buffer), "%zu:%02x", i, dirty[i]);
+    else
+      std::snprintf(buffer, sizeof(buffer), "%zu-%zu:%02x", i, j, dirty[i]);
+    out += out.empty() ? "" : ",";
+    out += buffer;
+    i = j + 1;
+  }
+  return out.empty() ? "none" : out;
+}
 
 RunResult *g_result = nullptr;
 const std::vector<TraceFrame> *g_trace = nullptr;
@@ -431,6 +457,23 @@ RunResult run_libretro(const std::string &core_path,
                            ? 0
                            : -1;
             }
+          } else if (op == "S" || op == "L") {
+            // S saves the state, L restores the one saved last
+            static std::vector<uint8_t> saved;
+            size_t(__cdecl * ssize)() = nullptr;
+            bool(__cdecl * ser)(void *, size_t) = nullptr;
+            bool(__cdecl * unser)(const void *, size_t) = nullptr;
+            if (sym(core, "retro_serialize_size", ssize) &&
+                sym(core, "retro_serialize", ser) &&
+                sym(core, "retro_unserialize", unser)) {
+              if (op == "S") {
+                saved.assign(ssize(), 0);
+                status = ser(saved.data(), saved.size()) ? 0 : -1;
+              } else {
+                status =
+                    !saved.empty() && unser(saved.data(), saved.size()) ? 0 : -1;
+              }
+            }
           } else if (op == "r" && reset_core) {
             reset_core();
             status = 0;
@@ -458,6 +501,50 @@ RunResult run_libretro(const std::string &core_path,
                << "/" << st.single_hits << " multi=" << st.multilayer_calls
                << "/" << st.multilayer_hits << " fingerprint=" << std::hex
                << st.controls_fingerprint << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'd' || op[0] == 'D') {
+            // TP-205.4: d[out_size] polls the delta of the last frame;
+            // D<generation>[,out_size] asks for the delta since a generation
+            // ("D-<n>" counts back from the generation of the last poll).
+            static uint64_t last_generation = 0;
+            tessera_obs_frame_delta_v1 delta{};
+            std::memset(&delta, 0x5A, sizeof(delta));
+            const auto comma = op.find(',');
+            const uint32_t size =
+                comma != std::string::npos
+                    ? static_cast<uint32_t>(std::stoul(op.substr(comma + 1)))
+                : op[0] == 'd' && op.size() > 1
+                    ? static_cast<uint32_t>(std::stoul(op.substr(1)))
+                    : static_cast<uint32_t>(sizeof(delta));
+            status = -8;
+            if (op[0] == 'd' && iface->poll_frame_delta) {
+              status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                  iface->poll_frame_delta)(&delta, size);
+            } else if (op[0] == 'D' &&
+                       iface->struct_size >=
+                           offsetof(AytherInterface, frame_delta_since) +
+                               sizeof(iface->frame_delta_since) &&
+                       iface->frame_delta_since) {
+              const std::string g = op.substr(
+                  1, comma == std::string::npos ? std::string::npos : comma - 1);
+              const uint64_t from =
+                  g[0] == '-' ? last_generation - std::stoull(g.substr(1))
+                              : std::stoull(g);
+              status = iface->frame_delta_since(from, &delta, size);
+            }
+            if (op[0] == 'd' && status == 0)
+              last_generation = delta.frame_generation;
+            so << "frame=" << i << " " << op << " status=" << status
+               << " size=" << delta.struct_size
+               << " version=" << delta.delta_version
+               << " generation=" << delta.frame_generation
+               << " raster=" << delta.raster_event_count
+               << " sprites=" << delta.parsed_sprite_count
+               << " audio=" << delta.audio_write_count
+               << " dropped=" << delta.raster_events_dropped << " dirty="
+               << dirty_runs(delta.dirty_patterns,
+                             sizeof(delta.dirty_patterns))
+               << "\n";
             continue;
           } else if (op.size() > 2 && op[0] == 'p') {
             const auto eq = op.find('=');

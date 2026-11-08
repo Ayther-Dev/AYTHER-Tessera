@@ -82,6 +82,17 @@ public:
     return line_vram_written_ ? line_vram_ : vram_;
   }
   void begin_line_vram() noexcept { line_vram_written_ = false; }
+  /// FRAME_DELTA dirty patterns (TP-205.4): one byte per 32-byte pattern of
+  /// the VRAM, bit n set when a write changed a byte of its row n (4 bytes a
+  /// row). Writing the value already there marks nothing, except through a
+  /// VRAM fill or copy (measured on gpgx).
+  /// Gathered since the last take_dirty; observation only, not saved.
+  using DirtyPatterns = std::array<std::uint8_t, 2048>;
+  DirtyPatterns take_dirty() noexcept {
+    const auto out = dirty_;
+    dirty_ = {};
+    return out;
+  }
   const std::array<std::uint16_t, 64> &cram() const noexcept { return cram_; }
   const std::array<std::uint16_t, 40> &vsram() const noexcept { return vsram_; }
   /// CRAM entries 16, 32 and 48 as they were the last time the limited
@@ -198,6 +209,18 @@ private:
       line_vram_written_ = true;
     }
   }
+  /// Writes a VRAM byte and marks its pattern row when the value changes,
+  /// or always for a DMA fill or copy (`always`; measured on gpgx: the same
+  /// value through the data port or a 68000 DMA marks nothing).
+  void set_vram(std::uint32_t index, std::uint8_t value,
+                bool always = false) noexcept {
+    index &= 0xFFFFU;
+    if (vram_[index] == value && !always)
+      return;
+    vram_[index] = value;
+    dirty_[index >> 5] |= static_cast<std::uint8_t>(1U << ((index >> 2) & 7U));
+  }
+  DirtyPatterns dirty_{};
   // Not in the savestate: begin_line_vram resets it before any line is drawn.
   std::array<std::uint8_t, 0x10000> line_vram_{};
   bool line_vram_written_ = false;

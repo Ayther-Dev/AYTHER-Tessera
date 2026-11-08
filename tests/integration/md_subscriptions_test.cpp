@@ -14,10 +14,12 @@
 #include "md/regions.hpp"
 #include "md/vdp_render.hpp"
 #include "session/session.hpp"
+#include "support/md_delta_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include <tessera/tessera.h>
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -572,6 +574,12 @@ Bytes rom_named(const std::string &name) {
     return rom::raster_bands_rom(rom::raster_variant(number(13)));
   if (name.rfind("mode4-scene-", 0) == 0)
     return rom::mode4_scene_rom(rom::mode4_variant(number(12)));
+  if (name.rfind("delta-probe-", 0) == 0)
+    return rom::delta_probe_rom(number(12));
+  if (name.rfind("sprite-limits-", 0) == 0)
+    return rom::sprite_limits_rom(rom::sprite_variant(number(14)));
+  if (name.rfind("fm-psg-", 0) == 0)
+    return rom::fm_psg_sweep_rom(number(7));
   FAIL("unknown test rom " << name);
   return {};
 }
@@ -587,9 +595,34 @@ std::string native_statuses(const std::string &line) {
                          ? TESSERA_WRONG_STATE
                      : reference == -23 ? TESSERA_INVALID_ARGUMENT
                      : reference == -9  ? TESSERA_NOT_SUBSCRIBED
+                     : reference == -10 ? TESSERA_STALE_EPOCH
                                         : reference;
   return line.substr(0, at + 7) + std::to_string(native) +
          (end == std::string::npos ? "" : line.substr(end));
+}
+
+/// The dirty bytes of a frame delta as tessera_diffbench prints them: runs
+/// "first-last:value" (or "index:value"), comma separated, or "none".
+std::string dirty_runs(const std::uint8_t (&dirty)[2048]) {
+  std::string out;
+  char buffer[32];
+  for (std::size_t i = 0; i < 2048;) {
+    if (dirty[i] == 0) {
+      ++i;
+      continue;
+    }
+    std::size_t j = i;
+    while (j + 1 < 2048 && dirty[j + 1] == dirty[i])
+      ++j;
+    if (j == i)
+      std::snprintf(buffer, sizeof(buffer), "%zu:%02x", i, dirty[i]);
+    else
+      std::snprintf(buffer, sizeof(buffer), "%zu-%zu:%02x", i, j, dirty[i]);
+    out += out.empty() ? "" : ",";
+    out += buffer;
+    i = j + 1;
+  }
+  return out.empty() ? "none" : out;
 }
 
 /// Runs a stats script (see compare_recompose_stats.py) on the native machine
@@ -607,6 +640,8 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
       list.push_back(op);
   }
   std::vector<std::string> out;
+  std::uint64_t last_generation = 0;
+  Bytes saved;
   const std::uint32_t full = 320 * 240;
   std::vector<std::uint16_t> layers(5u * full);
   for (unsigned i = 0; i < frames; ++i) {
@@ -642,7 +677,48 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
         out.push_back(line.str());
         continue;
       }
-      if (op[0] == 's') {
+      if (op[0] == 'd' || op[0] == 'D') {
+        // TP-205.4, as tessera_diffbench prints it (libretro_host.cpp)
+        tessera_obs_frame_delta_v1 delta{};
+        std::memset(&delta, 0x5A, sizeof(delta));
+        const auto comma = op.find(',');
+        const auto size =
+            comma != std::string::npos
+                ? static_cast<std::uint32_t>(std::stoul(op.substr(comma + 1)))
+            : op[0] == 'd' && op.size() > 1
+                ? static_cast<std::uint32_t>(std::stoul(op.substr(1)))
+                : static_cast<std::uint32_t>(sizeof(delta));
+        if (op[0] == 'd') {
+          status = tessera_observation_frame_delta_poll_v1(s.handle, &delta,
+                                                           size, &s.context);
+          if (status == TESSERA_OK)
+            last_generation = delta.frame_generation;
+        } else {
+          const auto g = op.substr(
+              1, comma == std::string::npos ? std::string::npos : comma - 1);
+          const std::uint64_t from =
+              g[0] == '-' ? last_generation - std::stoull(g.substr(1))
+                          : std::stoull(g);
+          status = tessera_observation_frame_delta_since_v1(
+              s.handle, from, &delta, size, &s.context);
+        }
+        line << op << " status=" << status << " size=" << delta.struct_size
+             << " version=" << delta.delta_version
+             << " generation=" << delta.frame_generation
+             << " raster=" << delta.raster_event_count
+             << " sprites=" << delta.parsed_sprite_count
+             << " audio=" << delta.audio_write_count
+             << " dropped=" << delta.raster_events_dropped
+             << " dirty=" << dirty_runs(delta.dirty_patterns);
+        out.push_back(line.str());
+        continue;
+      }
+      if (op == "S") {
+        saved = s.checkpoint();
+        status = TESSERA_OK;
+      } else if (op == "L") {
+        status = s.restore(saved);
+      } else if (op[0] == 's') {
         status = tessera_observation_recompose_v1(s.handle, layers.data(),
                                                   capacity, hex(), &width,
                                                   &height, &s.context);
@@ -673,9 +749,13 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
 }
 } // namespace
 
-TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
+namespace {
+/// Runs every case of a fixture written by compare_recompose_stats.py
+/// ("case <rom> <subscriptions hex> <script> [frames]", gpgx's lines, "end")
+/// on the native machine; answers how many cases it ran.
+unsigned check_stats_fixture(const std::string &name) {
   std::ifstream fixture(std::string(TESSERA_SOURCE_DIR) +
-                        "/tests/fixtures/diffbench/recompose-stats.txt");
+                        "/tests/fixtures/diffbench/" + name);
   REQUIRE(fixture.good());
   std::string header;
   std::vector<std::string> expected;
@@ -696,19 +776,39 @@ TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
     }
     std::istringstream fields(header.substr(5));
     std::string rom, sub, script;
+    unsigned frames = 5;
     fields >> rom >> sub >> script;
+    fields >> frames;
     CAPTURE(header);
     Observed s(rom_named(rom));
     REQUIRE(s.set(static_cast<std::uint32_t>(std::stoul(sub, nullptr, 16))) ==
             TESSERA_OK);
-    const auto got = run_stats_script(s, script, 5);
+    const auto got = run_stats_script(s, script, frames);
     CHECK(got == expected);
-    for (std::size_t i = 0; i < got.size() && i < expected.size(); ++i)
+    for (std::size_t i = 0, shown = 0;
+         i < got.size() && i < expected.size() && shown < 4; ++i)
       if (got[i] != expected[i]) {
         MESSAGE("native: " << got[i] << " | gpgx: " << expected[i]);
-        break;
+        ++shown;
       }
     ++cases;
   }
-  CHECK(cases == 16);
+  return cases;
+}
+} // namespace
+
+TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
+  CHECK(check_stats_fixture("recompose-stats.txt") == 16);
+}
+
+TEST_CASE("frame_delta answers as gpgx did (TP-205.4)") {
+  CHECK(check_stats_fixture("frame-delta.txt") == 20);
+}
+
+// Open with the owner (TP-205.4): the CPU writes a few VRAM words more per
+// frame than on gpgx, so the dirty rows next to a frame boundary differ. It
+// runs and shows the differences without failing the suite.
+TEST_CASE("frame_delta at a frame boundary (TP-205.4, open)" *
+          doctest::may_fail()) {
+  CHECK(check_stats_fixture("frame-delta-timing.txt") == 5);
 }

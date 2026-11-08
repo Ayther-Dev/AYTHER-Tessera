@@ -105,9 +105,19 @@ public:
     system_->set_attribution(
         subscriptions_.active(TESSERA_OBS_SUB_ATTRIBUTION));
     apply_controls();
+    // TP-205.4: the dirty patterns are gathered while VDP_MEMORY or
+    // RASTER_TRACKING is active; the first frame they are again, everything
+    // is dirty (nothing was followed before it).
+    const bool tracking =
+        subscriptions_.active(TESSERA_OBS_SUB_VDP_MEMORY) ||
+        subscriptions_.active(TESSERA_OBS_SUB_RASTER_TRACKING);
+    if (tracking && !delta_tracking_)
+      delta_all_dirty_ = true;
+    delta_tracking_ = tracking;
     system_->run_frame();
     ++frame_;
     capture_output();
+    freeze_delta();
   }
 
   [[nodiscard]] Bytes machine_record() const override {
@@ -149,6 +159,7 @@ public:
     apply_controls();
     // A restore empties the recomposition caches; the counters go on (gpgx).
     single_cache_.valid = multilayer_cache_.valid = false;
+    delta_restored();
     pixels_.clear();
     pcm_.clear();
     refresh_frame_geometry();
@@ -167,6 +178,12 @@ public:
       return;
     subscriptions_ = old->subscriptions_;
     stats_ = old->stats_; // the caches start empty
+    // The frame delta history and its generation are not machine state
+    // either: gpgx keeps counting frames through retro_unserialize.
+    delta_ring_ = old->delta_ring_;
+    delta_generation_ = old->delta_generation_;
+    delta_tracking_ = old->delta_tracking_;
+    delta_restored();
     apply_controls();
   }
 
@@ -263,6 +280,30 @@ public:
     out.controls_fingerprint = controls_fingerprint();
     return TESSERA_OK;
   }
+  [[nodiscard]] std::int32_t frame_delta(FrameDelta &out) const override {
+    out = latest_delta();
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t frame_delta_since(std::uint64_t from,
+                                               FrameDelta &out) const override {
+    out = latest_delta();
+    if (delta_generation_ == 0)
+      return TESSERA_OK;
+    // Every frame after `from`; a generation not before the last one gives the
+    // last frame (measured on gpgx). Eight frames are kept.
+    const std::uint64_t first =
+        std::min(from, delta_generation_ - 1) + 1; // exclusive of `from`
+    if (delta_generation_ - first + 1 > kDeltaHistory) {
+      out.dirty.fill(0xFF);
+      return TESSERA_STALE_EPOCH; // gpgx AYTHER_STATUS_DELTA_HISTORY_LOST
+    }
+    for (std::uint64_t g = first; g < delta_generation_; ++g) {
+      const auto &older = delta_ring_[g % kDeltaHistory].dirty;
+      for (std::size_t i = 0; i < out.dirty.size(); ++i)
+        out.dirty[i] |= older[i];
+    }
+    return TESSERA_OK;
+  }
   [[nodiscard]] std::int32_t
   write_control(std::uint32_t id, std::uint32_t offset,
                 std::span<const std::uint8_t> data) override {
@@ -352,6 +393,48 @@ private:
       mix(0);
     return hash;
   }
+  static constexpr std::uint64_t kDeltaHistory = 8;
+  /// The delta of the frame just run, frozen into the history (TP-205.4).
+  /// Each counter is the one of its subscription, 0 while it is idle.
+  void freeze_delta() {
+    const auto dirty = system_->take_vram_dirty();
+    FrameDelta delta{};
+    delta.generation = ++delta_generation_;
+    if (delta_all_dirty_)
+      delta.dirty.fill(0xFF);
+    else if (delta_tracking_)
+      delta.dirty = dirty;
+    delta_all_dirty_ = false;
+    if (subscriptions_.active(TESSERA_OBS_SUB_RASTER_TRACKING)) {
+      delta.raster_events = system_->vdp().raster().count;
+      delta.raster_dropped = system_->vdp().raster().dropped;
+    }
+    if (subscriptions_.active(TESSERA_OBS_SUB_SPRITE_CAPTURE))
+      delta.parsed_sprites = system_->renderer().sprite_capture().count;
+    if (subscriptions_.active(TESSERA_OBS_SUB_AUDIO_WRITES))
+      delta.audio_writes =
+          static_cast<std::uint32_t>(system_->audio_writes().size());
+    delta_ring_[delta.generation % kDeltaHistory] = delta;
+  }
+  /// A restore may replace the whole VRAM: the last frame's delta and the
+  /// next one report everything dirty, and the frozen counters read 0
+  /// (measured on gpgx through retro_unserialize).
+  void delta_restored() {
+    delta_all_dirty_ = true;
+    if (delta_generation_ == 0)
+      return;
+    auto &last = delta_ring_[delta_generation_ % kDeltaHistory];
+    last = {};
+    last.generation = delta_generation_;
+    last.dirty.fill(0xFF);
+  }
+  [[nodiscard]] FrameDelta latest_delta() const {
+    if (delta_generation_ != 0)
+      return delta_ring_[delta_generation_ % kDeltaHistory];
+    FrameDelta none{}; // before the first frame: nothing is known yet
+    none.dirty.fill(0xFF);
+    return none;
+  }
   void refresh_frame_geometry() {
     const auto size = system_->renderer().size();
     width_ = size.width;
@@ -379,6 +462,10 @@ private:
   std::uint64_t work_ = 0; ///< bytes the observation delivered (TP-201.3)
   RecomposeStats stats_{};
   RecomposeCache single_cache_, multilayer_cache_;
+  std::array<FrameDelta, kDeltaHistory> delta_ring_{};
+  std::uint64_t delta_generation_ = 0; ///< frames run (gpgx's generation)
+  bool delta_tracking_ = false;
+  bool delta_all_dirty_ = true; ///< power-on: the first frame is all dirty
 };
 } // namespace
 
