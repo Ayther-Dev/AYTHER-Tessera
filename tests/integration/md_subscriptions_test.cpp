@@ -791,8 +791,8 @@ namespace {
 /// ("case <rom> <subscriptions hex> <script> [frames]", gpgx's lines, "end")
 /// on the native machine; answers how many cases it ran.
 /// Drops the " audio=<hex>" field of a FRAME_HASH line: Tessera's PCM is not
-/// gpgx's (48 kHz against 44.1 kHz; plan §5.2 keeps PCM informative), so the
-/// audio hash is the same formula over different samples.
+/// gpgx's (48 kHz against 44.1 kHz; plan §5.2 keeps PCM informative; EXC-008),
+/// so the audio hash is the same formula over different samples.
 std::string without_audio(std::string line) {
   const auto at = line.find(" audio=");
   if (at != std::string::npos)
@@ -877,7 +877,8 @@ TEST_CASE("frame_hash over FX-02 answers as gpgx did (TP-206.1)" *
 
 // The first frames after power-on, where the test ROMs set the VDP
 // up while it draws: Tessera's CPU reaches each write a little earlier than
-// gpgx (the EXC-007 cause), so a line or a CRAM entry lands one step sooner.
+// gpgx (EXC-007, widened to frame_hash), so a line or a CRAM entry lands
+// one step sooner.
 // raster_bands 7 also holds the known H32-in-H40 limitation. It runs and
 // shows the differences without failing the suite.
 TEST_CASE("frame_hash while the ROM sets the VDP up (TP-206.1)" *
