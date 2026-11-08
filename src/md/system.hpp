@@ -165,6 +165,10 @@ public:
   /// The renderer parses the sprites for the PARSED_SPRITES and
   /// SPRITE_OUTCOME regions only while this is on (SPRITE_CAPTURE).
   void set_attribution(bool on) noexcept { renderer_.set_attribution(on); }
+  /// LAYER_MASK and LAYER_DIM in force from the next line drawn.
+  void set_render_controls(std::uint8_t mask, bool dim) noexcept {
+    renderer_.set_controls(mask, dim);
+  }
   void set_sprite_capture(bool on) noexcept {
     renderer_.set_sprite_capture(on);
   }

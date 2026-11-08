@@ -72,12 +72,14 @@ RunResult run_tessera(const std::string &backend_id,
 #endif
 
 // Escritura de control sobre una region despues de `frame` frames
-// (`--poke <region>:<offset hex>:<bytes hex>:<frame>`).
+// (`--poke <region>:<offset hex>:<bytes hex>:<frame>[,...]`); varias se
+// aplican en orden.
 struct Poke {
   uint32_t region = 0, offset = 0;
   std::vector<uint8_t> data;
   unsigned frame = 0;
-  int32_t status = 0; ///< resultado de write_control
+  int32_t status = 0;      ///< resultado de write_control
+  uint64_t generation = 0; ///< new_generation de write_control
 };
 
 // Mando fijo durante toda la ejecucion (TP-108): 12 bits en el orden de la
@@ -100,6 +102,9 @@ void set_audio_events_out(const std::string &path);
 /// the size and the pixels to `path` (TP-205.1).
 void set_recompose_out(const std::string &path, uint32_t flags,
                        uint32_t capacity);
+/// After the run, calls recompose_multilayer (with the flags and capacity of
+/// set_recompose_out) and writes status, size and the five layers (TP-205.2).
+void set_multilayer_out(const std::string &path);
 /// Times every retro_run (TP-014.1/.2). `observation`: -1 leaves the default,
 /// 0 subscribes to nothing, 1 to every region (the full set).
 void set_bench(bool on, int observation);
@@ -112,6 +117,6 @@ RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
                        bool dump_regions = false,
                        const std::vector<TraceFrame> *trace = nullptr,
-                       Poke *poke = nullptr);
+                       std::vector<Poke> *pokes = nullptr);
 
 } // namespace diffbench

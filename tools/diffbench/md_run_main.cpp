@@ -9,6 +9,7 @@
 #include "md/system.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,7 +27,9 @@ int main(int argc, char **argv) {
   unsigned soft_reset_at = 0, hard_reset_at = 0;
   std::string events_path;
   std::vector<std::pair<std::uint32_t, std::string>> region_outs;
-  std::string recompose_path;
+  std::string recompose_path, multilayer_path;
+  bool isolate_layers = false, replay_journal = false;
+  std::string controls_spec;
   bool print_region = false;
   // a = from the ROM header (default), j, u, e, p = Japan PAL
   tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
@@ -76,6 +79,18 @@ int main(int argc, char **argv) {
       region_outs.emplace_back(
           static_cast<std::uint32_t>(std::strtoul(spec.c_str(), nullptr, 10)),
           spec.substr(colon + 1));
+    } else if (arg == "--multilayer-out" && has_value) {
+      // status, width, height, then plane A, plane B, window, sprites and
+      // composite (RGB565), as tessera_diffbench writes them for gpgx
+      multilayer_path = argv[++i];
+    } else if (arg == "--isolate-layers") {
+      isolate_layers = true; // RENDER_CONTROLS subscribed
+    } else if (arg == "--replay-journal") {
+      replay_journal = true; // RASTER_TRACKING subscribed
+    } else if (arg == "--controls" && has_value) {
+      // <LAYER_MASK hex>:<LAYER_DIM>:<frame>: the render controls in force
+      // from frame N on (0 = the first), RENDER_CONTROLS subscribed
+      controls_spec = argv[++i];
     } else if (arg == "--recompose-out" && has_value) {
       // status, width, height (int32, uint32, uint32), then the RGB565 pixels
       // of recompose_frame, as tessera_diffbench writes them for gpgx
@@ -188,6 +203,16 @@ int main(int argc, char **argv) {
       if (step.frame == frame + 1)
         for (unsigned port = 0; port < 2; ++port)
           system.set_pad(port, static_cast<std::uint16_t>(step.mask[port]));
+    if (!controls_spec.empty() &&
+        frame == std::strtoul(
+                     controls_spec.substr(controls_spec.rfind(':') + 1).c_str(),
+                     nullptr, 10))
+      system.set_render_controls(
+          static_cast<std::uint8_t>(
+              std::strtoul(controls_spec.c_str(), nullptr, 16) & 15U),
+          std::strtoul(
+              controls_spec.substr(controls_spec.find(':') + 1).c_str(),
+              nullptr, 10) != 0);
     if (!poke_spec.empty() && frame == poke_frame &&
         !system.poke_z80_ram(poke_offset, poke_bytes)) {
       std::fputs("poke out of range\n", stderr);
@@ -255,6 +280,26 @@ int main(int argc, char **argv) {
     std::ofstream ro(path, std::ios::binary | std::ios::trunc);
     ro.write(reinterpret_cast<const char *>(bytes.data()),
              static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!multilayer_path.empty()) {
+    tessera::md::FrameSize size;
+    std::array<std::vector<std::uint32_t>, 5> layers;
+    const bool ok = system.renderer().recompose_layers(
+        system.vdp(), isolate_layers, replay_journal, layers, size);
+    const std::int32_t status = ok ? 0 : -5; // TESSERA_WRONG_STATE
+    if (!ok)
+      size = {0, 0};
+    std::ofstream ro(multilayer_path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(&status), 4);
+    ro.write(reinterpret_cast<const char *>(&size.width), 4);
+    ro.write(reinterpret_cast<const char *>(&size.height), 4);
+    for (const auto &layer : layers) {
+      std::vector<std::uint16_t> pixels(layer.size());
+      std::transform(layer.begin(), layer.end(), pixels.begin(),
+                     tessera::md::rgba_to_565);
+      ro.write(reinterpret_cast<const char *>(pixels.data()),
+               static_cast<std::streamsize>(pixels.size() * 2));
+    }
   }
   if (!recompose_path.empty()) {
     tessera::md::FrameSize size;

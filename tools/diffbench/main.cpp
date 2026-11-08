@@ -231,9 +231,11 @@ int main(int argc, char **argv) {
     std::cerr << "argumento no reconocido: " << a << "\n";
     return 2;
   }
-  if (args.count("--recompose-out"))
+  if (args.count("--multilayer-out"))
+    diffbench::set_multilayer_out(args["--multilayer-out"]);
+  if (args.count("--recompose-out") || args.count("--multilayer-out"))
     diffbench::set_recompose_out(
-        args["--recompose-out"],
+        args.count("--recompose-out") ? args["--recompose-out"] : "",
         args.count("--recompose-flags")
             ? static_cast<uint32_t>(
                   std::strtoul(args["--recompose-flags"].c_str(), nullptr, 16))
@@ -350,11 +352,13 @@ int main(int argc, char **argv) {
         return 1;
       }
     }
-    diffbench::Poke poke;
-    if (args.count("--poke")) {
+    std::vector<diffbench::Poke> pokes;
+    std::stringstream poke_list(args.count("--poke") ? args["--poke"] : "");
+    for (std::string entry; std::getline(poke_list, entry, ',');) {
       // <region>:<offset hex>:<bytes hex>:<frame>
+      diffbench::Poke &poke = pokes.emplace_back();
       std::vector<std::string> parts;
-      std::stringstream ss(args["--poke"]);
+      std::stringstream ss(entry);
       for (std::string part; std::getline(ss, part, ':');)
         parts.push_back(part);
       if (parts.size() != 4 || parts[2].size() % 2 != 0) {
@@ -385,7 +389,7 @@ int main(int argc, char **argv) {
     const auto r = diffbench::run_libretro(
         args["--libretro"], args["--rom"], frames, args.count("--dump-regions") > 0,
         args.count("--trace") ? &trace : nullptr,
-        args.count("--poke") ? &poke : nullptr);
+        pokes.empty() ? nullptr : &pokes);
     if (args.count("--bench-out")) {
       const unsigned warmup =
           args.count("--warmup")
@@ -415,8 +419,8 @@ int main(int argc, char **argv) {
       std::ofstream out(args["--bench-out"]);
       out << j.dump(2) << "\n";
     }
-    if (args.count("--poke"))
-      std::cout << "poke status=" << poke.status << "\n";
+    for (const auto &poke : pokes)
+      std::cout << "poke status=" << poke.status << " generation=" << poke.generation << "\n";
     return report_run(r, frames, args);
   }
   if (args.count("--tessera")) {

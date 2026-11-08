@@ -1291,6 +1291,17 @@ inline ModesVariant modes_variant(unsigned id) {
     v.reg1_extra = 0x08;
     v.reg18 = 0x8C;
     break;
+  case 32: // window right and below, shadow (27 without interlace)
+    v.reg12 = 0x08;
+    v.reg17 = 0x85;
+    v.reg18 = 0x84;
+    break;
+  case 33: // window above and left, shadow, line scroll
+    v.reg12 = 0x08;
+    v.reg11 = 0x03;
+    v.reg17 = 0x05;
+    v.reg18 = 0x03;
+    break;
   default:
     break;
   }
@@ -1329,6 +1340,7 @@ struct SpriteVariant {
   unsigned fixed_h = 0;     // cells tall (0 = random)
   bool poll_status = false; // read the sprite flags into work RAM
   std::uint8_t reg1_extra = 0x00;
+  std::uint8_t reg0_extra = 0x00; // 0x20: left column blank
 };
 
 inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
@@ -1337,6 +1349,8 @@ inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
                 {5, 0x70},  {11, 0x00}, {16, 0x00}, {12, v.reg12},
                 {17, 0x00}, {18, 0x00}, {7, 0x05}};
   scene.reg1 = static_cast<std::uint8_t>(0x44 | v.reg1_extra);
+  if (v.reg0_extra != 0)
+    scene.regs.push_back({0, static_cast<std::uint8_t>(0x04 | v.reg0_extra)});
   scene.poll_status = v.poll_status;
   Lcg rng{0x5EED1000U + v.seed};
   std::vector<std::uint16_t> tiles;
@@ -1992,6 +2006,17 @@ inline SpriteVariant sprite_variant(unsigned id) {
     v.reg12 = 0x02;
     v.seed = id;
     v.poll_status = true;
+    break;
+  case 224: // left column blank over sprites (LAYER_DIM, TP-205.2)
+    v.count = 30;
+    v.max_cells = 3;
+    v.reg0_extra = 0x20;
+    break;
+  case 225: // the same with shadow/highlight, H40
+    v.count = 30;
+    v.max_cells = 3;
+    v.reg12 = 0x89;
+    v.reg0_extra = 0x20;
     break;
   default:
     break;

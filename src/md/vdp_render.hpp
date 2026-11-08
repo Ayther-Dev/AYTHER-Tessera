@@ -164,6 +164,33 @@ public:
   /// gpgx returns (the open question of raster_bands 7).
   std::vector<std::uint32_t> recompose(const Vdp &vdp, FrameSize &size) const;
 
+  /// LAYER_MASK bits (the Engine's AYTHER_LAYER_*): planes A and B, the
+  /// window and the sprites. A hidden layer draws nothing.
+  static constexpr std::uint8_t kLayerA = 1;
+  static constexpr std::uint8_t kLayerB = 2;
+  static constexpr std::uint8_t kLayerWindow = 4;
+  static constexpr std::uint8_t kLayerSprites = 8;
+  static constexpr std::uint8_t kLayerPlanes = 7;
+  static constexpr std::uint8_t kLayerAll = 15;
+  /// The render controls in force (RENDER_CONTROLS): LAYER_MASK and
+  /// LAYER_DIM, which darkens the whole frame to a quarter (each channel
+  /// >> 2, measured on gpgx after the mask).
+  void set_controls(std::uint8_t mask, bool dim) noexcept {
+    layer_mask_ = mask;
+    dim_ = dim;
+  }
+  std::uint8_t layer_mask() const noexcept { return layer_mask_; }
+  bool dim() const noexcept { return dim_; }
+  /// recompose_multilayer (TP-205.2): plane A, plane B, window, sprites and
+  /// the composite, each a frame like recompose's. LAYER_DIM darkens all
+  /// five; LAYER_MASK none (the composite shows every layer). With
+  /// `replay` (RASTER_TRACKING) the raster journal is replayed over the
+  /// final state. False in interlace mode 2, in Mode 4 and when `replay`
+  /// meets a journal that lost events.
+  bool recompose_layers(const Vdp &vdp, bool isolate, bool replay,
+                        std::array<std::vector<std::uint32_t>, 5> &layers,
+                        FrameSize &size) const;
+
   /// Savestate: what carries from one frame to the next (the frame itself is
   /// drawn again).
   void save(StateWriter &w) const;
@@ -176,7 +203,31 @@ private:
     bool high = false;      ///< priority bit of the tile
     bool opaque = false;    ///< colour index of the tile pixel is not 0
     bool collided = false;  ///< sprite pixel met by a later opaque sprite
+    bool window = false;    ///< drawn by the window (it replaces plane A)
   };
+  /// Clears the pixels of the layers LAYER_MASK hides.
+  void hide_layers(std::span<Pixel> a, std::span<const Pixel> plane_a,
+                   std::span<Pixel> b, std::span<Pixel> sp, bool whole_line,
+                   unsigned shift, bool shadow) const noexcept;
+  /// The last frame drawn again from `vdp` with `layer_mask` (recompose);
+  /// `multilayer` for the passes of recompose_layers, `replay` to replay the
+  /// raster journal.
+  std::vector<std::uint32_t> redraw(const Vdp &vdp, std::uint8_t layer_mask,
+                                    bool multilayer, bool replay,
+                                    FrameSize &size) const;
+  std::uint8_t layer_mask_ = kLayerAll;
+  bool dim_ = false;
+  /// Plane A of the last line the window did not cover whole: gpgx shows it
+  /// again on such lines with plane A and the window shown and plane B
+  /// hidden (measured, modes_sweep 8, 9, 12: line 223 of the frame before).
+  std::vector<Pixel> last_plane_a_;
+  /// Pixels of the line being drawn that a sprite won (LAYER_DIM spares them).
+  std::array<bool, 320> line_sprite_{};
+  std::array<bool, 320> emitted_sprite_{}; ///< line_sprite_ of the last line
+  bool multilayer_ = false;                ///< a pass of recompose_layers
+  bool redrawing_ = false;                 ///< recompose or recompose_layers
+  /// Journal replay over a final state without shadow/highlight.
+  bool replay_without_shadow_ = false;
   unsigned hscroll_value(const Vdp &vdp, unsigned plane,
                          std::uint32_t line) const;
   /// Overwrites plane A with the window where it covers the line.
@@ -193,6 +244,7 @@ private:
   void capture_line(const Vdp &vdp, std::uint32_t line);
   /// Mode 4 (TP-105.10): background, sprites and CRAM of the SMS VDP.
   void render_line_m4(const Vdp &vdp, std::uint32_t line);
+  void render_line_m5(const Vdp &vdp, std::uint32_t line);
   std::vector<std::uint32_t> frame_;
   FrameSize size_;
   LineHook hook_;

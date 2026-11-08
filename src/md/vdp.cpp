@@ -172,6 +172,30 @@ void Vdp::put(std::uint16_t value) {
   address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
 }
 
+void Vdp::replay(const RasterEvent &event) noexcept {
+  switch (event.reason) {
+  case 1:
+    regs_[event.address & 31U] = static_cast<std::uint8_t>(event.data);
+    break;
+  case 2: // BBBGGGRRR back to the CRAM word
+    cram_[event.address & 0x3FU] = static_cast<std::uint16_t>(
+        ((event.data >> 6 & 7U) << 9) | ((event.data >> 3 & 7U) << 5) |
+        ((event.data & 7U) << 1));
+    break;
+  case 4:
+    if ((event.address >> 1) < vsram_.size())
+      vsram_[event.address >> 1] = event.data;
+    break;
+  case 8:
+    vram_[event.address & 0xFFFEU] = static_cast<std::uint8_t>(event.data >> 8);
+    vram_[(event.address & 0xFFFEU) + 1U] =
+        static_cast<std::uint8_t>(event.data);
+    break;
+  default:
+    break;
+  }
+}
+
 int Vdp::raster_line() const noexcept {
   const std::uint32_t total = lines_per_frame(standard_);
   const std::uint32_t v = (line_ + 1U) % total;

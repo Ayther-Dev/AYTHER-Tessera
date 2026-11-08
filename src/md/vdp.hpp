@@ -120,6 +120,9 @@ public:
     bool cram_changed = false; ///< a CRAM change on a visible line
   };
   const RasterTracking &raster() const noexcept { return raster_; }
+  /// Puts back the value a journal event wrote (the replay of
+  /// recompose_multilayer with RASTER_TRACKING), with no other effect.
+  void replay(const RasterEvent &event) noexcept;
   /// Called at the first line of a frame, before the CPU runs in it: clears
   /// the raster tracking and fixes the frame's active height. The horizontal
   /// interrupt counter and the journal keep that height for the whole frame,

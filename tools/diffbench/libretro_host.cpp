@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -51,6 +52,14 @@ struct AytherInterface {
   uint32_t subscription_state_size, reserved1;
   void *get_subscriptions;
   int32_t(__cdecl *set_subscriptions)(uint32_t);
+  // ABI 1.0 tail, 1.1 and 1.2 (read only when struct_size reaches them)
+  uint32_t frame_delta_size;
+  void *poll_frame_delta;
+  uint32_t recompose_stats_size, reserved2;
+  void *get_recompose_stats;
+  int32_t(__cdecl *recompose_multilayer)(uint16_t *, uint16_t *, uint16_t *,
+                                         uint16_t *, uint16_t *, uint32_t,
+                                         uint32_t, uint32_t *, uint32_t *);
 };
 
 RunResult *g_result = nullptr;
@@ -182,6 +191,8 @@ void set_audio_events_out(const std::string &path) { g_audio_events_out = path; 
 static std::string g_recompose_out;
 static uint32_t g_recompose_flags = 0;
 static uint32_t g_recompose_capacity = 320u * 240u;
+static std::string g_multilayer_out;
+void set_multilayer_out(const std::string &path) { g_multilayer_out = path; }
 void set_recompose_out(const std::string &path, uint32_t flags,
                        uint32_t capacity) {
   g_recompose_out = path;
@@ -211,7 +222,7 @@ void set_pad_masks(uint32_t port0, uint32_t port1) {
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
                        bool dump_regions,
-                       const std::vector<TraceFrame> *trace, Poke *poke) {
+                       const std::vector<TraceFrame> *trace, std::vector<Poke> *pokes) {
   RunResult result;
   std::ifstream in(rom_path, std::ios::binary);
   if (!in) {
@@ -275,9 +286,10 @@ RunResult run_libretro(const std::string &core_path,
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;
     const bool want_iface =
-        dump_regions || poke != nullptr || g_bench_observation >= 0 ||
+        dump_regions || pokes != nullptr || g_bench_observation >= 0 ||
         g_sub_mask >= 0 ||
-        !g_audio_events_out.empty() || !g_recompose_out.empty();
+        !g_audio_events_out.empty() || !g_recompose_out.empty() ||
+        !g_multilayer_out.empty();
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -315,16 +327,20 @@ RunResult run_libretro(const std::string &core_path,
       result.error = "el core no exporta retro_reset";
     if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
       result.error = "el core no exporta retro_reset";
+    std::vector<Poke> no_pokes;
     for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
       if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
         reset_core();
       if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
         reset_core();
-      if (poke && iface && i == poke->frame) {
+      for (Poke &poke : pokes ? *pokes : no_pokes) {
+        if (i != poke.frame || !iface)
+          continue;
         uint64_t generation = 0;
-        poke->status = iface->write_control(
-            poke->region, poke->offset, poke->data.data(),
-            static_cast<uint32_t>(poke->data.size()), UINT64_MAX, &generation);
+        poke.status = iface->write_control(
+            poke.region, poke.offset, poke.data.data(),
+            static_cast<uint32_t>(poke.data.size()), UINT64_MAX, &generation);
+        poke.generation = generation;
       }
       const auto drain_audio_events = [&] {
         if (g_audio_events_out.empty() || !iface || !iface->poll_audio_events)
@@ -439,6 +455,34 @@ RunResult run_libretro(const std::string &core_path,
                       (std::min<size_t>)(size_t{width} * height,
                                          pixels.size()) *
                       2));
+    }
+    if (!g_multilayer_out.empty()) {
+      // TP-205.2: status, width, height, then plane A, plane B, window,
+      // sprites and composite, width x height RGB565 each.
+      const uint32_t capacity = g_recompose_capacity;
+      std::vector<std::vector<uint16_t>> layers(
+          5, std::vector<uint16_t>((std::max)(capacity, 1u)));
+      int32_t status = -8; // AYTHER_STATUS_UNSUPPORTED
+      uint32_t width = 0, height = 0;
+      if (iface &&
+          iface->struct_size >= offsetof(AytherInterface, recompose_multilayer) +
+                                    sizeof(void *) &&
+          iface->recompose_multilayer)
+        status = iface->recompose_multilayer(
+            layers[0].data(), layers[1].data(), layers[2].data(),
+            layers[3].data(), layers[4].data(), capacity, g_recompose_flags,
+            &width, &height);
+      std::ofstream out(g_multilayer_out, std::ios::binary);
+      out.write(reinterpret_cast<const char *>(&status), 4);
+      out.write(reinterpret_cast<const char *>(&width), 4);
+      out.write(reinterpret_cast<const char *>(&height), 4);
+      if (status == 0)
+        for (const auto &layer : layers)
+          out.write(reinterpret_cast<const char *>(layer.data()),
+                    static_cast<std::streamsize>(
+                        (std::min<size_t>)(size_t{width} * height,
+                                           layer.size()) *
+                        2));
     }
     using MemSize = size_t(__cdecl *)(unsigned);
     using MemData = void *(__cdecl *)(unsigned);

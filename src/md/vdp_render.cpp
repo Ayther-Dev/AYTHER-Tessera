@@ -359,6 +359,7 @@ void Renderer::window_line(const Vdp &vdp, std::uint32_t line,
     Pixel &pixel = a[x];
     pixel.opaque = colour != 0;
     pixel.high = (entry & 0x8000U) != 0;
+    pixel.window = true;
     pixel.index =
         static_cast<std::uint8_t>(((entry >> 13) & 3U) * 16U + colour);
   }
@@ -558,14 +559,22 @@ void Renderer::render_line_m4(const Vdp &vdp, std::uint32_t line) {
         sprite[static_cast<unsigned>(x)] = static_cast<int>(16U + colour);
     }
   }
+  // LAYER_MASK in Mode 4 (measured on gpgx, mode4_scene 1 to 11): bit 0
+  // the background, bit 3 the sprites; a hidden background is CRAM entry 0.
+  const bool bg_on = (layer_mask_ & kLayerA) != 0;
+  const bool sprites_on = (layer_mask_ & kLayerSprites) != 0;
   for (unsigned x = 0; x < width; ++x) {
     // colour 0 of a tile shows colour 0 of its palette (not the backdrop)
-    unsigned index = bg[x].index;
-    const bool show_bg = bg[x].colour != 0;
-    if (sprite[x] >= 0 && !(show_bg && bg[x].priority))
+    unsigned index = bg_on ? bg[x].index : 0U;
+    const bool show_bg = bg_on && bg[x].colour != 0;
+    // LAYER_DIM spares an opaque sprite pixel even under the background.
+    line_sprite_[x] = sprites_on && sprite[x] >= 0;
+    if (line_sprite_[x] && !(show_bg && bg[x].priority))
       index = static_cast<unsigned>(sprite[x]);
     row[x] = rgba(index);
   }
+  // The left column blank keeps its sprite pixels for LAYER_DIM (measured,
+  // mode4_scene 2, 3, 11).
   if ((vdp.reg(0) & 0x20U) != 0)
     for (unsigned x = 0; x < 8U; ++x)
       row[x] = backdrop;
@@ -802,10 +811,34 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
   if (line >= size_.height ||
       frame_.size() < std::size_t{size_.width} * size_.height)
     return;
-  if (vdp.mode4_active()) {
+  line_sprite_.fill(false);
+  if (vdp.mode4_active())
     render_line_m4(vdp, line);
+  else
+    render_line_m5(vdp, line);
+  // LAYER_DIM: a quarter of every RGB565 channel, after the mask, but where
+  // a sprite wins. The recompositions spare on every line the pixels a
+  // sprite won on the last line of the emitted frame (measured on gpgx,
+  // palette_sweep, modes_sweep 0, raster_bands 0, sprite_limits 0, 9, 200,
+  // 223, mode4_scene, with every mask). Expanded back as a host expands
+  // gpgx's frame.
+  if (!dim_)
     return;
-  }
+  const auto row = std::span<std::uint32_t>(frame_).subspan(
+      std::size_t{line} * size_.width, size_.width);
+  const auto &spared = redrawing_ ? emitted_sprite_ : line_sprite_;
+  for (std::size_t x = 0; x < row.size(); ++x)
+    if (x >= spared.size() || !spared[x]) {
+      auto &pixel = row[x];
+      const std::uint32_t r5 = ((pixel >> 3) & 31U) >> 2;
+      const std::uint32_t g6 = ((pixel >> 10) & 63U) >> 2;
+      const std::uint32_t b5 = ((pixel >> 19) & 31U) >> 2;
+      pixel = (r5 << 3 | r5 >> 2) | ((g6 << 2 | g6 >> 4) << 8) |
+              ((b5 << 3 | b5 >> 2) << 16) | 0xFF000000U;
+    }
+}
+
+void Renderer::render_line_m5(const Vdp &vdp, std::uint32_t line) {
   capture_line_state(vdp, line);
   // Register 0 bit 2 clear (limited palette): gpgx keeps only the lowest bit
   // of each 3-bit channel (color_update_m5, data &= 0x49).
@@ -863,7 +896,35 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
     sprite_line(vdp, line, sp);
     plane_line(vdp, 0, line, a);
     plane_line(vdp, 1, line, b);
+    const bool masked = (layer_mask_ & kLayerAll) != kLayerAll;
+    std::vector<Pixel> plane_a;
+    if (masked)
+      plane_a = a;
     window_line(vdp, line, a);
+    const bool whole_line =
+        (reg18 & 0x80U) != 0 ? line >= v_bound : line < v_bound;
+    if (!whole_line)
+      last_plane_a_.assign(a.begin(), a.end());
+    if (masked) {
+      const unsigned shift =
+          (latch_.line == line ? latch_.hscroll[0]
+                               : hscroll_value(vdp, 0, line)) &
+          15U;
+      hide_layers(a, plane_a, b, sp, whole_line, shift, shadow_mode);
+    }
+    // gpgx quirk of the passes without sprites in shadow/highlight mode
+    // (measured, modes_sweep 13 and 21, palette_sweep, sprite_limits 200 to
+    // 210): what would be drawn at normal brightness is black where the
+    // winning pixel is opaque with priority, and the winning colour (plane or
+    // backdrop) highlighted otherwise.
+    // With the journal replayed, a line in shadow/highlight mode when the
+    // final state is not loses its sprites the same way (measured,
+    // raster_bands 8).
+    const bool sprites_lost = shadow_mode && replay_without_shadow_;
+    if (sprites_lost)
+      std::fill(sp.begin(), sp.end(), Pixel{});
+    const bool sh_no_sprites =
+        shadow_mode && ((layer_mask_ & kLayerSprites) == 0 || sprites_lost);
     for (unsigned x = 0; x < width; ++x) {
       unsigned index = backdrop_index;
       const Pixel &pa = a[x];
@@ -911,6 +972,12 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
         index = pb.index;
       }
       row[x] = cram_colour(index, shade);
+      // The attribution's notion of a sprite pixel (sprite_limits 0, 3, 9).
+      line_sprite_[x] = from_sprite || (sp[x].collided && !shadow_mode);
+      if (sh_no_sprites && shade == Shade::normal)
+        row[x] = (pa.opaque && pa.high) || (pb.opaque && pb.high)
+                     ? 0xFF000000U
+                     : cram_colour(index, Shade::highlight);
       // A sprite pixel met by a later opaque sprite counts as a sprite even
       // where a plane with priority hides it (measured, sprite_limits 0, 3,
       // 9), but not with shadow/highlight on (sprite_limits 201, 205, 207,
@@ -920,10 +987,12 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
             attribution_byte(pa, pb, x, shadow_mode, has_window,
                              from_sprite || (sp[x].collided && !shadow_mode));
     }
-    if ((vdp.reg(0) & 0x20U) != 0) // left column blank: backdrop
+    // Left column blank: backdrop at normal brightness, shadow/highlight
+    // or not (sprite_limits 225); not in the multilayer recomposition of
+    // gpgx (measured modes_sweep 7 and 29).
+    if ((vdp.reg(0) & 0x20U) != 0 && !multilayer_)
       for (unsigned x = 0; x < 8U && x < width; ++x)
-        row[x] = cram_colour(backdrop_index,
-                             shadow_mode ? Shade::shadow : Shade::normal);
+        row[x] = cram_colour(backdrop_index, Shade::normal);
   }
   if (hook_)
     hook_(line, row);
@@ -947,12 +1016,83 @@ void Renderer::load(StateReader &r) {
     b = r.boolean();
 }
 
+void Renderer::hide_layers(std::span<Pixel> a, std::span<const Pixel> plane_a,
+                           std::span<Pixel> b, std::span<Pixel> sp,
+                           bool whole_line, unsigned shift,
+                           bool shadow) const noexcept {
+  // Measured on gpgx (modes_sweep 8 to 12, 17 to 20, 26, 27, 31, every
+  // mask): a line the window covers whole is in neither layer alone; it
+  // shows with the window and plane B, and with the window and plane A but
+  // not B it shows the last plane A line drawn, except in shadow/highlight
+  // mode with the sprites shown (modes_sweep 27, 32, 33: nothing). Where it
+  // covers part of the
+  // line, plane A alone spills over the window by its fine scroll: with the
+  // window on the left (edge e) the 16 - shift pixels before e repeat the
+  // pair after them (A at x + 16, the repeated column of LINE_CELLS); with
+  // the window on the right the shift pixels after e are the plane itself.
+  const bool show_a = (layer_mask_ & kLayerA) != 0;
+  const bool show_w = (layer_mask_ & kLayerWindow) != 0;
+  const bool show_b = (layer_mask_ & kLayerB) != 0;
+  const bool show_sprites = (layer_mask_ & kLayerSprites) != 0;
+  const std::size_t width = a.size();
+  std::size_t spill_from = 0, spill_to = 0, spill_offset = 0;
+  if (!whole_line && show_a && !show_w && shift != 0 && width != 0) {
+    std::size_t edge = 0;
+    if (a[0].window) {
+      while (edge < width && a[edge].window)
+        ++edge;
+      spill_from = edge >= 16U - shift ? edge - (16U - shift) : 0;
+      spill_to = edge;
+      spill_offset = 16;
+    } else {
+      while (edge < width && !a[edge].window)
+        ++edge;
+      spill_from = edge;
+      spill_to = std::min(width, edge + shift);
+    }
+  }
+  for (std::size_t x = 0; x < width; ++x) {
+    Pixel &pixel = a[x];
+    if (whole_line) {
+      if (!show_w || !(show_a || show_b))
+        pixel = Pixel{};
+      else if (!show_b)
+        pixel = x < last_plane_a_.size() && !(shadow && show_sprites)
+                    ? last_plane_a_[x]
+                    : Pixel{};
+    } else if (pixel.window) {
+      if (!show_w)
+        pixel = x >= spill_from && x < spill_to && x + spill_offset < width
+                    ? plane_a[x + spill_offset]
+                    : Pixel{};
+    } else if (!show_a) {
+      pixel = Pixel{};
+    }
+  }
+  if (!show_b)
+    std::fill(b.begin(), b.end(), Pixel{});
+  if (!show_sprites)
+    std::fill(sp.begin(), sp.end(), Pixel{});
+}
+
 std::vector<std::uint32_t> Renderer::recompose(const Vdp &vdp,
                                                FrameSize &size) const {
+  return redraw(vdp, layer_mask_, false, false, size);
+}
+
+std::vector<std::uint32_t> Renderer::redraw(const Vdp &vdp,
+                                            std::uint8_t layer_mask,
+                                            bool multilayer, bool replay,
+                                            FrameSize &size) const {
   size = {0, 0};
   if (!vdp.mode4_active() && (vdp.reg(12) & 0x06U) == 0x06U)
     return {};
   Renderer copy = *this;
+  copy.layer_mask_ = layer_mask;
+  copy.multilayer_ = multilayer;
+  copy.redrawing_ = true;
+  copy.replay_without_shadow_ = replay && (vdp.reg(12) & 0x08U) == 0;
+  copy.emitted_sprite_ = line_sprite_;
   copy.hook_ = {};
   copy.capture_on_ = false;
   copy.attribution_on_ = false;
@@ -966,12 +1106,45 @@ std::vector<std::uint32_t> Renderer::recompose(const Vdp &vdp,
     copy.size_ = size_;
     copy.frame_.assign(std::size_t{size_.width} * size_.height, 0xFF000000U);
   }
+  // Journal replay (measured on gpgx, raster_bands 0 to 33): from the final
+  // state, an event takes effect on line v_counter; before its first event a
+  // value is the final one.
+  const auto &journal = vdp.raster();
+  std::uint32_t next = 0;
   for (std::uint32_t line = 0; line < copy.size_.height; ++line) {
+    while (replay && next < journal.count &&
+           journal.events[next].v_counter <= line)
+      state.replay(journal.events[next++]);
     copy.latch_line(state, line);
     copy.render_line(state, line);
   }
   size = copy.size_;
   return std::move(copy.frame_);
+}
+
+bool Renderer::recompose_layers(
+    const Vdp &vdp, bool isolate, bool replay,
+    std::array<std::vector<std::uint32_t>, 5> &layers, FrameSize &size) const {
+  // Measured on gpgx: with RENDER_CONTROLS each layer is drawn alone over the
+  // backdrop; without it, A, B and W are the planes together without sprites
+  // and the sprite layer is the whole frame.
+  const std::array<std::uint8_t, 4> masks =
+      isolate ? std::array<std::uint8_t, 4>{kLayerA, kLayerB, kLayerWindow,
+                                            kLayerSprites}
+              : std::array<std::uint8_t, 4>{kLayerPlanes, kLayerPlanes,
+                                            kLayerPlanes, kLayerAll};
+  // Mode 4 has no multilayer recomposition (gpgx RC_NOT_MODE5), nor a
+  // replay of a journal that lost events (RC_JOURNAL_OVERFLOW, raster_bands
+  // 9 and 10).
+  if (vdp.mode4_active() || (replay && vdp.raster().dropped != 0))
+    return false;
+  for (unsigned i = 0; i < 4; ++i) {
+    layers[i] = redraw(vdp, masks[i], true, replay, size);
+    if (layers[i].empty())
+      return false;
+  }
+  layers[4] = redraw(vdp, kLayerAll, true, replay, size);
+  return true;
 }
 
 } // namespace tessera::md

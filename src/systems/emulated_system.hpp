@@ -88,6 +88,22 @@ public:
     width = height = 0;
     return -6; // TESSERA_UNSUPPORTED_CAPABILITY
   }
+  /// recompose_multilayer (TP-205.2): plane A, plane B, window, sprites and
+  /// the composite, each `width` x `height` RGB565 pixels.
+  [[nodiscard]] virtual std::int32_t
+  recompose_layers(std::array<std::span<std::uint16_t>, 5> /*out*/,
+                   std::uint32_t /*flags*/, std::uint32_t &width,
+                   std::uint32_t &height) {
+    width = height = 0;
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// write_control (TP-205.2): INVALID_ARGUMENT for a value the control
+  /// refuses, UNSUPPORTED for a region the system does not control.
+  [[nodiscard]] virtual std::int32_t
+  write_control(std::uint32_t /*id*/, std::uint32_t /*offset*/,
+                std::span<const std::uint8_t> /*data*/) {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
   /// `event_size` bytes per event; `count` events written (0 if none).
   [[nodiscard]] virtual std::int32_t
   poll_audio_events(std::span<std::uint8_t> out, std::uint32_t capacity,

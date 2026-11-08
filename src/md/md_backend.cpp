@@ -104,6 +104,7 @@ public:
         subscriptions_.active(TESSERA_OBS_SUB_SPRITE_CAPTURE));
     system_->set_attribution(
         subscriptions_.active(TESSERA_OBS_SUB_ATTRIBUTION));
+    apply_controls();
     system_->run_frame();
     ++frame_;
     capture_output();
@@ -112,6 +113,9 @@ public:
   [[nodiscard]] Bytes machine_record() const override {
     Bytes record;
     wire::field(record, 1, TESSERA_ENCODING_BYTES, system_->save_state());
+    // RF-3.9: the written controls are part of the state.
+    const Bytes controls{layer_mask_, layer_dim_};
+    wire::field(record, 2, TESSERA_ENCODING_BYTES, controls);
     return record;
   }
 
@@ -121,18 +125,28 @@ public:
             TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
     const auto fields = wire::record(encoded, TESSERA_CHECKPOINT_INVALID,
                                      TESSERA_PHASE_RESTORE);
-    require(fields.size() == 1, TESSERA_CHECKPOINT_INVALID,
+    require(fields.size() == 2, TESSERA_CHECKPOINT_INVALID,
             TESSERA_PHASE_RESTORE);
     const auto state =
         wire::get(fields, 0, 1, TESSERA_ENCODING_BYTES,
                   std::numeric_limits<std::size_t>::max(),
                   TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+    const auto controls =
+        wire::get(fields, 1, 2, TESSERA_ENCODING_BYTES, 2,
+                  TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+    require(controls.size() == 2 &&
+                valid_control(kLayerMaskRegion, controls[0]) &&
+                valid_control(kLayerDimRegion, controls[1]),
+            TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
     // load_state leaves the machine as it was when it refuses (RF-4.5).
     require(system_->load_state(state) && system_->frame() == frame,
             TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
     apply_input(*system_, inputs);
     input_ = inputs;
     frame_ = frame;
+    layer_mask_ = controls[0];
+    layer_dim_ = controls[1];
+    apply_controls();
     pixels_.clear();
     pcm_.clear();
     refresh_frame_geometry();
@@ -158,6 +172,15 @@ public:
     const auto gate = observation::region_gate(id);
     if (gate != 0 && !subscriptions_.active(gate))
       return TESSERA_NOT_SUBSCRIBED; // idle: no work at all
+    if (id == kLayerMaskRegion || id == kLayerDimRegion) {
+      // Read back as written, with or without RENDER_CONTROLS (measured).
+      if (offset != 0 || out.size() > 1)
+        return TESSERA_INVALID_ARGUMENT;
+      if (!out.empty())
+        out[0] = id == kLayerMaskRegion ? layer_mask_ : layer_dim_;
+      work_ += out.size();
+      return TESSERA_OK;
+    }
     const auto content = memory_region(*system_, id);
     if (content.empty() && !variable_region(*system_, id))
       return TESSERA_UNSUPPORTED_CAPABILITY; // not served yet (TP-202 onwards)
@@ -193,6 +216,46 @@ public:
     work_ += frame.size() * sizeof(std::uint16_t);
     return TESSERA_OK;
   }
+  [[nodiscard]] std::int32_t
+  recompose_layers(std::array<std::span<std::uint16_t>, 5> out,
+                   std::uint32_t /*flags*/, std::uint32_t &width,
+                   std::uint32_t &height) override {
+    width = height = 0;
+    if (!subscriptions_.active(TESSERA_OBS_SUB_RECOMPOSITION))
+      return TESSERA_NOT_SUBSCRIBED;
+    // With RENDER_CONTROLS every layer is drawn alone (measured on gpgx).
+    std::array<std::vector<std::uint32_t>, 5> layers;
+    FrameSize size;
+    if (!system_->renderer().recompose_layers(
+            system_->vdp(),
+            subscriptions_.active(TESSERA_OBS_SUB_RENDER_CONTROLS),
+            subscriptions_.active(TESSERA_OBS_SUB_RASTER_TRACKING), layers,
+            size))
+      return TESSERA_WRONG_STATE; // gpgx RC_NOT_MODE5, RC_INTERLACE2,
+                                  // RC_JOURNAL_OVERFLOW
+    for (unsigned i = 0; i < 5; ++i)
+      if (out[i].size() < layers[i].size())
+        return TESSERA_INVALID_ARGUMENT;
+    for (unsigned i = 0; i < 5; ++i)
+      std::transform(layers[i].begin(), layers[i].end(), out[i].begin(),
+                     rgba_to_565);
+    width = size.width;
+    height = size.height;
+    work_ += 5U * layers[0].size() * sizeof(std::uint16_t);
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t
+  write_control(std::uint32_t id, std::uint32_t offset,
+                std::span<const std::uint8_t> data) override {
+    if (id != kLayerMaskRegion && id != kLayerDimRegion)
+      return TESSERA_UNSUPPORTED_CAPABILITY; // AUDIO_MUTE arrives with TP-209
+    if (offset != 0 || data.size() != 1 || !valid_control(id, data[0]) ||
+        data[0] == 0xFF)
+      return TESSERA_INVALID_ARGUMENT;
+    (id == kLayerMaskRegion ? layer_mask_ : layer_dim_) = data[0];
+    apply_controls();
+    return TESSERA_OK;
+  }
   [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
                                                std::uint32_t capacity,
                                                std::uint32_t event_size,
@@ -223,6 +286,22 @@ public:
   }
 
 private:
+  static constexpr std::uint32_t kLayerMaskRegion =
+      TESSERA_OBS_REGION_LAYER_MASK;
+  static constexpr std::uint32_t kLayerDimRegion = TESSERA_OBS_REGION_LAYER_DIM;
+  /// gpgx refuses a mask beyond the four layers and a dim other than 0 or 1;
+  /// 0xFF, the mask before any write, is valid only as restored state.
+  static bool valid_control(std::uint32_t id, std::uint8_t value) noexcept {
+    return id == kLayerMaskRegion ? value <= 0x0F || value == 0xFF : value <= 1;
+  }
+  /// The controls act only while RENDER_CONTROLS is active (measured).
+  void apply_controls() {
+    const bool on = subscriptions_.active(TESSERA_OBS_SUB_RENDER_CONTROLS);
+    system_->set_render_controls(
+        on ? static_cast<std::uint8_t>(layer_mask_ & Renderer::kLayerAll)
+           : Renderer::kLayerAll,
+        on && layer_dim_ != 0);
+  }
   void refresh_frame_geometry() {
     const auto size = system_->renderer().size();
     width_ = size.width;
@@ -245,6 +324,8 @@ private:
   std::uint32_t width_ = 0, height_ = 0;
   std::uint64_t frame_ = 0;
   observation::Subscriptions subscriptions_;
+  std::uint8_t layer_mask_ = 0xFF; ///< LAYER_MASK as written (gpgx: 0xFF)
+  std::uint8_t layer_dim_ = 0;     ///< LAYER_DIM as written
   std::uint64_t work_ = 0; ///< bytes the observation delivered (TP-201.3)
 };
 } // namespace

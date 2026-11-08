@@ -176,7 +176,8 @@ bool served(unsigned region) {
   return region == 1 || region == 2 || region == 3 || region == 4 ||
          region == 13 || region == 14 || region == 17 || region == 18 ||
          region == 24 || region == 25 || region == 26 || region == 16 ||
-         region == 19 || region == 20 || region == 21 || region == 22;
+         region == 19 || region == 20 || region == 21 || region == 22 ||
+         region == 5 || region == 10;
 }
 } // namespace
 
@@ -321,6 +322,117 @@ TEST_CASE("recompose_frame draws the last frame again (TP-205.1)") {
                                          &width, &height, &s.context) ==
         TESSERA_INVALID_ARGUMENT);
   CHECK(s.checkpoint() == before);
+}
+
+TEST_CASE("LAYER_MASK and LAYER_DIM through write_control (TP-205.2)") {
+  Observed s(rom_idle());
+  Observed plain(rom_idle()); // the same frames with no control written
+  const auto write = [&](std::uint32_t region, Bytes data,
+                         std::uint64_t *generation = nullptr) {
+    std::uint64_t g = 0;
+    const auto status = tessera_observation_write_control_v1(
+        s.handle, region, 0, data.data(),
+        static_cast<std::uint32_t>(data.size()), UINT64_MAX, &g, &s.context);
+    if (generation)
+      *generation = g;
+    return status;
+  };
+  const auto value = [&](std::uint32_t region) {
+    Bytes out;
+    REQUIRE(s.read(region, &out) == TESSERA_OK);
+    REQUIRE(out.size() == 1);
+    return out[0];
+  };
+  s.step(2);
+  plain.step(2);
+  // Before any write gpgx reads 0xFF and 0, with nothing subscribed.
+  CHECK(value(TESSERA_OBS_REGION_LAYER_MASK) == 0xFF);
+  CHECK(value(TESSERA_OBS_REGION_LAYER_DIM) == 0);
+  std::uint64_t before = 0, after = 0;
+  REQUIRE(write(TESSERA_OBS_REGION_LAYER_MASK, {0x0F}, &before) == TESSERA_OK);
+  // Refused: a mask beyond the four layers, a dim other than 0 or 1, more
+  // bytes than the region has. A refused write leaves the generation.
+  CHECK(write(TESSERA_OBS_REGION_LAYER_MASK, {0x10}) ==
+        TESSERA_INVALID_ARGUMENT);
+  CHECK(write(TESSERA_OBS_REGION_LAYER_MASK, {0xFF}) ==
+        TESSERA_INVALID_ARGUMENT);
+  CHECK(write(TESSERA_OBS_REGION_LAYER_DIM, {2}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(write(TESSERA_OBS_REGION_LAYER_DIM, {1, 0}) ==
+        TESSERA_INVALID_ARGUMENT);
+  CHECK(write(TESSERA_OBS_REGION_AUDIO_MUTE, {1}) ==
+        TESSERA_UNSUPPORTED_CAPABILITY); // TP-209
+  REQUIRE(write(TESSERA_OBS_REGION_LAYER_DIM, {1}, &after) == TESSERA_OK);
+  CHECK(after == before + 1);
+  CHECK(value(TESSERA_OBS_REGION_LAYER_DIM) == 1);
+  // Without RENDER_CONTROLS the controls are kept but do nothing.
+  s.step();
+  plain.step();
+  CHECK(s.original() == plain.original());
+  // With it, from the next frame: LAYER_DIM darkens every channel.
+  REQUIRE(s.set(TESSERA_OBS_SUB_RENDER_CONTROLS |
+                TESSERA_OBS_SUB_RECOMPOSITION) == TESSERA_OK);
+  s.step();
+  plain.step();
+  const auto dark = s.original(), lit = plain.original();
+  REQUIRE(dark.size() == lit.size());
+  const std::size_t pixels = 256 * 224;
+  bool dimmed = true;
+  for (std::size_t i = 0; i < pixels * 4; i += 4)
+    for (unsigned c = 0; c < 3; ++c) {
+      const unsigned bits = c == 1 ? 6 : 5;
+      const unsigned v = (lit[i + c] >> (8 - bits)) >> 2;
+      const unsigned expanded =
+          bits == 6 ? (v << 2 | v >> 4) : (v << 3 | v >> 2);
+      dimmed = dimmed && dark[i + c] == expanded;
+    }
+  CHECK(dimmed);
+  // recompose_multilayer: five dimmed layers; the composite is the frame.
+  std::array<std::vector<std::uint16_t>, 5> layers;
+  for (auto &layer : layers)
+    layer.assign(pixels, 0);
+  std::uint32_t width = 0, height = 0;
+  const auto multilayer = [&](std::uint32_t capacity) {
+    return tessera_observation_recompose_multilayer_v1(
+        s.handle, layers[0].data(), layers[1].data(), layers[2].data(),
+        layers[3].data(), layers[4].data(), capacity, 0, &width, &height,
+        &s.context);
+  };
+  REQUIRE(multilayer(pixels) == TESSERA_OK);
+  CHECK(width == 256);
+  CHECK(height == 224);
+  bool composite = true;
+  for (std::size_t i = 0; i < pixels; ++i)
+    composite = composite &&
+                layers[4][i] == tessera::md::rgba_to_565(dark[4 * i] |
+                                                         dark[4 * i + 1] << 8 |
+                                                         dark[4 * i + 2] << 16);
+  CHECK(composite);
+  CHECK(multilayer(pixels - 1) == TESSERA_INVALID_ARGUMENT);
+  CHECK(tessera_observation_recompose_multilayer_v1(
+            s.handle, layers[0].data(), nullptr, layers[2].data(),
+            layers[3].data(), layers[4].data(), pixels, 0, &width, &height,
+            &s.context) == TESSERA_INVALID_ARGUMENT);
+  // RF-3.9: the controls are part of the state.
+  REQUIRE(write(TESSERA_OBS_REGION_LAYER_MASK, {0x05}) == TESSERA_OK);
+  const auto saved = s.checkpoint();
+  REQUIRE(write(TESSERA_OBS_REGION_LAYER_MASK, {0x0F}) == TESSERA_OK);
+  REQUIRE(write(TESSERA_OBS_REGION_LAYER_DIM, {0}) == TESSERA_OK);
+  REQUIRE(s.restore(saved) == TESSERA_OK);
+  CHECK(value(TESSERA_OBS_REGION_LAYER_MASK) == 0x05);
+  CHECK(value(TESSERA_OBS_REGION_LAYER_DIM) == 1);
+}
+
+TEST_CASE("recompose_multilayer needs RECOMPOSITION (TP-205.2)") {
+  Observed s(rom_idle());
+  std::array<std::vector<std::uint16_t>, 5> l;
+  for (auto &layer : l)
+    layer.assign(256 * 224, 0);
+  std::uint32_t width = 0, height = 0;
+  s.step(2);
+  CHECK(tessera_observation_recompose_multilayer_v1(
+            s.handle, l[0].data(), l[1].data(), l[2].data(), l[3].data(),
+            l[4].data(), 256 * 224, 0, &width, &height,
+            &s.context) == TESSERA_NOT_SUBSCRIBED);
 }
 
 TEST_CASE("the audio event transport only runs while subscribed") {

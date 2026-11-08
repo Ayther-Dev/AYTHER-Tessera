@@ -177,7 +177,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(block RANGE 0 8)
             list(APPEND frame_roms palette-sweep-${block})
         endforeach()
-        foreach(variant RANGE 0 31)
+        foreach(variant RANGE 0 33)
             list(APPEND frame_roms modes-sweep-${variant})
         endforeach()
         # sprite_limits (TP-105.5, TP-105.6): sprite table, per line limits,
@@ -188,7 +188,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # sprite_variant() in tests/support/md_testrom.hpp.
         set(sprite_variants)
         foreach(range IN ITEMS "0;25" "100;120" "130;135" "140;145" "150;167"
-                               "170;176" "180;188" "200;211" "220;223")
+                               "170;176" "180;188" "200;211" "220;225")
             list(GET range 0 first)
             list(GET range 1 last)
             foreach(variant RANGE ${first} ${last})
@@ -283,6 +283,43 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_REQUIRED md_${mode}_rom
                 PASS_REGULAR_EXPRESSION "^identical"
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
+        # TP-205.2: recompose_multilayer with the raster journal replayed
+        # (RASTER_TRACKING), every layer alone (RENDER_CONTROLS) or not, and
+        # LAYER_MASK / LAYER_DIM written through write_control: the emitted
+        # frame, recompose_frame and the five layers. The masks with the
+        # window and one plane, the dim over sprites and the hidden Mode 4
+        # background are the measured quirks.
+        foreach(mode IN LISTS frame_roms)
+            foreach(kind IN ITEMS raster isolate)
+                set(kind_args --raster)
+                if(kind STREQUAL "isolate")
+                    list(APPEND kind_args --isolate)
+                endif()
+                add_test(NAME integration.md_${mode}_multilayer_${kind}
+                    COMMAND ${Python3_EXECUTABLE} -I
+                    "${CMAKE_CURRENT_SOURCE_DIR}/compare_multilayer.py"
+                    $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                    "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                    "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}-multilayer-${kind}" ${kind_args})
+                set_tests_properties(integration.md_${mode}_multilayer_${kind} PROPERTIES
+                    FIXTURES_REQUIRED md_${mode}_rom
+                    PASS_REGULAR_EXPRESSION "^identical"
+                    LABELS "integration;phase1;md;local" TIMEOUT 120)
+            endforeach()
+            if(mode MATCHES "^sprite-limits-")
+                set(controls "d:1,a:1")
+            else()
+                set(controls "5:0,6:0,d:1,a:1")
+            endif()
+            add_test(NAME integration.md_${mode}_controls COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_controls.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin" 8
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${mode}-controls" "${controls}")
+            set_tests_properties(integration.md_${mode}_controls PROPERTIES
+                FIXTURES_REQUIRED md_${mode}_rom
+                LABELS "integration;phase1;md;local" TIMEOUT 300)
         endforeach()
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
