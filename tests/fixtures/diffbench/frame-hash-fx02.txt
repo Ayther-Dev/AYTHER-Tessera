@@ -1,0 +1,13 @@
+# FRAME_HASH measured on gpgx over the FX-02 synthetic ROM (spec 008,
+# TP-206.1). Written by tools/diffbench/compare_recompose_stats.py --update
+# --fx02 <ayther_synthetic.md>; the native side runs it when the build knows
+# TESSERA_DIFFBENCH_FX02_ROM. See frame-hash.txt for the h operation.
+
+case fx02 800 0:h;1:h;2:h;10:h;30:h;59:h 60
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=50f23fcd93e40383 audio=db0253c04dfdd9ab vram=c40c8db7a7d67935 cram=f12f608be61854b7 vsram=306c537b2ff38983
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=f9e21f55859a2c83 audio=9afc658419cff2b vram=c40c8db7a7d67935 cram=f12f608be61854b7 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=c44e4b6965bd2c83 audio=d4edd7fe26e7ecf3 vram=c40c8db7a7d67935 cram=f12f608be61854b7 vsram=306c537b2ff38983
+frame=10 hash status=0 version=1 size=56 frame_index=10 video=c44e4b6965bd2c83 audio=a07884534f3f0d83 vram=c40a09000b97a7bf cram=91fcee9175d806af vsram=306c537b2ff38983
+frame=30 hash status=0 version=1 size=56 frame_index=30 video=c44e4b6965bd2c83 audio=a07884534f3f0d83 vram=c40a09000b97a7bf cram=91fcee9175d806af vsram=306c537b2ff38983
+frame=59 hash status=0 version=1 size=56 frame_index=59 video=c44e4b6965bd2c83 audio=a07884534f3f0d83 vram=c40a09000b97a7bf cram=91fcee9175d806af vsram=306c537b2ff38983
+end

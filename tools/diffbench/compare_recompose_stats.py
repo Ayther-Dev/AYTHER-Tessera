@@ -9,12 +9,14 @@ after frame N, in order, s/m recompose (single/multilayer, optional
 writes a control, u<hex> sets the subscriptions, x saves and restores the
 state, S/L save a state and restore it later, d[out_size] polls the frame
 delta, D<generation>[,out_size] asks for the delta since a generation (TP-205.4;
-"D-<n>" counts back from the last poll). The fixture keeps what gpgx
+"D-<n>" counts back from the last poll), h reads FRAME_HASH (TP-206.1; H also
+prints the host's own hashes, for diagnosis). A case rom "fx02" is the FX-02
+synthetic ROM given with --fx02. The fixture keeps what gpgx
 answered; the native side runs the same cases through the public API in
 tests/integration/md_subscriptions_test.cpp.
 
 usage: compare_recompose_stats.py <testrom> <diffbench> <gpgx_core> <fixture>
-                                  <out_dir> [--update]
+                                  <out_dir> [--update] [--fx02 <rom>]
 exit:  0 gpgx answers as recorded (or fixture rewritten), 1 different,
        2 a tool failed
 """
@@ -40,9 +42,16 @@ def cases(path):
     return result
 
 
+FX02 = None  # path of the FX-02 synthetic ROM (--fx02), the case rom "fx02"
+
+
 def run(testrom, diffbench, core, out_dir, rom, sub, script, frames):
     rom_path = os.path.join(out_dir, rom + ".bin")
-    if not os.path.exists(rom_path):
+    if rom == "fx02":
+        if FX02 is None:
+            return None
+        rom_path = FX02
+    elif not os.path.exists(rom_path):
         if subprocess.run([testrom, rom, rom_path],
                           capture_output=True).returncode != 0:
             return None
@@ -60,6 +69,12 @@ def run(testrom, diffbench, core, out_dir, rom, sub, script, frames):
 
 
 def main(argv):
+    global FX02
+    argv = list(argv)
+    if "--fx02" in argv:
+        at = argv.index("--fx02")
+        FX02 = argv[at + 1]
+        del argv[at:at + 2]
     if len(argv) not in (6, 7):
         print(__doc__)
         return 2

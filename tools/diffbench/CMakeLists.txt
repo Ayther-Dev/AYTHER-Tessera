@@ -24,6 +24,11 @@ set(TESSERA_DIFFBENCH_GPGX_CORE "" CACHE FILEPATH "Core libretro de gpgx (r4) pa
 set(TESSERA_DIFFBENCH_CORPUS_DIR "" CACHE PATH "Carpeta con las ROM del corpus (TP-105.11).")
 set(TESSERA_DIFFBENCH_CORPUS_MANIFEST "${PROJECT_SOURCE_DIR}/../specs/008-AYTHER-tessera-parity/tools/corpus.toml" CACHE FILEPATH "Manifiesto del corpus.")
 set(TESSERA_DIFFBENCH_FX02_ROM "" CACHE FILEPATH "ROM FX-02 generada por el probe del Gate 0.")
+# TP-206.1: the native FRAME_HASH test reads FX-02 where the bench does.
+if(TESSERA_DIFFBENCH_FX02_ROM AND TARGET tessera_md_subscriptions_test)
+    target_compile_definitions(tessera_md_subscriptions_test PRIVATE
+        TESSERA_FX02_ROM="${TESSERA_DIFFBENCH_FX02_ROM}")
+endif()
 if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
     add_test(NAME tool.diffbench_gpgx_fx02 COMMAND tessera_diffbench
         --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_ROM}"
@@ -349,6 +354,35 @@ if(TESSERA_BUILD_MEGADRIVE)
                 PASS_REGULAR_EXPRESSION "^identical: ${count} cases"
                 LABELS "integration;phase1;md;local" TIMEOUT 300)
         endforeach()
+        # TP-206.1: FRAME_HASH, the same way (the timing fixture holds frame 1
+        # of the test ROMs, still open on the native side); FX-02 when the
+        # build knows it.
+        foreach(fixture IN ITEMS frame-hash:43 frame-hash-timing:38)
+            string(REPLACE ":" ";" parts "${fixture}")
+            list(GET parts 0 name)
+            list(GET parts 1 count)
+            add_test(NAME integration.md_${name}_reference COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_recompose_stats.py"
+                $<TARGET_FILE:tessera_md_testrom> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${PROJECT_SOURCE_DIR}/tests/fixtures/diffbench/${name}.txt"
+                "${CMAKE_CURRENT_BINARY_DIR}/md-${name}")
+            set_tests_properties(integration.md_${name}_reference PROPERTIES
+                PASS_REGULAR_EXPRESSION "^identical: ${count} cases"
+                LABELS "integration;phase1;md;local" TIMEOUT 300)
+        endforeach()
+        if(TESSERA_DIFFBENCH_FX02_ROM)
+            add_test(NAME integration.md_frame-hash-fx02_reference COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_recompose_stats.py"
+                $<TARGET_FILE:tessera_md_testrom> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}"
+                "${PROJECT_SOURCE_DIR}/tests/fixtures/diffbench/frame-hash-fx02.txt"
+                "${CMAKE_CURRENT_BINARY_DIR}/md-frame-hash-fx02"
+                --fx02 "${TESSERA_DIFFBENCH_FX02_ROM}")
+            set_tests_properties(integration.md_frame-hash-fx02_reference PROPERTIES
+                PASS_REGULAR_EXPRESSION "^identical: 1 cases"
+                LABELS "integration;phase1;md;local" TIMEOUT 300)
+        endif()
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-103.2/103.3/103.4: the Z80 side. Work RAM and the Z80_RAM region

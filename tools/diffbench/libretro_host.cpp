@@ -125,7 +125,30 @@ bool __cdecl environment(unsigned cmd, void *data) {
   }
 }
 
+// TP-206.1: FNV-1a 64 over what the core emitted in the last frame, computed
+// by the host: the 16-bit pixels row by row (w pixels, skipping the pitch)
+// and the audio samples as delivered.
+uint64_t g_video_fnv = 0, g_audio_fnv = 0, g_video_prev_fnv = 0;
+unsigned g_prev_w = 0, g_prev_h = 0; // geometry of the frame before
+uint64_t fnv_bytes(uint64_t h, const uint8_t *p, size_t n) {
+  for (size_t i = 0; i < n; ++i)
+    h = (h ^ p[i]) * 1099511628211ull;
+  return h;
+}
 void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
+  if (data) {
+    g_video_fnv = g_video_prev_fnv = fnv_seed;
+    for (unsigned y = 0; y < h; ++y)
+      g_video_fnv = fnv_bytes(g_video_fnv,
+                              static_cast<const uint8_t *>(data) + y * pitch,
+                              size_t{w} * 2);
+    for (unsigned y = 0; y < g_prev_h; ++y)
+      g_video_prev_fnv = fnv_bytes(
+          g_video_prev_fnv, static_cast<const uint8_t *>(data) + y * pitch,
+          size_t{g_prev_w} * 2);
+    g_prev_w = w;
+    g_prev_h = h;
+  }
   if (!g_result)
     return;
   uint64_t hash = fnv_seed;
@@ -160,6 +183,8 @@ void __cdecl audio(int16_t l, int16_t r) {
   note_peak(r);
 }
 size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
+  g_audio_fnv = fnv_bytes(g_audio_fnv, reinterpret_cast<const uint8_t *>(data),
+                          frames * 4);
   for (size_t i = 0; i < frames * 2; ++i)
     note_peak(data[i]);
   return frames;
@@ -404,6 +429,7 @@ RunResult run_libretro(const std::string &core_path,
                     static_cast<std::streamsize>(count) * 80);
         }
       };
+      g_audio_fnv = fnv_seed;
       if (g_bench) {
         const auto t0 = std::chrono::steady_clock::now();
         run();
@@ -501,6 +527,43 @@ RunResult run_libretro(const std::string &core_path,
                << "/" << st.single_hits << " multi=" << st.multilayer_calls
                << "/" << st.multilayer_hits << " fingerprint=" << std::hex
                << st.controls_fingerprint << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'h' || op[0] == 'H') {
+            // TP-206.1: the FRAME_HASH region against the host's own FNV-1a
+            // of the emitted video and audio and of the VRAM, CRAM and VSRAM
+            // regions (read raw, as the core lays them out).
+            std::vector<uint8_t> fh(56, 0x5A);
+            uint64_t generation = 0;
+            status = iface->read_region(23, 0, fh.data(), 56, UINT64_MAX,
+                                        &generation);
+            const auto u64 = [&](size_t at) {
+              uint64_t v = 0;
+              std::memcpy(&v, fh.data() + at, 8);
+              return v;
+            };
+            const auto memory = [&](uint32_t id, uint32_t size) {
+              std::vector<uint8_t> m(size);
+              uint64_t g = 0;
+              return iface->read_region(id, 0, m.data(), size, UINT64_MAX,
+                                        &g) == 0
+                         ? fnv_bytes(fnv_seed, m.data(), m.size())
+                         : 0;
+            };
+            uint32_t version = 0, size = 0;
+            std::memcpy(&version, fh.data(), 4);
+            std::memcpy(&size, fh.data() + 4, 4);
+            so << "frame=" << i << " hash status=" << status
+               << " version=" << version << " size=" << size
+               << " frame_index=" << u64(8) << std::hex
+               << " video=" << u64(16) << " audio=" << u64(24)
+               << " vram=" << u64(32) << " cram=" << u64(40)
+               << " vsram=" << u64(48);
+            if (op[0] == 'H') // diagnostics: what the host computes itself
+              so << " | host video=" << g_video_fnv
+               << " audio=" << g_audio_fnv << " vram=" << memory(1, 65536)
+               << " cram=" << memory(2, 128) << " vsram=" << memory(4, 128)
+               << " video_prev_geometry=" << g_video_prev_fnv;
+            so << std::dec << "\n";
             continue;
           } else if (op[0] == 'd' || op[0] == 'D') {
             // TP-205.4: d[out_size] polls the delta of the last frame;

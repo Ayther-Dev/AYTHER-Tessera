@@ -124,6 +124,21 @@ Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibuja
 - Excepción declarada EXC-007 (`docs/parity-exceptions.md`): cinco guiones en los que la CPU de Tessera escribe la VRAM a un ritmo algo distinto que gpgx (2554 palabras por frame con la pantalla encendida, frente a 2550; una palabra al final de cargar la escena con la pantalla apagada). Cambian las filas sucias junto al límite de un frame y el recuento de sprites del frame que reescribe la tabla de sprites. No es una regla del delta. Están en `frame-delta-timing.txt`; el test nativo los ejecuta y muestra la diferencia sin fallar la suite.
 - Banco: operaciones `d[out_size]`, `D<generación>[,out_size]` (`D-<n>` cuenta hacia atrás desde la última lectura), `S` y `L` (guardar y restaurar más tarde) en `--stats-script`.
 
+## Hash del frame (TP-206.1, medido sobre gpgx r4)
+
+La región 23 (`FRAME_HASH`, 56 bytes) exige la suscripción `FRAME_HASH` (0x800); sin ella, `TESSERA_NOT_SUBSCRIBED` (gpgx -9). Ajustada con los 34 `modes_sweep`, `raster_bands`, `sprite_limits`, `fm_psg_sweep`, `fm_psg_z80`, `mode4_scene`, `delta_probe` y FX-02 (`tests/fixtures/diffbench/frame-hash*.txt`), que corren igual en gpgx y en Tessera por la API pública.
+
+- Disposición: `layout_version` (u32, 1), `struct_size` (u32, 56) y seis u64 little endian: `frame_index`, `video`, `audio`, `vram`, `cram`, `vsram`.
+- Algoritmo: FNV-1a de 64 bits con primo 0x100000001b3 y base 1469598103934665603 (0x14650FB0739D0383). No es la base estándar de FNV-1a (0xCBF29CE484222325): es la que usa gpgx, y cada campo parte de ella.
+- `frame_index`: índice desde 0 del último frame ejecutado. Es monótono y no cambia al restaurar.
+- `video`: los píxeles emitidos en RGB565 little endian, fila a fila, `ancho × 2` bytes por fila sin el relleno del pitch. La ventana es la geometría del frame **anterior** (en el primer frame, la propia): gpgx hashea antes de actualizar su viewport. Medido al crecer (de 256×192 a 256×224 en el frame 1 de `modes_sweep`): el frame nuevo entra solo en la ventana vieja.
+- `audio`: las muestras int16 estéreo intercaladas del frame, tal como se entregan.
+- `vram`, `cram`, `vsram`: los bytes crudos de las regiones 1 (64 KB), 2 (128 bytes) y 4 (128 bytes), como se leen.
+- Se calcula al final de cada frame con la suscripción activa. Restaurar un estado, cargar otro o hacer un reset no lo recalcula: la región conserva el valor anterior hasta el final del frame siguiente.
+- `audio` no es comparable con gpgx: Tessera mezcla a 48 kHz (801 muestras estéreo por frame en NTSC) y gpgx a 44,1 kHz (736 en el estado estable medido). Es la misma fórmula sobre otras muestras, y el PCM es solo informativo (plan §5.2). Los tests comparan los otros cinco campos byte a byte.
+- Primeros frames tras el encendido: mientras la ROM prepara el VDP con la pantalla dibujándose, la CPU de Tessera llega a cada escritura algo antes que gpgx (la causa de EXC-007). Una línea o una entrada de CRAM cae un paso antes, y cambian `video`, `vram` o `cram` en los frames 0–1. `raster_bands` 7 arrastra además la limitación conocida de líneas H32 en un frame H40. Están en `frame-hash-timing.txt`; el test nativo los ejecuta y muestra la diferencia sin fallar la suite.
+- Banco: operación `h` en `--stats-script` (`H` añade los hashes que calcula el propio host, para diagnóstico). Un caso cuya ROM es `fx02` usa la ROM FX-02 indicada con `--fx02`.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

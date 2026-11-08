@@ -15,6 +15,7 @@
 #include "md/vdp_render.hpp"
 #include "session/session.hpp"
 #include "support/md_delta_testrom.hpp"
+#include "support/md_z80_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include <tessera/tessera.h>
 
@@ -22,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <sstream>
 #include <string>
@@ -179,7 +181,7 @@ bool served(unsigned region) {
          region == 13 || region == 14 || region == 17 || region == 18 ||
          region == 24 || region == 25 || region == 26 || region == 16 ||
          region == 19 || region == 20 || region == 21 || region == 22 ||
-         region == 5 || region == 10;
+         region == 5 || region == 10 || region == 23;
 }
 } // namespace
 
@@ -578,8 +580,17 @@ Bytes rom_named(const std::string &name) {
     return rom::delta_probe_rom(number(12));
   if (name.rfind("sprite-limits-", 0) == 0)
     return rom::sprite_limits_rom(rom::sprite_variant(number(14)));
+  if (name == "fm-psg-z80")
+    return rom::fm_psg_z80_rom();
   if (name.rfind("fm-psg-", 0) == 0)
     return rom::fm_psg_sweep_rom(number(7));
+#ifdef TESSERA_FX02_ROM
+  if (name == "fx02") {
+    std::ifstream file(TESSERA_FX02_ROM, std::ios::binary);
+    REQUIRE(file.good());
+    return Bytes(std::istreambuf_iterator<char>(file), {});
+  }
+#endif
   FAIL("unknown test rom " << name);
   return {};
 }
@@ -677,6 +688,32 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
         out.push_back(line.str());
         continue;
       }
+      if (op[0] == 'h') {
+        // TP-206.1: the FRAME_HASH region, as tessera_diffbench prints it
+        std::array<std::uint8_t, 56> fh;
+        fh.fill(0x5A);
+        std::uint64_t generation = 0;
+        status = tessera_observation_region_read_v1(
+            s.handle, TESSERA_OBS_REGION_FRAME_HASH, 0, fh.data(), 56,
+            UINT64_MAX, &generation, &s.context);
+        const auto u32 = [&](std::size_t at) {
+          std::uint32_t v = 0;
+          std::memcpy(&v, fh.data() + at, 4);
+          return v;
+        };
+        const auto u64 = [&](std::size_t at) {
+          std::uint64_t v = 0;
+          std::memcpy(&v, fh.data() + at, 8);
+          return v;
+        };
+        line << "hash status=" << status << " version=" << u32(0)
+             << " size=" << u32(4) << " frame_index=" << u64(8) << std::hex
+             << " video=" << u64(16) << " audio=" << u64(24)
+             << " vram=" << u64(32) << " cram=" << u64(40)
+             << " vsram=" << u64(48);
+        out.push_back(line.str());
+        continue;
+      }
       if (op[0] == 'd' || op[0] == 'D') {
         // TP-205.4, as tessera_diffbench prints it (libretro_host.cpp)
         tessera_obs_frame_delta_v1 delta{};
@@ -753,7 +790,17 @@ namespace {
 /// Runs every case of a fixture written by compare_recompose_stats.py
 /// ("case <rom> <subscriptions hex> <script> [frames]", gpgx's lines, "end")
 /// on the native machine; answers how many cases it ran.
-unsigned check_stats_fixture(const std::string &name) {
+/// Drops the " audio=<hex>" field of a FRAME_HASH line: Tessera's PCM is not
+/// gpgx's (48 kHz against 44.1 kHz; plan §5.2 keeps PCM informative), so the
+/// audio hash is the same formula over different samples.
+std::string without_audio(std::string line) {
+  const auto at = line.find(" audio=");
+  if (at != std::string::npos)
+    line.erase(at, line.find(' ', at + 1) - at);
+  return line;
+}
+
+unsigned check_stats_fixture(const std::string &name, bool skip_audio = false) {
   std::ifstream fixture(std::string(TESSERA_SOURCE_DIR) +
                         "/tests/fixtures/diffbench/" + name);
   REQUIRE(fixture.good());
@@ -771,7 +818,8 @@ unsigned check_stats_fixture(const std::string &name) {
       continue;
     }
     if (line != "end") {
-      expected.push_back(native_statuses(line));
+      expected.push_back(skip_audio ? without_audio(native_statuses(line))
+                                    : native_statuses(line));
       continue;
     }
     std::istringstream fields(header.substr(5));
@@ -783,7 +831,10 @@ unsigned check_stats_fixture(const std::string &name) {
     Observed s(rom_named(rom));
     REQUIRE(s.set(static_cast<std::uint32_t>(std::stoul(sub, nullptr, 16))) ==
             TESSERA_OK);
-    const auto got = run_stats_script(s, script, frames);
+    auto got = run_stats_script(s, script, frames);
+    if (skip_audio)
+      for (auto &line : got)
+        line = without_audio(line);
     CHECK(got == expected);
     for (std::size_t i = 0, shown = 0;
          i < got.size() && i < expected.size() && shown < 4; ++i)
@@ -803,6 +854,35 @@ TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
 
 TEST_CASE("frame_delta answers as gpgx did (TP-205.4)") {
   CHECK(check_stats_fixture("frame-delta.txt") == 20);
+}
+
+// TP-206.1: video, VRAM, CRAM, VSRAM and frame_index byte for byte; the
+// audio field is left out (without_audio).
+TEST_CASE("frame_hash answers as gpgx did (TP-206.1)") {
+  CHECK(check_stats_fixture("frame-hash.txt", true) == 43);
+}
+
+// FX-02 comes from the backend probe; without TESSERA_DIFFBENCH_FX02_ROM the
+// build cannot name it and the case does not run.
+TEST_CASE("frame_hash over FX-02 answers as gpgx did (TP-206.1)" *
+          doctest::skip(
+#ifdef TESSERA_FX02_ROM
+              false
+#else
+              true
+#endif
+              )) {
+  CHECK(check_stats_fixture("frame-hash-fx02.txt", true) == 1);
+}
+
+// The first frames after power-on, where the test ROMs set the VDP
+// up while it draws: Tessera's CPU reaches each write a little earlier than
+// gpgx (the EXC-007 cause), so a line or a CRAM entry lands one step sooner.
+// raster_bands 7 also holds the known H32-in-H40 limitation. It runs and
+// shows the differences without failing the suite.
+TEST_CASE("frame_hash while the ROM sets the VDP up (TP-206.1)" *
+          doctest::may_fail()) {
+  CHECK(check_stats_fixture("frame-hash-timing.txt", true) == 38);
 }
 
 // EXC-007 (docs/parity-exceptions.md): the CPU writes a few VRAM words more

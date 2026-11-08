@@ -1,0 +1,307 @@
+# FRAME_HASH measured on gpgx (spec 008, TP-206.1). Written by
+# tools/diffbench/compare_recompose_stats.py --update; the native side runs the
+# same cases in tests/integration/md_subscriptions_test.cpp. The h operation
+# reads region 23: FNV-1a 64 (basis 1469598103934665603) of the emitted video,
+# audio, VRAM, CRAM and VSRAM. Frame 1 of the test ROMs is in
+# frame-hash-timing.txt.
+
+case modes-sweep-0 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=78f4d0f30ae98945 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=78f4d0f30ae98945 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=78f4d0f30ae98945 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-1 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=d12c0ee6e4b588b6 audio=d4edd7fe26e7ecf3 vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=d12c0ee6e4b588b6 audio=e693fa3b4b76355b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=d12c0ee6e4b588b6 audio=89686642d2fd612b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+end
+
+case modes-sweep-2 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=8ad2aacd5c35962f audio=d4edd7fe26e7ecf3 vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=8ad2aacd5c35962f audio=e693fa3b4b76355b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=8ad2aacd5c35962f audio=89686642d2fd612b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+end
+
+case modes-sweep-3 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=7266227cd3a3f06a audio=d4edd7fe26e7ecf3 vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=7266227cd3a3f06a audio=e693fa3b4b76355b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=7266227cd3a3f06a audio=89686642d2fd612b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+end
+
+case modes-sweep-4 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=f53adc2327a1b210 audio=d4edd7fe26e7ecf3 vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=f53adc2327a1b210 audio=e693fa3b4b76355b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=f53adc2327a1b210 audio=89686642d2fd612b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+end
+
+case modes-sweep-5 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=e163ed025c1a7d3f audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=e163ed025c1a7d3f audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=e163ed025c1a7d3f audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-6 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=1a5bbed5928332d0 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=438a41a86e414e61 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=438a41a86e414e61 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-7 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=da31da4c3223fa85 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=d510ee3428cec7ea audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=d510ee3428cec7ea audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=d510ee3428cec7ea audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-8 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=421976ac2afc5858 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=421976ac2afc5858 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=421976ac2afc5858 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-9 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=973e5f2a4bf4d060 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=973e5f2a4bf4d060 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=973e5f2a4bf4d060 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-10 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=f246cf0594237f9 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=f246cf0594237f9 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=f246cf0594237f9 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-11 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=2076cf0147042ad7 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=2076cf0147042ad7 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=2076cf0147042ad7 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-12 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=d9d968a2ad6319e4 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=d9d968a2ad6319e4 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=d9d968a2ad6319e4 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-13 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=5d6efa94fc9a99b5 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=5d6efa94fc9a99b5 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=5d6efa94fc9a99b5 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-14 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=9f4acf80611da50d audio=d4edd7fe26e7ecf3 vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=9f4acf80611da50d audio=e693fa3b4b76355b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=9f4acf80611da50d audio=89686642d2fd612b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+end
+
+case modes-sweep-15 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=6d844db7ded9ef58 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=6d844db7ded9ef58 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=6d844db7ded9ef58 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-16 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=fc6f899a128141f8 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=fc6f899a128141f8 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=fc6f899a128141f8 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-17 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=fffd26f8b1b3dd95 audio=d4edd7fe26e7ecf3 vram=8b9f26fcf906d912 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=fffd26f8b1b3dd95 audio=e693fa3b4b76355b vram=8b9f26fcf906d912 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=fffd26f8b1b3dd95 audio=89686642d2fd612b vram=8b9f26fcf906d912 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-18 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=64c4edc5bb2ce1f3 audio=d4edd7fe26e7ecf3 vram=515fb143a9abc4ea cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=64c4edc5bb2ce1f3 audio=e693fa3b4b76355b vram=515fb143a9abc4ea cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=64c4edc5bb2ce1f3 audio=89686642d2fd612b vram=515fb143a9abc4ea cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-19 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=5b35c127c6dbb7f9 audio=d4edd7fe26e7ecf3 vram=aa5d05340b6c4417 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=5b35c127c6dbb7f9 audio=e693fa3b4b76355b vram=aa5d05340b6c4417 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=5b35c127c6dbb7f9 audio=89686642d2fd612b vram=aa5d05340b6c4417 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-20 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=e38c836b89484a50 audio=d4edd7fe26e7ecf3 vram=45d8239953ec88c8 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=e38c836b89484a50 audio=e693fa3b4b76355b vram=45d8239953ec88c8 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=e38c836b89484a50 audio=89686642d2fd612b vram=45d8239953ec88c8 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-21 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=da31da4c3223fa85 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=946d6528fa5a7e8f audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=946d6528fa5a7e8f audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=946d6528fa5a7e8f audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-22 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=78f4d0f30ae98945 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=78f4d0f30ae98945 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=78f4d0f30ae98945 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-23 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=4ca0e33a2d6efb5 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=2e5ecffb7f8be105 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=4ca0e33a2d6efb5 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-24 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=f0129cd44eae4ad4 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=93b69b82a3f0b544 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=f0129cd44eae4ad4 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-25 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=b16fcb15ed2073be audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=7f0472b6fe113ab audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=b16fcb15ed2073be audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-26 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=a0a64583d77a641e audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=ad12d262790d27fb audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=a0a64583d77a641e audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-27 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=e46228cee7e84f67 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=b0013b67cf0fc1d1 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=e46228cee7e84f67 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-28 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=78f4d0f30ae98945 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=631b793528d9034c audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=631b793528d9034c audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-29 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=da31da4c3223fa85 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=103a6e878effe434 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=103a6e878effe434 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=103a6e878effe434 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-30 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=a1dcfbf77b7e9d9d audio=d4edd7fe26e7ecf3 vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=a1dcfbf77b7e9d9d audio=e693fa3b4b76355b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=765a205affb89012 audio=89686642d2fd612b vram=e14afcacac47adee cram=ef74c608e7807a0d vsram=1b158497363525e1
+end
+
+case modes-sweep-31 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=5869a327194c37b1 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=20c8d1454512c900 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=20c8d1454512c900 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-32 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=63a683100189a7cf audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=63a683100189a7cf audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=63a683100189a7cf audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-33 800 0:h;2:h;3:h;4:h 5
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=e4af552c94668a34 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=9b513fc32dd9026b audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=9b513fc32dd9026b audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=9b513fc32dd9026b audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case raster-bands-1 800 0:h;2:h;3:h 4
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=3130d28f27c4d38f cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=fe13b469ab05c90a audio=d4edd7fe26e7ecf3 vram=a62d9c040e78e465 cram=efbd49ba8243d8d vsram=306c537b2ff38983
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=fe13b469ab05c90a audio=e693fa3b4b76355b vram=a62d9c040e78e465 cram=efbd49ba8243d8d vsram=306c537b2ff38983
+end
+
+case sprite-limits-0 800 2:h 3
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=941479432e666915 audio=d4edd7fe26e7ecf3 vram=6851b7d8badc1752 cram=c64636b5a8878a34 vsram=306c537b2ff38983
+end
+
+case fm-psg-5 800 0:h;1:h;2:h;3:h 4
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=6c86293c7bceee7b vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=45d8b7140d720383 audio=160ef43cafb246df vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=45d8b7140d720383 audio=9638c97c0113f81b vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+end
+
+case fm-psg-z80 800 0:h;1:h;2:h 3
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=7e16fedd55096d53 vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=e8a75f44ee68ce23 vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=c6ba2821652f0383 audio=1268aef3e445fb83 vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+end
+
+case mode4-scene-0 800 1:h;2:h;3:h 4
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=69a98991bfb0db31 audio=9afc658419cff2b vram=a48533c730649726 cram=677ff86cd6aecf9b vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=69a98991bfb0db31 audio=d4edd7fe26e7ecf3 vram=a48533c730649726 cram=677ff86cd6aecf9b vsram=306c537b2ff38983
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=69a98991bfb0db31 audio=e693fa3b4b76355b vram=a48533c730649726 cram=677ff86cd6aecf9b vsram=306c537b2ff38983
+end
+
+case delta-probe-0 800 0:h;5:h;12:h 13
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=fe72814514a90383 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=5 hash status=0 version=1 size=56 frame_index=5 video=c916ac0bebe74383 audio=e969c58e9c04272b vram=9521be8a0512e683 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=12 hash status=0 version=1 size=56 frame_index=12 video=aadf3e61b1706f83 audio=a07884534f3f0d83 vram=7829ef3042cc6f5b cram=39ab84e40216ff63 vsram=5e2acea42ed5b23
+end
+
+case modes-sweep-6 1 0:h.u801;2:h;3:h.u1;4:h.u801;5:h 6
+frame=0 hash status=-9 version=1515870810 size=1515870810 frame_index=6510615555426900570 video=5a5a5a5a5a5a5a5a audio=5a5a5a5a5a5a5a5a vram=5a5a5a5a5a5a5a5a cram=5a5a5a5a5a5a5a5a vsram=5a5a5a5a5a5a5a5a
+frame=0 u801 status=0
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=1a5bbed5928332d0 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=438a41a86e414e61 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 u1 status=0
+frame=4 hash status=-9 version=1515870810 size=1515870810 frame_index=6510615555426900570 video=5a5a5a5a5a5a5a5a audio=5a5a5a5a5a5a5a5a vram=5a5a5a5a5a5a5a5a cram=5a5a5a5a5a5a5a5a vsram=5a5a5a5a5a5a5a5a
+frame=4 u801 status=0
+frame=5 hash status=0 version=1 size=56 frame_index=5 video=438a41a86e414e61 audio=e969c58e9c04272b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-6 801 2:h.x.h;3:h;4:h 5
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=1a5bbed5928332d0 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=2 x status=0
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=1a5bbed5928332d0 audio=d4edd7fe26e7ecf3 vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=438a41a86e414e61 audio=e693fa3b4b76355b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=438a41a86e414e61 audio=89686642d2fd612b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case delta-probe-2 801 1:S.h;4:h.L.h;5:h 7
+frame=1 S status=0
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=9afc658419cff2b vram=2c4cf1773de32b88 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=c916ac0bebe74383 audio=89686642d2fd612b vram=270fe35ce85904bf cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=4 L status=0
+frame=4 hash status=0 version=1 size=56 frame_index=4 video=c916ac0bebe74383 audio=89686642d2fd612b vram=270fe35ce85904bf cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=5 hash status=0 version=1 size=56 frame_index=5 video=c916ac0bebe74383 audio=d4edd7fe26e7ecf3 vram=a641825cebfff29e cram=306c537b2ff38983 vsram=306c537b2ff38983
+end

@@ -118,6 +118,9 @@ public:
     ++frame_;
     capture_output();
     freeze_delta();
+    update_screen();
+    if (subscriptions_.active(TESSERA_OBS_SUB_FRAME_HASH))
+      hash_frame();
   }
 
   [[nodiscard]] Bytes machine_record() const override {
@@ -184,6 +187,14 @@ public:
     delta_generation_ = old->delta_generation_;
     delta_tracking_ = old->delta_tracking_;
     delta_restored();
+    // FRAME_HASH stays as the last frame left it, and the screen it walks is
+    // the frontend's bitmap, not machine state (measured on gpgx).
+    frame_hash_ = old->frame_hash_;
+    screen_ = old->screen_;
+    screen_width_ = old->screen_width_;
+    screen_height_ = old->screen_height_;
+    hash_width_ = old->hash_width_;
+    hash_height_ = old->hash_height_;
     apply_controls();
   }
 
@@ -199,6 +210,14 @@ public:
     const auto gate = observation::region_gate(id);
     if (gate != 0 && !subscriptions_.active(gate))
       return TESSERA_NOT_SUBSCRIBED; // idle: no work at all
+    if (id == TESSERA_OBS_REGION_FRAME_HASH) {
+      if (offset > frame_hash_.size() ||
+          out.size() > frame_hash_.size() - offset)
+        return TESSERA_INVALID_ARGUMENT;
+      std::copy_n(frame_hash_.begin() + offset, out.size(), out.begin());
+      work_ += out.size();
+      return TESSERA_OK;
+    }
     if (id == kLayerMaskRegion || id == kLayerDimRegion) {
       // Read back as written, with or without RENDER_CONTROLS (measured).
       if (offset != 0 || out.size() > 1)
@@ -435,6 +454,61 @@ private:
     none.dirty.fill(0xFF);
     return none;
   }
+  /// gpgx draws into a 720-pixel-wide bitmap that is never cleared: what a
+  /// smaller frame does not cover keeps older pixels. Kept here as RGB565.
+  static constexpr std::uint32_t kScreenWidth = 720, kScreenHeight = 576;
+  void update_screen() {
+    const auto &frame = system_->renderer().frame();
+    const auto w = std::min(width_, kScreenWidth);
+    const auto h = std::min(height_, kScreenHeight);
+    if (frame.size() < std::size_t{width_} * height_)
+      return;
+    for (std::uint32_t y = 0; y < h; ++y)
+      std::transform(frame.begin() + std::size_t{y} * width_,
+                     frame.begin() + std::size_t{y} * width_ + w,
+                     screen_.begin() + std::size_t{y} * kScreenWidth,
+                     rgba_to_565);
+    // FRAME_HASH walks the geometry of the frame before (gpgx updates its
+    // viewport after hashing; measured on modes_sweep 0 to 33).
+    hash_width_ = screen_width_ != 0 ? screen_width_ : w;
+    hash_height_ = screen_height_ != 0 ? screen_height_ : h;
+    screen_width_ = w;
+    screen_height_ = h;
+  }
+  /// FRAME_HASH (TP-206.1): FNV-1a 64 with gpgx's offset basis
+  /// 1469598103934665603 over the emitted pixels (RGB565 little endian, row
+  /// by row), the frame's samples, and the VRAM, CRAM and VSRAM regions as
+  /// they are read; frame_index is the frame just run, counted from 0.
+  void hash_frame() {
+    constexpr std::uint64_t kBasis = 1469598103934665603ULL;
+    const auto fnv = [](std::uint64_t hash, const std::uint8_t *p,
+                        std::size_t n) {
+      for (std::size_t i = 0; i < n; ++i)
+        hash = (hash ^ p[i]) * 0x100000001b3ULL;
+      return hash;
+    };
+    std::uint64_t video = kBasis;
+    for (std::uint32_t y = 0; y < hash_height_; ++y)
+      for (std::uint32_t x = 0; x < hash_width_; ++x) {
+        const std::uint16_t px = screen_[std::size_t{y} * kScreenWidth + x];
+        const std::uint8_t bytes[2] = {static_cast<std::uint8_t>(px),
+                                       static_cast<std::uint8_t>(px >> 8)};
+        video = fnv(video, bytes, 2);
+      }
+    const auto memory = [&](std::uint32_t id) {
+      const auto bytes = memory_region(*system_, id);
+      return fnv(kBasis, bytes.data(), bytes.size());
+    };
+    const std::uint64_t fields[] = {delta_generation_ - 1,
+                                    video,
+                                    fnv(kBasis, pcm_.data(), pcm_.size()),
+                                    memory(TESSERA_OBS_REGION_VRAM),
+                                    memory(TESSERA_OBS_REGION_CRAM),
+                                    memory(TESSERA_OBS_REGION_VSRAM)};
+    const std::uint32_t header[] = {1, 56};
+    std::memcpy(frame_hash_.data(), header, sizeof(header));
+    std::memcpy(frame_hash_.data() + 8, fields, sizeof(fields));
+  }
   void refresh_frame_geometry() {
     const auto size = system_->renderer().size();
     width_ = size.width;
@@ -466,6 +540,11 @@ private:
   std::uint64_t delta_generation_ = 0; ///< frames run (gpgx's generation)
   bool delta_tracking_ = false;
   bool delta_all_dirty_ = true; ///< power-on: the first frame is all dirty
+  std::array<std::uint8_t, 56> frame_hash_{}; ///< tessera_obs_frame_hash_v1
+  std::vector<std::uint16_t> screen_ =
+      std::vector<std::uint16_t>(std::size_t{kScreenWidth} * kScreenHeight);
+  std::uint32_t screen_width_ = 0, screen_height_ = 0;
+  std::uint32_t hash_width_ = 0, hash_height_ = 0;
 };
 } // namespace
 
