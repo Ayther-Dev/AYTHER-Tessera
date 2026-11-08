@@ -188,6 +188,10 @@ void set_bench(bool on, int observation) {
   g_bench_observation = observation;
 }
 
+void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1) {
+  pad_script().push_back({frame, {port0, port1}});
+}
+
 void set_pad_masks(uint32_t port0, uint32_t port1) {
   g_pad_masks[0] = port0;
   g_pad_masks[1] = port1;

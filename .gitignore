@@ -20,3 +20,6 @@ Thumbs.db
 /tests/fixtures/graphics-replacement/fx03_rom.md
 /tests/fixtures/graphics-replacement/fx03.ay
 /tests/fixtures/graphics-replacement/trust.toml
+
+__pycache__/
+*.pyc
