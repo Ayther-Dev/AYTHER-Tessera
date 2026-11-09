@@ -89,6 +89,23 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(integration.md_mode4-pbc_frame PROPERTIES
             FIXTURES_REQUIRED md_mode4-pbc_rom
             PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
+        # TP-104.6: every region of mode4_pbc against gpgx. Frame 0 runs in
+        # Mode 4 (no sprite or line model there, as for mode4_scene); by
+        # frame 8 the ROM is back in Mode 5 and all regions count.
+        foreach(case IN ITEMS "1;--no-sprites" "8;")
+            list(GET case 0 frames)
+            list(GET case 1 extra)
+            add_test(NAME integration.md_mode4-pbc_regions-${frames} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_regions.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/mode4-pbc.bin" ${frames}
+                "${CMAKE_CURRENT_BINARY_DIR}/md-mode4-pbc-regions-${frames}" ${extra})
+            set_tests_properties(integration.md_mode4-pbc_regions-${frames} PROPERTIES
+                FIXTURES_REQUIRED md_mode4-pbc_rom
+                FAIL_REGULAR_EXPRESSION "differing=[1-9]|different sizes|tool failed"
+                PASS_REGULAR_EXPRESSION "WORK_RAM bytes=65536 differing=0"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
     endif()
 endif()
 

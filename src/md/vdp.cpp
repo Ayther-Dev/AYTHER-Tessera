@@ -38,8 +38,10 @@ void Vdp::write_control(std::uint16_t value) {
     const bool was_mode4 = mode4();
     const std::uint8_t palette_bits_before =
         static_cast<std::uint8_t>((regs_[0] & 0x04U) | (regs_[12] & 0x08U));
+    // Geometry: H40 (12), V30 (1 bit 3) and the mode (1 bit 2): leaving
+    // Mode 4 takes the frame from 192 lines to 224 (measured, mode4_pbc).
     const std::uint8_t geometry_before =
-        static_cast<std::uint8_t>((regs_[12] & 0x81U) | (regs_[1] & 0x08U));
+        static_cast<std::uint8_t>((regs_[12] & 0x81U) | (regs_[1] & 0x0CU));
     const std::uint8_t old_value = regs_[index];
     if (index <= 10 || (regs_[1] & 0x04U) != 0) {
       regs_[index] = static_cast<std::uint8_t>(value);
@@ -62,7 +64,7 @@ void Vdp::write_control(std::uint16_t value) {
                            : std::array<std::uint8_t, 2>{0, split};
       }
     }
-    if (((regs_[12] & 0x81U) | (regs_[1] & 0x08U)) != geometry_before)
+    if (((regs_[12] & 0x81U) | (regs_[1] & 0x0CU)) != geometry_before)
       geometry_changed_ = true;
     if (((regs_[0] & 0x04U) | (regs_[12] & 0x08U)) != palette_bits_before) {
       // gpgx refreshes its whole palette when the limited palette or the
