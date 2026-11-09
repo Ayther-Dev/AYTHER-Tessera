@@ -68,7 +68,7 @@ jobs:
         run: |
           ./tools/check.ps1 -Preset windows-clown-reference -Stage Configure -Jobs 2
           ./tools/check.ps1 -Preset windows-clown-reference -Stage Build -Jobs 2
-          ctest --test-dir build/windows-clown-reference -E '^integration.megadrive_replay$' --output-on-failure -j 2
+          ctest --test-dir build/windows-clown-reference -E '^integration[.]megadrive_replay(_clown)?$' --output-on-failure -j 2
       # This tree links AGPL-3.0 components, cannot be installed and produces no
       # artifact. The long Mega Drive replay matrix runs locally for Gate 3.
 

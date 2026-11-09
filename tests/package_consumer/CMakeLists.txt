@@ -15,7 +15,7 @@ if(NOT TESSERA_TEST_PREFIX)
     message(FATAL_ERROR "PACKAGE_TEST_PREFIX_REQUIRED: falta el prefijo instalado.")
 endif()
 if(NOT TESSERA_TEST_FIND_VERSION)
-    set(TESSERA_TEST_FIND_VERSION 0.1)
+    set(TESSERA_TEST_FIND_VERSION 0.2)
 endif()
 if(TESSERA_TEST_BAD_ARCH)
     set(CMAKE_CXX_COMPILER_ARCHITECTURE_ID ARM64)
@@ -31,7 +31,7 @@ endif()
 if(NOT Tessera_ABI_MAJOR EQUAL 1 OR NOT Tessera_ABI_MINOR EQUAL 1 OR
         NOT Tessera_POINTER_BYTES EQUAL 8 OR
         NOT Tessera_MSVC_RUNTIME STREQUAL "MultiThreadedDLL" OR
-        NOT Tessera_VERSION VERSION_EQUAL "0.1.0")
+        NOT Tessera_VERSION VERSION_EQUAL "0.2.0")
     message(FATAL_ERROR "PACKAGE_METADATA_INVALID: versión, ABI o runtime incompatibles.")
 endif()
 

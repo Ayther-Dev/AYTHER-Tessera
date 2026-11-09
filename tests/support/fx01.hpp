@@ -83,10 +83,11 @@ inline Bytes content(unsigned profile, unsigned flags = 0,
 inline tessera_backend_info_v1 backend(bool complete = true) {
   auto c = init<tessera_context_v1>();
   std::uint32_t required{};
-  std::array<tessera_backend_info_v1, 3> out{init<tessera_backend_info_v1>(),
-                                             init<tessera_backend_info_v1>(),
-                                             init<tessera_backend_info_v1>()};
-  expect(tessera_backends_enumerate_v1(out.data(), 3, &required, &c));
+  std::array<tessera_backend_info_v1, 4> out{};
+  for (auto &b : out)
+    b = init<tessera_backend_info_v1>();
+  expect(tessera_backends_enumerate_v1(
+      out.data(), static_cast<std::uint32_t>(out.size()), &required, &c));
   for (auto b : out)
     if (std::string(b.id) ==
         (complete ? "synthetic.complete" : "synthetic.minimal"))

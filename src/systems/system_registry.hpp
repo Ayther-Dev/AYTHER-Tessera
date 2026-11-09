@@ -9,9 +9,11 @@
 #define TESSERA_MEGADRIVE 0
 #endif
 namespace tessera {
-// The distributed core registers only the two synthetic test backends. The
-// ClownMDEmu reference backend (AGPL-3.0) is present, and listed first, only in
-// the local reference build (TESSERA_BUILD_CLOWN_REFERENCE).
+// The distributed core registers the native Mega Drive core (megadrive, first
+// and the default for Mega Drive content, TP-112.1) and the two synthetic test
+// backends. The ClownMDEmu reference backend (AGPL-3.0) is present only in the
+// local reference build (TESSERA_BUILD_CLOWN_REFERENCE), after megadrive, and
+// is selected only by its id.
 inline constexpr std::size_t kRegistrationCount =
     2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 1 : 0);
 struct SystemRegistration {

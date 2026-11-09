@@ -2,6 +2,8 @@
 #include "cli/public_client.hpp"
 #include "domain/wire.hpp"
 #include "persistence/state_store.hpp"
+#include "support/backend_under_test.hpp"
+#include <tessera/tessera_observation.h>
 
 #include <nlohmann/json.hpp>
 #include <windows.h>
@@ -21,9 +23,9 @@ using Bytes = tessera::Bytes;
 using View = tessera::wire::View;
 namespace client = tessera::cli;
 
-void require(bool valid, std::string_view reason) {
+void require(bool valid, const std::string &reason) {
   if (!valid)
-    throw std::runtime_error(std::string(reason));
+    throw std::runtime_error(reason);
 }
 Bytes read(const std::filesystem::path &path) {
   std::ifstream input(path, std::ios::binary);
@@ -144,6 +146,17 @@ Bytes trace(View content, View config, const Json &source) {
                             controls.at(name).get<bool>() ? 1 : 0);
       assignments.push_back(std::move(item));
     }
+    // The native core takes two pads of 12 controls (TP-108.3): the rest of
+    // pad 1 (X, Y, Z, mode) and all of pad 2 stay released.
+    for (std::uint32_t port = 0; port < tessera_test::pad_ports(); ++port)
+      for (std::uint32_t control = port == 0 ? 8U : 0U;
+           control < tessera_test::pad_controls(); ++control) {
+        Bytes item;
+        tessera::wire::scalar(item, 1, TESSERA_ENCODING_U32, port);
+        tessera::wire::scalar(item, 2, TESSERA_ENCODING_U32, control);
+        tessera::wire::scalar(item, 3, TESSERA_ENCODING_I32, 0);
+        assignments.push_back(std::move(item));
+      }
     Bytes item;
     tessera::wire::scalar(item, 1, TESSERA_ENCODING_U64, index + 1);
     tessera::wire::field(item, 2, TESSERA_ENCODING_ARRAY,
@@ -161,9 +174,16 @@ void oracle(const tessera_original_frame_v1 &frame, tessera_session session,
           "FX02_GEOMETRY_OR_AUDIO_MISSING");
   const auto center =
       (std::size_t(frame.height / 2) * frame.width + frame.width / 2) * 4;
-  require(frame.pixels.data[center] == (active ? 255 : 0) &&
-              frame.pixels.data[center + 2] == (active ? 0 : 255),
-          "FX02_VIDEO_ORACLE_FAILED");
+  // A full-level channel: 255 in ClownMDEmu; 239 natively, the normal-shade
+  // level 14 of 15 measured on gpgx (vdp_render.cpp, colour_to_565).
+  const std::uint8_t full = tessera_test::native_under_test() ? 239 : 255;
+  require(frame.pixels.data[center] == (active ? full : 0) &&
+              frame.pixels.data[center + 2] == (active ? 0 : full),
+          "FX02_VIDEO_ORACLE_FAILED rgb=" +
+              std::to_string(frame.pixels.data[center]) + "," +
+              std::to_string(frame.pixels.data[center + 1]) + "," +
+              std::to_string(frame.pixels.data[center + 2]) +
+              " frame=" + std::to_string(frame.frame_id.frame));
   std::int32_t minimum = 32767, maximum = -32768;
   for (std::size_t offset = 0; offset < frame.pcm.bytes; offset += 2) {
     const auto bits = std::uint16_t(frame.pcm.data[offset]) |
@@ -173,8 +193,35 @@ void oracle(const tessera_original_frame_v1 &frame, tessera_session session,
     minimum = std::min(minimum, sample);
     maximum = std::max(maximum, sample);
   }
-  require(active ? maximum - minimum > 16 : minimum >= -2 && maximum <= 2,
-          "FX02_AUDIO_ORACLE_FAILED");
+  // Neutral means no tone: ClownMDEmu gives silence; the native core a flat
+  // DC level from its mixer (504 with this ROM).
+  const bool flat = tessera_test::native_under_test()
+                        ? maximum - minimum <= 4
+                        : minimum >= -2 && maximum <= 2;
+  require(active ? maximum - minimum > 16 : flat,
+          "FX02_AUDIO_ORACLE_FAILED min=" + std::to_string(minimum) +
+              " max=" + std::to_string(maximum));
+  if (tessera_test::native_under_test()) {
+    // The native core shows the VDP memories through API 1.1 regions: VRAM
+    // word-swapped (byte b at b ^ 1), CRAM as native-endian BBBGGGRRR words.
+    // Its work RAM is not a public region yet (TP-301), so the input byte of
+    // the ClownMDEmu oracle is not read here.
+    std::array<std::uint8_t, 2> vram{}, cram{};
+    std::uint64_t generation{};
+    require(tessera_observation_region_read_v1(
+                session, TESSERA_OBS_REGION_VRAM, 0xFFFC, vram.data(), 2,
+                UINT64_MAX, &generation, &context) == TESSERA_OK &&
+                tessera_observation_region_read_v1(
+                    session, TESSERA_OBS_REGION_CRAM, 0, cram.data(), 2,
+                    UINT64_MAX, &generation, &context) == TESSERA_OK,
+            "FX02_REGIONS_MISSING");
+    const auto marker = std::uint16_t(vram[1]) << 8 | vram[0];
+    const auto colour = std::uint16_t(cram[0]) | std::uint16_t(cram[1]) << 8;
+    require(marker == (active ? 0x2468 : 0x1357) &&
+                colour == (active ? 0x0007 : 0x01C0),
+            "FX02_MACHINE_ORACLE_FAILED");
+    return;
+  }
   tessera_snapshot snapshot{};
   require(tessera_snapshot_acquire_v1(session, &snapshot, &context) ==
               TESSERA_OK,
@@ -211,7 +258,8 @@ int worker(const std::filesystem::path &rom_path,
            bool fx02, std::uint64_t frames) {
   const auto rom = read(rom_path), config = read(config_path),
              memory = read(memory_path), trace = read(trace_path);
-  client::PublicSession session("clownmdemu", rom, config, memory);
+  client::PublicSession session(tessera_test::backend_under_test(), rom, config,
+                                memory);
   if (checkpoint_path == "-") {
     session.bind(trace);
   } else {
@@ -224,7 +272,13 @@ int worker(const std::filesystem::path &rom_path,
   }
   auto info = session.info();
   const auto start = info.frame_id.frame;
-  if (observe) {
+  if (observe && tessera_test::native_under_test()) {
+    // The native core observes through API 1.1 subscriptions (TP-201).
+    auto context = client::init<tessera_context_v1>();
+    require(tessera_observation_subscriptions_set_v1(
+                session.handle(), TESSERA_OBS_SUB_ALL, &context) == TESSERA_OK,
+            "SUBSCRIPTIONS_FAILED");
+  } else if (observe) {
     const std::array<tessera_control_item_v1, 2> controls{
         {{1, 1, 15}, {2, 1, 31}}};
     session.submit(900 + start, controls);
@@ -312,9 +366,9 @@ int parent(const std::filesystem::path &self,
   const auto action_json = json(generated / "full-action.json");
   const auto neutral_json = json(generated / "full-control.json");
   const auto memory = Bytes(65536, 0);
-  const auto backend = client::find_backend("clownmdemu");
-  const auto config =
-      tessera::wire::configuration("clownmdemu", backend.build_id, memory);
+  const auto backend = client::find_backend(tessera_test::backend_under_test());
+  const auto config = tessera::wire::configuration(
+      tessera_test::backend_under_test(), backend.build_id, memory);
   write(evidence / "memory.bin", memory);
   write(evidence / "config.bin", config);
   struct Scenario {

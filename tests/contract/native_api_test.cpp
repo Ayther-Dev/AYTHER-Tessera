@@ -685,8 +685,12 @@ TEST_CASE("Extended backend arrays honor each declared stride and preserve "
   REQUIRE(tessera_backends_enumerate_v1(&values[0].prefix, kBackendCount,
                                         &required, &context) == TESSERA_OK);
   CHECK(required == kBackendCount);
+  // TP-112.1: the native core is listed first; the reference backend after it.
+  if constexpr (TESSERA_MEGADRIVE != 0)
+    CHECK(fixed_id(values[0].prefix.id) == "megadrive");
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
-    CHECK(fixed_id(values[0].prefix.id) == "clownmdemu");
+    CHECK(fixed_id(values[TESSERA_MEGADRIVE != 0 ? 1 : 0].prefix.id) ==
+          "clownmdemu");
   CHECK(fixed_id(values[kFirstSynthetic].prefix.id) == "synthetic.minimal");
   CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) ==
         "synthetic.complete");

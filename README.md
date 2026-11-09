@@ -16,6 +16,16 @@ paquetes Tessera→Engine→Runtime. Consultar los resultados de las
 [2](docs/phase-2-results.md) y [3](docs/phase-3-results.md), y el progreso de las
 [fases 4](docs/phase-4-progress.md) y [5](docs/phase-5-progress.md).
 
+**Núcleo Mega Drive propio (spec 008, desde `v0.2.0`).** El backend de producto
+de Mega Drive es `megadrive`, un núcleo propio escrito en sala limpia y
+contrastado contra Genesis Plus GX como caja negra: 68000 (Moira), Z80 (floooh/chips),
+YM2612 (ymfm), PSG, VDP con FIFO y DMA, mandos de tres y seis botones, SRAM y la
+API de observación 1.1. Se compila por defecto (`TESSERA_BUILD_MEGADRIVE=ON`) y
+es el que se elige para contenido Mega Drive cuando no se pide un backend por id.
+Las [excepciones de paridad](docs/parity-exceptions.md) aprobadas y el
+[contrato de observación](docs/observation-contract.md) documentan lo que
+difiere del oráculo y por qué.
+
 ## Alcance y arquitectura aprobados
 
 El MVP inicial es Windows x64 y Mega Drive. Tessera detectará el sistema y
@@ -49,10 +59,13 @@ una caché de dependencias fijadas por hash. Desde la raíz, con la caché dispo
 ./tools/check.ps1 -Preset windows-dev -Jobs 1
 ```
 
-Ese preset construye lo que se distribuye, sin ClownMDEmu, y solo ejecuta las
-pruebas con los backends sintéticos. Para las pruebas de Mega Drive y el banco
-diferencial se usa el árbol de referencia, que requiere preparar las fuentes
-fijadas del backend con `./tools/bootstrap-backends.ps1` y no es instalable:
+Ese preset construye lo que se distribuye, con el núcleo `megadrive` y sin
+ClownMDEmu, y ejecuta sus pruebas unitarias y de contrato. El banco diferencial
+contra gpgx usa `windows-md-dev`. Para comparar con ClownMDEmu se usa el árbol de
+referencia, que requiere preparar las fuentes fijadas del backend con
+`./tools/bootstrap-backends.ps1` y no es instalable; allí cada prueba
+`integration.megadrive_*` corre con `megadrive` y, con el sufijo `_clown`, con
+ClownMDEmu:
 
 ```powershell
 ./tools/check.ps1 -Preset windows-clown-reference -Jobs 1
@@ -70,8 +83,9 @@ los candidatos se construyen con un trabajo para limitar memoria.
 
 La [hoja de ruta](docs/roadmap.md) resume las decisiones de alcance, las fases y las puertas.
 La [guía de CLI](docs/cli.md) describe trazas, generación de fixtures e informes.
-Mega Drive se reconoce por bytes, pero su implementación de producto corresponde
-a T019. Los perfiles TEST no anuncian checkpoint; su implementación sigue T022/T023.
+Mega Drive se reconoce por bytes y se abre con `megadrive`; ClownMDEmu, en el
+árbol de referencia, solo se elige por su id. Los perfiles TEST no anuncian
+checkpoint; su implementación sigue T022/T023.
 
 ## Documentación del MVP
 
@@ -99,8 +113,9 @@ instala ni se publica: el backend Mega Drive basado en ellos es una referencia
 local para el banco diferencial. Se compila solo con
 `-DTESSERA_BUILD_CLOWN_REFERENCE=ON` (preset `windows-clown-reference`), en un
 árbol separado que no se puede instalar, y ningún artefacto distribuido contiene
-código AGPL. El paquete distribuido no incluye un backend de producto de Mega
-Drive hasta que lo aporte el núcleo propio.
+código AGPL. Desde `v0.2.0` el paquete incluye el núcleo propio `megadrive`,
+compilado con Moira (MIT), el Z80 de floooh/chips (Zlib) e ymfm (BSD-3-Clause),
+cuyas licencias viajan en `share/tessera/licenses/`.
 
 No incorporar código restringido de Genesis Plus GX sin permisos adicionales
 suficientes. La disponibilidad de fuentes no concede por sí sola derechos

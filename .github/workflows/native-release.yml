@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v0.1.0-mvp.*'
+      - 'v0.2.0-*'
 
 permissions:
   contents: write
@@ -67,6 +68,23 @@ jobs:
               $metadata.source.clean_at_configure -ne $true) {
             throw 'Package source does not match the clean release tag.'
           }
+          # v0.2.0-* (TP-112.3): the tag names the package version and the
+          # package carries the native Mega Drive core.
+          $tag = '${{ github.ref_name }}'
+          if ($tag.StartsWith('v0.2.0-')) {
+            if (-not $tag.StartsWith("v$($metadata.version)-")) {
+              throw "Tag $tag does not match package version $($metadata.version)."
+            }
+            if ($metadata.scope.core -cne 'megadrive') {
+              throw 'A v0.2.0 candidate must carry the megadrive backend.'
+            }
+            & "$env:RUNNER_TEMP/tessera-install/bin/tessera.exe" backend list |
+              Out-File release-backends.json -Encoding utf8NoBOM
+            if ($LASTEXITCODE -ne 0 -or
+                -not (Select-String -Path release-backends.json -Pattern '"megadrive"' -Quiet)) {
+              throw 'The installed CLI does not list megadrive.'
+            }
+          }
 
       - name: Package twice and reject drift
         run: |
@@ -95,16 +113,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          @'
+          if ('${{ github.ref_name }}'.StartsWith('v0.2.0-')) {
+            $backend = @'
+          Incluye el backend de producto de Mega Drive `megadrive`, el núcleo
+          propio de la spec 008 (68000 Moira MIT, Z80 floooh/chips Zlib, YM2612
+          ymfm BSD-3-Clause, con sus licencias), elegido por defecto para
+          contenido Mega Drive.
+          '@
+          } else {
+            $backend = 'No incluye un backend de producto de Mega Drive.'
+          }
+          @"
           Candidato nativo de Tessera para Windows x64 bajo MPL-2.0. El paquete
           incluye la API C, CLI, referencia al código fuente correspondiente,
           inventario y licencias. No incluye ClownMDEmu ni ningún componente AGPL,
-          GPL o LGPL, y no incluye un backend de producto de Mega Drive. El tag y el
+          GPL o LGPL. $backend El tag y el
           commit registrado en el paquete identifican las fuentes exactas.
           No incluye ROM, pack de contenido, registro de confianza ni generador
           compilado. El borrador permanece sin publicar hasta cerrar la revisión
           de distribución y el lock nativo de Runtime.
-          '@ | Set-Content release-notes.md -Encoding utf8NoBOM
+          "@ | Set-Content release-notes.md -Encoding utf8NoBOM
           gh release create '${{ github.ref_name }}' `
             "release-out/$env:ASSET_NAME" release-out/CHECKSUMS.sha256 `
             --repo '${{ github.repository }}' --verify-tag --draft --prerelease `

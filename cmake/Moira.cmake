@@ -46,7 +46,7 @@ function(tessera_add_moira)
     file(COPY_FILE "${PROJECT_SOURCE_DIR}/src/md/moira/MoiraConfig.h"
          "${work_dir}/MoiraConfig.h" ONLY_IF_DIFFERENT)
 
-    add_library(tessera_moira STATIC
+    add_library(tessera_moira OBJECT
         "${work_dir}/Moira.cpp" "${work_dir}/MoiraCore68000.cpp"
         "${work_dir}/MoiraCore68010.cpp" "${work_dir}/MoiraCore68020.cpp"
         "${work_dir}/MoiraDebugger.cpp")

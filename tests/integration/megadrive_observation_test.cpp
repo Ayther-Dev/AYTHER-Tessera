@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include "domain/wire.hpp"
+#include "support/backend_under_test.hpp"
 #include <tessera/tessera.h>
 
 #include <array>
@@ -34,15 +35,22 @@ struct Driver {
   tessera_context_v1 context = initial<tessera_context_v1>();
   std::uint64_t epoch{};
   Driver() {
-    std::array<tessera_backend_info_v1, 3> backends{
+    const auto id = tessera_test::backend_under_test();
+    std::array<tessera_backend_info_v1, 4> backends{
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
-        initial<tessera_backend_info_v1>()};
+        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
     std::uint32_t count{};
     REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
                                           &count, &context) == TESSERA_OK);
-    configuration = tessera::wire::configuration("clownmdemu",
-                                                 backends[0].build_id, memory);
+    const tessera_backend_info_v1 *backend = nullptr;
+    for (std::uint32_t i = 0; i < count && i < backends.size(); ++i)
+      if (backends[i].id == id)
+        backend = &backends[i];
+    REQUIRE(backend != nullptr);
+    configuration = tessera::wire::configuration(id, backend->build_id, memory);
     auto create = initial<tessera_session_create_info_v1>();
+    const auto id_bytes = tessera::wire::text(id);
+    create.backend_id = {id_bytes.data(), id_bytes.size()};
     create.content = {content.data(), content.size()};
     create.config = {configuration.data(), configuration.size()};
     create.initial_persistent_memory = {memory.data(), memory.size()};
@@ -52,7 +60,8 @@ struct Driver {
     auto info = initial<tessera_session_info_v1>();
     REQUIRE(tessera_session_query_v1(session, &info, &context) == TESSERA_OK);
     epoch = info.frame_id.epoch;
-    CHECK((info.capabilities & TESSERA_CAP_TEMPORAL_OBSERVATION) != 0);
+    CHECK(((info.capabilities & TESSERA_CAP_TEMPORAL_OBSERVATION) != 0) ==
+          !tessera_test::native_under_test());
   }
   ~Driver() {
     if (session)
@@ -72,14 +81,13 @@ struct Driver {
             TESSERA_OK);
   }
   void step(std::uint64_t frame) {
-    std::array<tessera_input_assignment_v1, 8> assignments{};
-    for (std::uint16_t i = 0; i < assignments.size(); ++i)
-      assignments[i] = {0, i, 0};
+    auto assignments =
+        tessera_test::neutral_input<tessera_input_assignment_v1>();
     auto input = initial<tessera_input_frame_v1>();
     input.epoch = epoch;
     input.frame = frame;
     input.assignments = assignments.data();
-    input.count = assignments.size();
+    input.count = static_cast<std::uint32_t>(assignments.size());
     REQUIRE(tessera_session_step_v1(session, &input, &context) == TESSERA_OK);
   }
   Bytes state() {
@@ -125,7 +133,31 @@ struct Retained {
 };
 } // namespace
 
-TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
+// API 1.0 temporal observation is a ClownMDEmu capability; the native core
+// observes through API 1.1 (tessera_observation_*, TP-201) and refuses it.
+TEST_CASE("The native core refuses API 1.0 temporal observation" *
+          doctest::skip(!tessera_test::native_under_test())) {
+  Driver native;
+  auto info = initial<tessera_session_info_v1>();
+  REQUIRE(tessera_session_query_v1(native.session, &info, &native.context) ==
+          TESSERA_OK);
+  CHECK((info.capabilities & TESSERA_CAP_TEMPORAL_OBSERVATION) == 0);
+  std::array<tessera_control_item_v1, 1> items{
+      {{TESSERA_CONTROL_OBSERVATION_REGION_MASK, TESSERA_VALUE_MASK64, 31}}};
+  auto controls = initial<tessera_control_transaction_v1>();
+  controls.epoch = native.epoch;
+  controls.frame = 1;
+  controls.id = 1;
+  controls.items = items.data();
+  controls.count = items.size();
+  CHECK(
+      tessera_controls_submit_v1(native.session, &controls, &native.context) ==
+      TESSERA_UNSUPPORTED_CAPABILITY);
+  native.step(1);
+}
+
+TEST_CASE("Mega Drive scanline evidence reconstructs the exact original" *
+          doctest::skip(tessera_test::native_under_test())) {
   Driver observed, plain;
   observed.observe(1);
   observed.step(1);
@@ -207,7 +239,8 @@ TEST_CASE("Mega Drive scanline evidence reconstructs the exact original") {
 }
 
 TEST_CASE("Retained readers cause a bounded loss and the next full capture "
-          "recovers") {
+          "recovers" *
+          doctest::skip(tessera_test::native_under_test())) {
   Driver driver;
   driver.observe(1);
   std::vector<std::unique_ptr<Retained>> readers;

@@ -5,7 +5,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "Use the shared release MSVC runtime (/MD)." FORCE)
-project(Tessera VERSION 0.1.0 LANGUAGES C CXX)
+project(Tessera VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -24,7 +24,7 @@ option(TESSERA_ENGINE_INTEGRATION "Link a minimal installed Engine SDK consumer.
 option(TESSERA_RUNTIME_INTEGRATION "Require the native Runtime integration acceptance target." OFF)
 option(TESSERA_BUILD_BACKEND_PROBES "Build the explicitly enabled Gate 0 backend probes." OFF)
 option(TESSERA_BUILD_CLOWN_REFERENCE "Build the ClownMDEmu reference backend (AGPL-3.0) for local differential testing only. Never installed or distributed." OFF)
-option(TESSERA_BUILD_MEGADRIVE "Build the native Mega Drive core (backend megadrive, spec 008)." OFF)
+option(TESSERA_BUILD_MEGADRIVE "Build the native Mega Drive core (backend megadrive, spec 008, the default Mega Drive backend since TP-112.1)." ON)
 option(TESSERA_BUILD_DIFFBENCH "Build the differential bench against oracles (local tool, never installed)." OFF)
 option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
 option(TESSERA_PERF_BUDGET "Register performance.md_budget, the RNF-1/RNF-2 targets on the corpus (windows-bench only)." OFF)

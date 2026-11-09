@@ -10,13 +10,13 @@
 namespace tessera {
 std::span<const SystemRegistration> SystemRegistry::registrations() {
   static const std::array<SystemRegistration, kRegistrationCount> entries{{
-#if TESSERA_CLOWN_REFERENCE
-      {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
-       make_megadrive_backend},
-#endif
 #if TESSERA_MEGADRIVE
       {"megadrive", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
        md::make_backend},
+#endif
+#if TESSERA_CLOWN_REFERENCE
+      {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
+       make_megadrive_backend},
 #endif
       {"synthetic.minimal", TESSERA_BACKEND_TEST, TESSERA_SYSTEM_NONE, 0x120F,
        make_synthetic_backend},
@@ -58,9 +58,11 @@ std::string SystemRegistry::resolve(std::string_view requested,
   if (requested.empty()) {
     const auto detection = SystemDetector::detect(content, system_override);
     require(detection.status == TESSERA_OK, detection.status);
+    // TP-112.1 (DA-1): the native core is the default; the ClownMDEmu
+    // reference backend is only ever selected by its id.
     for (const auto &entry : registrations())
       if (entry.kind == TESSERA_BACKEND_PRODUCT &&
-          entry.system == detection.info.system)
+          entry.system == detection.info.system && entry.id != "clownmdemu")
         return std::string(entry.id);
   }
   throw Failure{TESSERA_IMPLEMENTATION_UNAVAILABLE, TESSERA_PHASE_CREATE};

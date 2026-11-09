@@ -28,6 +28,28 @@ set(TESSERA_DIFFBENCH_FX02_ROM "" CACHE FILEPATH "ROM FX-02 generada por el prob
 # (program.md, SHA-256 5296c4fa...), the ROM that plays a tone while B is held;
 # ayther_synthetic.md does not read the pad.
 set(TESSERA_DIFFBENCH_FX02_AUDIO_ROM "" CACHE FILEPATH "ROM FX-02 audio-active (program.md) de las trazas fx02-*.json.")
+# Each variable must name the ROM its golden values were measured on; a wrong
+# file is reported and its tests are not registered (TP-112: the two ROMs had
+# been swapped in local caches).
+function(tessera_diffbench_expect_rom variable expected name)
+    if(NOT ${variable})
+        return()
+    endif()
+    if(NOT EXISTS "${${variable}}")
+        message(WARNING "${variable}: ${${variable}} no existe; sus pruebas no se registran.")
+        set(${variable} "" PARENT_SCOPE)
+        return()
+    endif()
+    file(SHA256 "${${variable}}" actual)
+    if(NOT actual STREQUAL expected)
+        message(WARNING "${variable} debe ser ${name} (SHA-256 ${expected}), no ${${variable}} (${actual}); sus pruebas no se registran.")
+        set(${variable} "" PARENT_SCOPE)
+    endif()
+endfunction()
+tessera_diffbench_expect_rom(TESSERA_DIFFBENCH_FX02_ROM
+    c7666ec2a4d05ad3df8ce14648b5abd5bc4b0f9711c2edcaad228e127070c34f ayther_synthetic.md)
+tessera_diffbench_expect_rom(TESSERA_DIFFBENCH_FX02_AUDIO_ROM
+    5296c4fa331fd8cb47663fc7ce3b0abef03364221b309a65f2966c6a8642225c program.md)
 # TP-206.1: the native FRAME_HASH test reads FX-02 where the bench does.
 if(TESSERA_DIFFBENCH_FX02_ROM AND TARGET tessera_md_subscriptions_test)
     target_compile_definitions(tessera_md_subscriptions_test PRIVATE

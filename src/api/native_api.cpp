@@ -50,7 +50,9 @@ std::array<tessera_backend_info_v1, kRegistrationCount> backends() {
     v.system = registrations[i].system;
     v.capabilities = registrations[i].capabilities;
     std::memcpy(v.id, registrations[i].id.data(), registrations[i].id.size());
-    std::memcpy(v.version, "0.1.0", 5);
+    static_assert(sizeof(TESSERA_PACKAGE_VERSION) <= sizeof(v.version));
+    std::memcpy(v.version, TESSERA_PACKAGE_VERSION,
+                sizeof(TESSERA_PACKAGE_VERSION) - 1);
     std::copy(hash.begin(), hash.end(), v.build_id);
   }
   return values;

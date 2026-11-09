@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include "domain/wire.hpp"
+#include "support/backend_under_test.hpp"
 #include <tessera/tessera.h>
 
 #include <array>
@@ -39,17 +40,24 @@ TEST_CASE(
   CHECK(detection.system == TESSERA_SYSTEM_MEGA_DRIVE);
   REQUIRE(required == 1);
 
-  std::array<tessera_backend_info_v1, 3> backends{
+  const auto id = tessera_test::backend_under_test();
+  std::array<tessera_backend_info_v1, 4> backends{
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
-      initial<tessera_backend_info_v1>()};
+      initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
   REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
                                         &required, &context) == TESSERA_OK);
-  REQUIRE(std::string_view(backends[0].id) == "clownmdemu");
-  CHECK(backends[0].kind == TESSERA_BACKEND_PRODUCT);
+  const tessera_backend_info_v1 *backend = nullptr;
+  for (std::uint32_t i = 0; i < required && i < backends.size(); ++i)
+    if (backends[i].id == id)
+      backend = &backends[i];
+  REQUIRE(backend != nullptr);
+  CHECK(backend->kind == TESSERA_BACKEND_PRODUCT);
   const std::vector<std::uint8_t> memory(65536, 0);
   const auto configuration =
-      tessera::wire::configuration("clownmdemu", backends[0].build_id, memory);
+      tessera::wire::configuration(id, backend->build_id, memory);
   auto create = initial<tessera_session_create_info_v1>();
+  const auto id_bytes = tessera::wire::text(id);
+  create.backend_id = {id_bytes.data(), id_bytes.size()};
   create.content = {rom.data(), rom.size()};
   create.config = {configuration.data(), configuration.size()};
   create.initial_persistent_memory = {memory.data(), memory.size()};
@@ -62,32 +70,36 @@ TEST_CASE(
   CHECK(info.tick_hz_num == 53693175);
   CHECK(info.frame_id.frame == 0);
 
-  std::array<tessera_input_assignment_v1, 8> assignments{};
-  for (std::uint16_t index = 0; index < assignments.size(); ++index)
-    assignments[index] = {0, index, 0};
+  auto assignments = tessera_test::neutral_input<tessera_input_assignment_v1>();
   auto input = initial<tessera_input_frame_v1>();
   input.epoch = info.frame_id.epoch;
   input.frame = 1;
   input.assignments = assignments.data();
-  input.count = assignments.size();
+  input.count = static_cast<std::uint32_t>(assignments.size());
   REQUIRE(tessera_session_step_v1(session, &input, &context) == TESSERA_OK);
   auto original = initial<tessera_original_frame_v1>();
   REQUIRE(tessera_original_frame_query_v1(session, &original, &context) ==
           TESSERA_OK);
   CHECK(original.frame_id.frame == 1);
-  CHECK(original.width == 320);
-  CHECK(original.height == 224);
-  CHECK(original.pixels.bytes == 320 * 224 * 4);
+  // Frame 1 of this ROM is still in the reset video mode: the native core
+  // gives 256x192 as gpgx does; ClownMDEmu always gives 320x224.
+  const bool native = tessera_test::native_under_test();
+  const std::uint32_t width = native ? 256 : 320, height = native ? 192 : 224;
+  CHECK(original.width == width);
+  CHECK(original.height == height);
+  CHECK(original.pixels.bytes == std::uint64_t{width} * height * 4);
   CHECK(original.video_format == TESSERA_VIDEO_RGBA8);
   CHECK(original.sample_rate == 48000);
   CHECK(original.pcm_frames > 0);
   CHECK(original.pcm.bytes == original.pcm_frames * 4);
-  CHECK(original.tick_end - original.tick_begin == 895780);
+  // A whole NTSC frame in master cycles: 896 040 natively (TP-101.2).
+  CHECK(original.tick_end - original.tick_begin ==
+        (native ? 896040U : 895780U));
   std::uint64_t state_bytes{};
   CHECK(tessera_state_export_canonical_v1(session, {nullptr, 0}, &state_bytes,
                                           &context) ==
         TESSERA_BUFFER_TOO_SMALL);
-  CHECK(state_bytes > 1000000);
+  CHECK(state_bytes > (native ? 100000U : 1000000U));
   std::vector<std::uint8_t> before(static_cast<std::size_t>(state_bytes));
   REQUIRE(
       tessera_state_export_canonical_v1(session, {before.data(), before.size()},

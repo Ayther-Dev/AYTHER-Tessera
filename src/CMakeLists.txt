@@ -53,6 +53,8 @@ else()
     target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_CLOWN_REFERENCE=0>")
 endif()
 if(TESSERA_BUILD_MEGADRIVE)
+    # Object libraries: their objects go into tessera_core itself, so the
+    # installed static library needs no further targets (TP-112.1).
     target_link_libraries(tessera_core PUBLIC "$<BUILD_INTERFACE:Tessera::moira>" "$<BUILD_INTERFACE:Tessera::z80_chips>" "$<BUILD_INTERFACE:Tessera::ymfm>")
 endif()
 target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>>")
@@ -81,7 +83,7 @@ endforeach()
 string(SHA256 build_id "${identity_manifest}")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/build_identity.hpp"
-    CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n" @ONLY)
+    CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n#define TESSERA_PACKAGE_VERSION \"@PROJECT_VERSION@\"\n" @ONLY)
 
 if(WIN32) # the CLI uses wmain and the Windows console
 add_executable(tessera_cli cli/main.cpp cli/replay_trace.cpp)

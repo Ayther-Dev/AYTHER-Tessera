@@ -1,5 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "support/fx01.hpp"
+#if TESSERA_MEGADRIVE
+#include "domain/wire.hpp"
+#endif
 #include <doctest/doctest.h>
 
 #include <algorithm>
@@ -214,3 +217,38 @@ TEST_CASE("An invalid synthetic-looking prefix does not hide a valid COPIER512 "
   fx01::append(bytes, raw);
   recognized(detect(bytes), bytes, 512, raw.size());
 }
+
+#if TESSERA_MEGADRIVE
+TEST_CASE("Without a backend id Mega Drive content opens the native core") {
+  // TP-112.1 (DA-1): megadrive is the default Mega Drive backend; ClownMDEmu,
+  // when the reference build has it, is chosen only by its id.
+  auto context = fx01::init<tessera_context_v1>();
+  std::array<tessera_backend_info_v1, 4> backends{};
+  for (auto &backend : backends)
+    backend = fx01::init<tessera_backend_info_v1>();
+  std::uint32_t count = 0;
+  REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
+                                        &count, &context) == TESSERA_OK);
+  REQUIRE(count >= 3);
+  CHECK(std::string(backends[0].id) == "megadrive");
+  CHECK(backends[0].kind == TESSERA_BACKEND_PRODUCT);
+  const auto rom = raw_md();
+  const fx01::Bytes memory(65536, 0);
+  const auto config =
+      tessera::wire::configuration("megadrive", backends[0].build_id, memory);
+  auto request = fx01::init<tessera_session_create_info_v1>();
+  request.content = fx01::view(rom);
+  request.config = fx01::view(config);
+  request.initial_persistent_memory = fx01::view(memory);
+  tessera_session session = 0;
+  REQUIRE(tessera_session_create_v1(&request, &session, &context) ==
+          TESSERA_OK);
+  auto info = fx01::init<tessera_session_info_v1>();
+  REQUIRE(tessera_session_query_v1(session, &info, &context) == TESSERA_OK);
+  CHECK(info.system == TESSERA_SYSTEM_MEGA_DRIVE);
+  CHECK(std::equal(std::begin(info.backend_build_id),
+                   std::end(info.backend_build_id),
+                   std::begin(backends[0].build_id)));
+  CHECK(tessera_session_close_v1(session, &context) == TESSERA_OK);
+}
+#endif
