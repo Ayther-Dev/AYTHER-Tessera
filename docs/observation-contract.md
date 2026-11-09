@@ -141,7 +141,7 @@ La región 23 (`FRAME_HASH`, 56 bytes) exige la suscripción `FRAME_HASH` (0x800
 
 ## Controles en Mode 4 (TP-211.1, medido sobre gpgx r4)
 
-gpgx r4 anuncia las capacidades 0xEFFFF: **sin** el bit 16 (`MODE4_CONTROLS`). Según la ABI, ese bit dice que la supresión de sprites, el peel y la supresión por celda de plano funcionan también en Mode 4; Tessera no sirve esos controles en ningún modo (regiones 6–9, PQ-1).
+gpgx r4 anuncia las capacidades 0xEFFFF: **sin** el bit 16 (`MODE4_CONTROLS`). Según la ABI, ese bit dice que la supresión de sprites, el peel y la supresión por celda de plano funcionan también en Mode 4; Tessera no sirve esos controles en ningún modo (regiones 6–9, PQ-1). Por eso Tessera tampoco lo anuncia: paridad con r4 (decisión del propietario, 2026-11-08). La API aún no publica la máscara de capacidades de observación; queda pendiente fuera de TP-211.1.
 
 - LAYER_MASK y LAYER_DIM en Mode 4: gpgx acepta los 16 valores de la máscara (estado 0, también con los bits B y ventana, que no tienen referente; r4 no devuelve `UNSUPPORTED_MODE`). Bit 0 = el fondo, bit 3 = los sprites (TP-205.2). Se escriben y actúan igual que en Mode 5: desde el frame siguiente y solo con `RENDER_CONTROLS` activa.
 - Ajustado con `tests/fixtures/diffbench/mode4-controls.txt`: `mode4_scene` 1, 2, 4, 5, 6, 8, 9, 10 y 11 recorren las 16 máscaras, LAYER_DIM y sus combinaciones; un guion sin `RENDER_CONTROLS` que la activa a mitad; y `mode4_pbc`. El efecto se lee en el vídeo de FRAME_HASH del frame siguiente, junto con VRAM, CRAM y VSRAM, desde el frame 1 (el 0 es el de EXC-007).
