@@ -16,11 +16,14 @@ bool signature(wire::View b) {
 bool valid(wire::View b) {
   if (b.size() < 0x200 || (b.size() & 1))
     return false;
-  const auto sp = big32(b, 0), pc = big32(b, 4);
+  // The 68000 drives 24 address lines: the top byte of the vectors does not
+  // count, and a stack pointer of 0 is valid (the first push wraps to the top
+  // of work RAM). Streets of Rage 2 starts with SP 0, Phantasy Star IV with
+  // $FFFF4FF0 and Gunstar Heroes with $FFFFFF00.
+  const auto sp = big32(b, 0) & 0xffffffU, pc = big32(b, 4) & 0xffffffU;
   const auto start = big32(b, 0x1a0), end = big32(b, 0x1a4);
-  return (sp & 1) == 0 && sp >= 0xff0000 && sp <= 0xffffff && (pc & 1) == 0 &&
-         pc >= 0x200 && pc < b.size() && start == 0 && end >= pc &&
-         std::uint64_t(end) < b.size();
+  return (sp & 1) == 0 && (pc & 1) == 0 && pc >= 0x200 && pc < b.size() &&
+         start == 0 && end >= pc && std::uint64_t(end) < b.size();
 }
 } // namespace
 Detection SystemDetector::detect(wire::View bytes,

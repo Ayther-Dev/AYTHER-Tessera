@@ -108,6 +108,19 @@ TEST_CASE("Two valid MD interpretations remain ambiguous even with a "
   }
 }
 
+TEST_CASE("The stack pointer counts on 24 address lines and may be 0") {
+  // The initial SP of Streets of Rage 2, Phantasy Star IV and Gunstar Heroes.
+  for (const std::uint32_t sp : {0x00000000U, 0xFFFF4FF0U, 0xFFFFFF00U}) {
+    auto bytes = raw_md();
+    put_be32(bytes, 0, sp);
+    CAPTURE(sp);
+    recognized(detect(bytes), bytes, 0, bytes.size());
+  }
+  auto odd_sp = raw_md();
+  put_be32(odd_sp, 0, 0x00FF1001);
+  CHECK(detect(odd_sp).status == TESSERA_INVALID_CONTENT);
+}
+
 TEST_CASE("Malformed MD structure differs from unknown bytes and override "
           "cannot invent evidence") {
   auto truncated = raw_md();
