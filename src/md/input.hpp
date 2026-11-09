@@ -1,7 +1,8 @@
 // Input of the native Mega Drive (spec 008, TP-108.3): two pads of twelve
-// controls each, stored port-major in an InputState (control order: up, down,
-// left, right, B, C, A, start, X, Y, Z, mode), which is the bit order of the
-// pad masks of System::set_pad.
+// controls each, stored port-major in an InputState. The control order is the
+// API's, the one of ClownMDEmu, FX-01 and the traces: up, down, left, right,
+// A, B, C, start, then X, Y, Z, mode (TP-112.2). pad_mask turns it into the
+// bit order of System::set_pad (B, C, A at bits 4, 5, 6).
 #pragma once
 #include "md/system.hpp"
 #include "systems/emulated_system.hpp"
@@ -16,13 +17,16 @@ namespace tessera::md {
 /// (TESSERA_INPUT_CONTRADICTORY).
 inline std::optional<std::uint16_t> pad_mask(const InputState &input,
                                              unsigned port) noexcept {
+  static constexpr std::uint16_t kControlBits[kPadControls] = {
+      kPadUp, kPadDown,  kPadLeft, kPadRight, kPadA, kPadB,
+      kPadC,  kPadStart, kPadX,    kPadY,     kPadZ, kPadMode};
   const auto *c = input.data() + std::size_t{port} * kPadControls;
   if ((c[0] && c[1]) || (c[2] && c[3]))
     return std::nullopt;
   std::uint16_t mask = 0;
   for (unsigned control = 0; control < kPadControls; ++control)
     if (c[control])
-      mask = static_cast<std::uint16_t>(mask | (1U << control));
+      mask = static_cast<std::uint16_t>(mask | kControlBits[control]);
   return mask;
 }
 
