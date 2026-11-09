@@ -128,6 +128,9 @@ bool __cdecl environment(unsigned cmd, void *data) {
 // TP-206.1: FNV-1a 64 over what the core emitted in the last frame, computed
 // by the host: the 16-bit pixels row by row (w pixels, skipping the pitch)
 // and the audio samples as delivered.
+// Only with a --stats-script (the h/H operations need them): the bench
+// timings of retro_run (TP-014, TP-208) leave them out, as the baseline did.
+bool g_host_hash = false;
 uint64_t g_video_fnv = 0, g_audio_fnv = 0, g_video_prev_fnv = 0;
 unsigned g_prev_w = 0, g_prev_h = 0; // geometry of the frame before
 uint64_t fnv_bytes(uint64_t h, const uint8_t *p, size_t n) {
@@ -136,7 +139,7 @@ uint64_t fnv_bytes(uint64_t h, const uint8_t *p, size_t n) {
   return h;
 }
 void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
-  if (data) {
+  if (data && g_host_hash) {
     g_video_fnv = g_video_prev_fnv = fnv_seed;
     for (unsigned y = 0; y < h; ++y)
       g_video_fnv = fnv_bytes(g_video_fnv,
@@ -183,8 +186,9 @@ void __cdecl audio(int16_t l, int16_t r) {
   note_peak(r);
 }
 size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
-  g_audio_fnv = fnv_bytes(g_audio_fnv, reinterpret_cast<const uint8_t *>(data),
-                          frames * 4);
+  if (g_host_hash)
+    g_audio_fnv = fnv_bytes(g_audio_fnv,
+                            reinterpret_cast<const uint8_t *>(data), frames * 4);
   for (size_t i = 0; i < frames * 2; ++i)
     note_peak(data[i]);
   return frames;
@@ -399,6 +403,7 @@ RunResult run_libretro(const std::string &core_path,
     }
     if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
       result.error = "el core no exporta retro_reset";
+    g_host_hash = !g_stats_script.empty();
     if (!g_stats_script.empty() && !reset_core)
       sym(core, "retro_reset", reset_core);
     std::vector<Poke> no_pokes;

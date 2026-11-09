@@ -100,6 +100,12 @@ if(TESSERA_BUILD_MEGADRIVE)
     target_include_directories(tessera_md_run PRIVATE "${PROJECT_SOURCE_DIR}/src")
     target_link_libraries(tessera_md_run PRIVATE Tessera::core Tessera::build_options)
     tessera_copy_diagnostic_runtime(tessera_md_run)
+    # TP-208: cost and memory of the native machine through the public API.
+    add_executable(tessera_md_bench md_bench_main.cpp)
+    target_include_directories(tessera_md_bench PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_link_libraries(tessera_md_bench PRIVATE Tessera::core Tessera::build_options
+        nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2 psapi)
+    tessera_copy_diagnostic_runtime(tessera_md_bench)
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
         add_test(NAME integration.md_boot_fx02 COMMAND ${Python3_EXECUTABLE} -I
             "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"
