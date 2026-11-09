@@ -17,12 +17,14 @@ namespace tessera::testrom {
 /// records of AUDIO_WRITES. d0 counts up by one at the end of every block, so
 /// the records of consecutive blocks differ.
 inline std::vector<std::uint8_t> audio_flood_rom(unsigned writes = 4096) {
+  // clang-format off
   std::vector<std::uint16_t> c = {
       0x41F9,
       0x00C0,
       0x0011, // lea $C00011,a0 (PSG)
       0x7000, // moveq #0,d0
   };
+  // clang-format on
   const std::size_t loop = c.size();
   for (unsigned i = 0; i < writes; ++i)
     c.push_back(0x1080); // move.b d0,(a0)
