@@ -27,6 +27,7 @@ option(TESSERA_BUILD_CLOWN_REFERENCE "Build the ClownMDEmu reference backend (AG
 option(TESSERA_BUILD_MEGADRIVE "Build the native Mega Drive core (backend megadrive, spec 008)." OFF)
 option(TESSERA_BUILD_DIFFBENCH "Build the differential bench against oracles (local tool, never installed)." OFF)
 option(TESSERA_ALLOCATION_METRICS "Count C++ new allocations in the CLI benchmark path." OFF)
+option(TESSERA_PERF_BUDGET "Register performance.md_budget, the RNF-1/RNF-2 targets on the corpus (windows-bench only)." OFF)
 
 if(TESSERA_RUNTIME_INTEGRATION)
     message(FATAL_ERROR "RUNTIME_INTEGRATION_UNAVAILABLE: the native Runtime product and acceptance tests are not implemented. This preset cannot pass as a bootstrap check.")

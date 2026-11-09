@@ -106,6 +106,19 @@ if(TESSERA_BUILD_MEGADRIVE)
     target_link_libraries(tessera_md_bench PRIVATE Tessera::core Tessera::build_options
         nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2 psapi)
     tessera_copy_diagnostic_runtime(tessera_md_bench)
+    if(TESSERA_PERF_BUDGET AND Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE
+       AND TESSERA_DIFFBENCH_CORPUS_DIR AND EXISTS "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}")
+        # TP-208.1: the provisional G1 targets of plan 2.10 on the corpus. Only
+        # in windows-bench, with the power overlay of plan 2.1 set by hand.
+        add_test(NAME performance.md_budget COMMAND ${Python3_EXECUTABLE} -I
+            "${CMAKE_CURRENT_SOURCE_DIR}/perf_budget.py"
+            $<TARGET_FILE:tessera_md_bench> $<TARGET_FILE:tessera_diffbench>
+            "${TESSERA_DIFFBENCH_GPGX_CORE}" "${TESSERA_DIFFBENCH_CORPUS_MANIFEST}"
+            "${TESSERA_DIFFBENCH_CORPUS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/md-perf")
+        set_tests_properties(performance.md_budget PROPERTIES
+            PASS_REGULAR_EXPRESSION "result=ok" RUN_SERIAL TRUE
+            LABELS "performance;phase1;md;local" TIMEOUT 1800)
+    endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
         add_test(NAME integration.md_boot_fx02 COMMAND ${Python3_EXECUTABLE} -I
             "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"

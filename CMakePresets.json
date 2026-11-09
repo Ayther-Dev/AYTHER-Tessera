@@ -89,6 +89,16 @@
         "TESSERA_BUILD_DIFFBENCH": "ON",
         "TESSERA_BUILD_MEGADRIVE": "ON"
       }
+    },
+    {
+      "name": "windows-bench",
+      "displayName": "Windows x64 measurements of RNF-1 and RNF-2 (RelWithDebInfo, as the gpgx baseline)",
+      "inherits": "windows-md-dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "TESSERA_ALLOCATION_METRICS": "OFF",
+        "TESSERA_PERF_BUDGET": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -125,6 +135,11 @@
     {
       "name": "windows-md-dev",
       "configurePreset": "windows-md-dev",
+      "jobs": 2
+    },
+    {
+      "name": "windows-bench",
+      "configurePreset": "windows-bench",
       "jobs": 2
     }
   ],
