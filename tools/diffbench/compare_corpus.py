@@ -26,8 +26,9 @@ import sys
 # on HEAD 6d29fe4, i.e. not caused by later work. Cause NOT diagnosed yet:
 # open item, revisit before G1 closes. Only the frames observed are declared,
 # so a new diverging frame still fails the test.
-DECLARED = {("240p-test-suite-1.32", 60)} | {
-    ("vdp-fifo-testing", f) for f in range(60, 601, 60)}
+# VDP FIFO Testing left the list on 2026-11-09 (TP-104.3: the bits a CRAM,
+# VSRAM or 8-bit VRAM read takes from the FIFO; 9/9 like gpgx).
+DECLARED = {("240p-test-suite-1.32", 60)}
 
 # EXC-001..004 of docs/parity-exceptions.md (approved 2026-11-07): audio_writes
 # cycle divergences from the 68000 DRAM refresh model, whole first segment.

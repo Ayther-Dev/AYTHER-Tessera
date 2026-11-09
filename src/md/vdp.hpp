@@ -261,6 +261,16 @@ private:
   unsigned fifo_head_ = 0;
   unsigned fifo_count_ = 0;
   std::uint64_t fifo_last_done_ = 0;
+  // Data of the last four words through the data port (CPU writes, 68000
+  // DMA words, the fill word), and the entry the next one goes to. A CRAM,
+  // VSRAM or 8-bit VRAM read takes the bits the memory does not drive from
+  // that entry (measured on gpgx with VDP FIFO Testing, TP-104.3).
+  std::array<std::uint16_t, 4> fifo_data_{};
+  unsigned fifo_wr_ = 0;
+  void fifo_record(std::uint16_t value) noexcept {
+    fifo_data_[fifo_wr_] = value;
+    fifo_wr_ = (fifo_wr_ + 1U) & 3U;
+  }
   std::function<std::uint16_t(std::uint32_t)> dma_reader_;
 };
 

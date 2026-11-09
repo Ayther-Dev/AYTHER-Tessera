@@ -392,6 +392,8 @@ void Vdp::fifo_write(std::uint16_t value) {
   fifo_last_done_ = slot_service(start, slots);
   fifo_done_[(fifo_head_ + fifo_count_) & 3U] = fifo_last_done_;
   ++fifo_count_;
+  if (!mode4()) // Mode 4 writes leave the data bits alone (mode4_pbc)
+    fifo_record(value);
   put(value);
 }
 
@@ -412,12 +414,18 @@ std::uint16_t Vdp::read_data() {
     value = static_cast<std::uint16_t>((vram_[address_ & 0xFFFEU] << 8) |
                                        vram_[(address_ & 0xFFFEU) + 1U]);
     break;
-  case 8:
-    value = cram_[(address_ >> 1) & 0x3FU];
+  case 8: // 9 bits of colour, the rest from the FIFO
+    value = static_cast<std::uint16_t>((fifo_data_[fifo_wr_] & 0xF111U) |
+                                       cram_[(address_ >> 1) & 0x3FU]);
     break;
-  case 4:
+  case 4: // 11 bits of scroll, the rest from the FIFO
+    value = static_cast<std::uint16_t>(fifo_data_[fifo_wr_] & 0xF800U);
     if (((address_ >> 1) & 0x7FU) < vsram_.size())
-      value = vsram_[(address_ >> 1) & 0x7FU];
+      value |= vsram_[(address_ >> 1) & 0x7FU];
+    break;
+  case 12: // 8-bit VRAM read: the byte of address ^ 1, high byte from the FIFO
+    value = static_cast<std::uint16_t>((fifo_data_[fifo_wr_] & 0xFF00U) |
+                                       vram_[address_ ^ 1U]);
     break;
   default:
     break;
@@ -436,8 +444,11 @@ void Vdp::run_dma(std::uint16_t first_data) {
                                (std::uint32_t{regs_[21]} << 1);
   if (mode < 2) { // 68000 bus to VDP
     std::uint32_t at = source;
-    for (std::uint32_t i = 0; i < length; ++i, at += 2)
-      put(dma_reader_ ? dma_reader_(at) : std::uint16_t{0xFFFF});
+    for (std::uint32_t i = 0; i < length; ++i, at += 2) {
+      const std::uint16_t word = dma_reader_ ? dma_reader_(at) : 0xFFFFU;
+      fifo_record(word);
+      put(word);
+    }
     // A VRAM word takes two external slots, a CRAM or VSRAM word one.
     cpu_stall_ += slots_end(now_, (code_ & 0x0FU) == 1 ? 2ULL * length : length,
                             (code_ & 0x0FU) != 1) -
@@ -448,6 +459,7 @@ void Vdp::run_dma(std::uint16_t first_data) {
   // Fill: one slot per byte; copy: two slots per byte (read and write).
   busy_until_ = now_ + dma_cycles(mode == 2 ? length : 2ULL * length);
   if (mode == 2) { // VRAM fill: the data word, then its high byte
+    fifo_record(first_data);
     put(first_data);
     const auto byte = static_cast<std::uint8_t>(first_data >> 8);
     touch_vram();
@@ -646,6 +658,8 @@ void Vdp::save(StateWriter &w) const {
   w.u32(fifo_head_);
   w.u32(fifo_count_);
   w.u64(fifo_last_done_);
+  w.array(fifo_data_);
+  w.u32(fifo_wr_);
 }
 
 void Vdp::load(StateReader &r) {
@@ -680,6 +694,8 @@ void Vdp::load(StateReader &r) {
   fifo_head_ = r.u32();
   fifo_count_ = r.u32();
   fifo_last_done_ = r.u64();
+  r.array(fifo_data_);
+  fifo_wr_ = r.u32() & 3U;
   if (fifo_head_ >= fifo_done_.size() || fifo_count_ > fifo_done_.size())
     r.fail();
 }

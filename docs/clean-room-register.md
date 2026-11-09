@@ -26,4 +26,10 @@ Observaciones de caja negra de TP-110.4 (gpgx como binario, `retro_reset`; sonda
 - Una VINT pendiente y enmascarada antes del reset se atiende después, igual en los dos.
 - Bits 15-10 del registro de estado del VDP: bus abierto, los de la palabra que el 68000 tiene precargada (la instrucción siguiente a la lectura), no 0x34 fijos.
 
+Observaciones de caja negra de TP-104.3 (gpgx como binario; ROM pública VDP FIFO Testing, de la que solo se leen la pantalla y la work RAM, sin abrir su .asm; sondas propias `fifo_status` y `fifo_timing`):
+
+- Bits 8 (lleno) y 9 (vacío) del registro de estado: siguen la cola de 4 entradas; tras 4 escrituras seguidas a VRAM con la pantalla activa la cola está llena en H40 y no en H32.
+- La última línea del frame (V = $FF) ya cuenta como pantalla: el indicador de blanking baja en ella y las escrituras se atascan como en la pantalla activa.
+- Toda palabra que entra por el puerto de datos (escritura de la CPU, palabra de una DMA desde el 68000, palabra de un fill, escritura a un destino de lectura, que no escribe nada) ocupa la entrada siguiente de un anillo de 4. Una lectura de CRAM da `(entrada & $F111) | color`, una de VSRAM `(entrada & $F800) | valor`, y la lectura de 8 bits de VRAM (código $0C) `(entrada & $FF00) | vram[dirección ^ 1]`, con la entrada que tocaría escribir a continuación; leer no mueve el anillo. Las escrituras en Mode 4 no cambian esos bits (`mode4_pbc`). Los valores esperados son los que la propia ROM guarda en la work RAM.
+
 Toda persona nueva que lea código de gpgx se añade aquí antes de escribir en Tessera.

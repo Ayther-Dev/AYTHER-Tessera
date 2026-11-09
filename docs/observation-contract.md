@@ -74,7 +74,7 @@ Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibuja
 - Bit 0, sprite: el píxel visible es de un sprite, o un sprite chocó en esa columna sin sombra/brillo activo.
 - Una línea con la pantalla apagada al dibujar pero encendida al comenzar se atribuye con los planos. Las líneas no dibujadas conservan los bytes del frame anterior: la tabla solo se borra al cambiar de tamaño.
 - Hasta que una línea pasa por la mezcla desde el arranque, la consulta informa 0 bytes y la lectura de 0 bytes (con o sin buffer) responde por la suscripción. Modo 4 no tiene atribución (0 bytes).
-- Corpus sin entrada y con la línea de tiempo de cada juego: idéntico salvo dos excepciones aprobadas (EXC-005 y EXC-006 de `docs/parity-exceptions.md`). Phantasy Star IV en el frame 480, 3 píxeles de la línea 91 (x 242–244), A/paleta 1 en gpgx y fondo en Tessera, con imagen idéntica: la escritura de VRAM cae a mitad de línea. VDP FIFO Testing en todos los puntos: el texto de resultados sale con otra paleta porque la máquina ya diverge (framebuffer declarado en `compare_corpus.py`).
+- Corpus sin entrada y con la línea de tiempo de cada juego: idéntico salvo una excepción aprobada (EXC-005 de `docs/parity-exceptions.md`). Phantasy Star IV en el frame 480, 3 píxeles de la línea 91 (x 242–244), A/paleta 1 en gpgx y fondo en Tessera, con imagen idéntica: la escritura de VRAM cae a mitad de línea. VDP FIFO Testing, antes EXC-006, es idéntico desde TP-104.3 (2026-11-09).
 
 ## Recomposición del frame (TP-205.1, medida sobre gpgx r4)
 

@@ -585,3 +585,79 @@ TEST_CASE("the last line of the frame is not blanked and has display slots") {
   v.write_data(0x4444);
   CHECK(v.take_cpu_stall() > 0); // as in the active display
 }
+
+// TP-104.3: the bits a read takes from the FIFO (measured on gpgx with VDP
+// FIFO Testing). The entry is the one the next data port write goes to.
+TEST_CASE("CRAM and VSRAM reads take the undriven bits from the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x8000, 1);
+  for (std::uint16_t w : {0x1111, 0x2222, 0x3333, 0x4444, 0x5555, 0x6666})
+    v.write_data(w);
+  // six writes into four entries: the next one is the third (3333)
+  set_read(v, 0x0000, 4); // VSRAM
+  CHECK(v.read_data() == 0x3000);
+  CHECK(v.read_data() == 0x3000); // a read does not move the FIFO
+  set_read(v, 0x0000, 8);         // CRAM
+  CHECK(v.read_data() == 0x3111);
+  set_write(v, 0x0020, 3); // CRAM write: one more entry
+  v.write_data(0x0EEE);
+  set_read(v, 0x0020, 8);
+  CHECK(v.read_data() == 0x4EEE); // 4444 & F111 | colour
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0x4000);
+}
+
+TEST_CASE("a write to a read target goes through the FIFO and writes nothing") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x0000, 1);
+  for (std::uint16_t w : {0x1111, 0x2222, 0x3333, 0x4444})
+    v.write_data(w);
+  set_read(v, 0x0004, 4); // VSRAM read code
+  v.write_data(0xFFFF);
+  CHECK(v.vsram()[2] == 0);
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0x2000); // the FFFF took the 1111 entry
+}
+
+TEST_CASE(
+    "8-bit VRAM read: the byte of address ^ 1, the high byte from the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x8000, 1);
+  for (std::uint16_t w : {0x1122, 0x3344, 0x5566, 0x7788, 0x99AA})
+    v.write_data(w);
+  set_read(v, 0x8000, 0x0C);
+  CHECK(v.read_data() == 0x3322); // entry 3344
+  CHECK(v.read_data() == 0x3344);
+  reg(v, 15, 1);
+  set_read(v, 0x8001, 0x0C);
+  CHECK(v.read_data() == 0x3311);
+  CHECK(v.read_data() == 0x3344);
+}
+
+TEST_CASE("68000 DMA words and the fill word enter the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14); // mode 5, DMA enabled, display off
+  reg(v, 15, 2);
+  std::uint16_t next = 0xAAAA;
+  v.set_dma_reader([&next](std::uint32_t) -> std::uint16_t {
+    const std::uint16_t w = next;
+    next = static_cast<std::uint16_t>(next + 0x1111);
+    return w;
+  });
+  dma_regs(v, 6, 0x1000, 0x00);
+  dma_command(v, 0x8000, 1); // AAAA BBBB CCCC DDDD EEEE FFFF
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0xC800);
+  reg(v, 15, 1);
+  dma_regs(v, 4, 0, 0x80);
+  dma_command(v, 0x9000, 1);
+  v.write_data(0x1234); // fill word
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0xD800); // the fill took the CCCC entry
+}

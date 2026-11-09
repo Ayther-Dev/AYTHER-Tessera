@@ -35,15 +35,12 @@ FPS = 59.9227
 # Heroes: at frame 4392 only the leftover slots past the count differ.
 DECLARED = {("sonic1-usa-eur", 1807), ("sonic1-usa-eur", 2410),
             ("sonic1-usa-eur", 3013), ("gunstar-heroes-usa", 4392)}
-# EXC-005/006 of docs/parity-exceptions.md: ATTRIBUTION divergences declared
-# by the owner (2026-11-08), runs from power on without input. Phantasy Star
-# IV 480: 3 pixels of line 91 (x 242-244), a VRAM write in the middle of the
+# EXC-005 of docs/parity-exceptions.md: ATTRIBUTION divergence declared by
+# the owner (2026-11-08), runs from power on without input. Phantasy Star IV
+# 480: 3 pixels of line 91 (x 242-244), a VRAM write in the middle of the
 # line; the picture is identical. Cause NOT diagnosed, revisit before G1
-# closes. VDP FIFO Testing: inherited from the framebuffer divergence
-# declared in compare_corpus.py (the machine already differs, the result
-# text takes another palette).
-DECLARED_ATTRIBUTION = {("phantasy-star-iv-usa", 480)} | {
-    ("vdp-fifo-testing", f) for f in range(120, 601, 120)}
+# closes. (EXC-006, VDP FIFO Testing, retired 2026-11-09 with TP-104.3.)
+DECLARED_ATTRIBUTION = {("phantasy-star-iv-usa", 480)}
 # Mega Drive pad order of the bench: up down left right B C A start X Y Z mode
 BUTTONS = {"up": 0, "down": 1, "left": 2, "right": 3, "b": 4, "c": 5, "a": 6,
            "start": 7, "x": 8, "y": 9, "z": 10, "mode": 11}
