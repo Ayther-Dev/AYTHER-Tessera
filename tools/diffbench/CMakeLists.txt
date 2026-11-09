@@ -24,6 +24,10 @@ set(TESSERA_DIFFBENCH_GPGX_CORE "" CACHE FILEPATH "Core libretro de gpgx (r4) pa
 set(TESSERA_DIFFBENCH_CORPUS_DIR "" CACHE PATH "Carpeta con las ROM del corpus (TP-105.11).")
 set(TESSERA_DIFFBENCH_CORPUS_MANIFEST "${PROJECT_SOURCE_DIR}/../specs/008-AYTHER-tessera-parity/tools/corpus.toml" CACHE FILEPATH "Manifiesto del corpus.")
 set(TESSERA_DIFFBENCH_FX02_ROM "" CACHE FILEPATH "ROM FX-02 generada por el probe del Gate 0.")
+# The trace fixtures (fx02-*.json) were recorded on FX-02 audio-active
+# (program.md, SHA-256 5296c4fa...), the ROM that plays a tone while B is held;
+# ayther_synthetic.md does not read the pad.
+set(TESSERA_DIFFBENCH_FX02_AUDIO_ROM "" CACHE FILEPATH "ROM FX-02 audio-active (program.md) de las trazas fx02-*.json.")
 # TP-206.1: the native FRAME_HASH test reads FX-02 where the bench does.
 if(TESSERA_DIFFBENCH_FX02_ROM AND TARGET tessera_md_subscriptions_test)
     target_compile_definitions(tessera_md_subscriptions_test PRIVATE
@@ -43,14 +47,14 @@ if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
     set_tests_properties(tool.diffbench_gpgx_regions PROPERTIES
         PASS_REGULAR_EXPRESSION "regions=26 readable=26 read_ok=26 size_ok=26" LABELS "tool;phase0;local" TIMEOUT 120)
 endif()
-if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_ROM)
+if(TESSERA_DIFFBENCH_GPGX_CORE AND TESSERA_DIFFBENCH_FX02_AUDIO_ROM)
     add_test(NAME tool.diffbench_trace_b_pressed COMMAND tessera_diffbench
-        --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_ROM}"
+        --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_AUDIO_ROM}"
         --trace "${fx}/fx02-b-pressed.json" --frames 120)
     set_tests_properties(tool.diffbench_trace_b_pressed PROPERTIES
         PASS_REGULAR_EXPRESSION "audio_peak=4225 " LABELS "tool;phase0;local" TIMEOUT 120)
     add_test(NAME tool.diffbench_trace_neutral COMMAND tessera_diffbench
-        --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_ROM}"
+        --libretro "${TESSERA_DIFFBENCH_GPGX_CORE}" --rom "${TESSERA_DIFFBENCH_FX02_AUDIO_ROM}"
         --trace "${fx}/fx02-neutral.json" --frames 120)
     set_tests_properties(tool.diffbench_trace_neutral PROPERTIES
         PASS_REGULAR_EXPRESSION "audio_peak=768 " LABELS "tool;phase0;local" TIMEOUT 120)
