@@ -529,3 +529,59 @@ TEST_CASE("the fifth data port write of a burst stalls the CPU") {
   v.write_data(0x0EEE);
   CHECK(v.take_cpu_stall() > 0);
 }
+
+TEST_CASE(
+    "FIFO status bits: empty, then full after a burst, then empty again") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x44); // mode 5, display on
+  reg(v, 15, 2);
+  reg(v, 12, 0x81);
+  v.begin_line(10);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1); // VRAM: two slots per word
+  v.set_time(1000);
+  CHECK((v.read_status() & 0x0300) == 0x0200); // empty, not full
+  v.write_data(0x1111);
+  CHECK((v.read_status() & 0x0300) == 0x0000); // neither
+  for (int i = 0; i < 4; ++i)
+    v.write_data(0x2222);
+  CHECK(v.take_cpu_stall() > 0); // the fifth write waited for a free entry
+  CHECK((v.read_status() & 0x0300) == 0x0100); // full, not empty
+  v.set_time(1000 + 2 * 3420); // two lines later every entry is written
+  CHECK((v.read_status() & 0x0300) == 0x0200);
+}
+
+TEST_CASE("the FIFO never fills in the blanking") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // display off: blanking slots on every line
+  reg(v, 15, 2);
+  v.begin_line(10);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1);
+  std::uint64_t t = 1000;
+  for (int i = 0; i < 8; ++i, t += 56) { // one move.w d0,(a0) apart
+    v.set_time(t);
+    v.write_data(0x3333);
+    CHECK((v.read_status() & 0x0100) == 0);
+  }
+  CHECK(v.take_cpu_stall() == 0);
+}
+
+TEST_CASE("the last line of the frame is not blanked and has display slots") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x44);
+  reg(v, 15, 2);
+  reg(v, 12, 0x81);
+  v.begin_line(260, false);
+  CHECK((v.read_status() & 0x0008) != 0); // still the vertical blank
+  v.begin_line(261, false);               // V = $FF
+  CHECK((v.read_status() & 0x0008) == 0);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1);
+  v.set_time(1000);
+  for (int i = 0; i < 4; ++i)
+    v.write_data(0x4444);
+  CHECK(v.take_cpu_stall() == 0);
+  v.write_data(0x4444);
+  CHECK(v.take_cpu_stall() > 0); // as in the active display
+}

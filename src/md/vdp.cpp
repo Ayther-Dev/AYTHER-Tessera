@@ -340,7 +340,8 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
         total_lines;
     const std::uint64_t line_end = static_cast<std::uint64_t>(
         static_cast<std::int64_t>(line_start_) + (k + 1) * kCyclesPerLine);
-    if (!enabled || wrapped >= active) { // blanking: evenly spread slots
+    if (!enabled || (wrapped >= active && wrapped + 1 != total_lines)) {
+      // blanking: evenly spread slots
       const std::uint64_t avail = (line_end - t) * per_line / kCyclesPerLine;
       if (slots <= avail || avail == 0 || true) {
         const std::uint64_t need =
@@ -487,7 +488,12 @@ void Vdp::finish_dma(std::uint32_t length, bool advance_source) noexcept {
 
 std::uint16_t Vdp::read_status() {
   pending_second_ = false;
-  std::uint16_t status = 0x3400U | 0x0200U; // fixed bits, FIFO empty
+  std::uint16_t status = 0x3400U; // fixed bits
+  fifo_retire();
+  if (fifo_count_ == 0)
+    status |= 0x0200U; // FIFO empty
+  else if (fifo_count_ == 4)
+    status |= 0x0100U; // FIFO full
   if (standard_ == Standard::pal)
     status |= 0x0001U;
   if (display_blank())
@@ -506,8 +512,13 @@ std::uint16_t Vdp::read_status() {
   return status;
 }
 
+// The last line of the frame (V = $FF) already belongs to the display: the
+// status flag drops and the 68000 gets the active-display slots there
+// (measured on gpgx with fifo_timing, TP-104.3).
 bool Vdp::display_blank() const noexcept {
-  return line_ >= active_lines() || (regs_[1] & 0x40U) == 0;
+  return (line_ >= active_lines() &&
+          line_ + 1U != lines_per_frame(standard_)) ||
+         (regs_[1] & 0x40U) == 0;
 }
 
 // External-bus slots per line: 16/18 (H32/H40) while the display is drawn,

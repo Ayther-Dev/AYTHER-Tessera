@@ -191,6 +191,25 @@ if(TESSERA_BUILD_MEGADRIVE)
             PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
     endif()
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
+        # TP-104.3: FIFO full and empty bits of the status register after
+        # bursts of n writes. The CRAM bursts of the active display depend on
+        # the CPU phase against the slots (G2) and are left out.
+        foreach(variant IN ITEMS 0-d-h32-a 0-d-h32-v 0-d-h40-a 0-d-h40-v
+                0-b-h32-a 0-b-h32-v 0-b-h40-a 0-b-h40-v 1-d-h32-v 1-d-h40-v
+                1-b-h32-a 1-b-h32-v 1-b-h40-a 1-b-h40-v)
+            add_test(NAME integration.md_fifo_status_${variant}_rom COMMAND tessera_md_testrom
+                fifo-status-${variant} "${CMAKE_CURRENT_BINARY_DIR}/fifo_status_${variant}.bin")
+            set_tests_properties(integration.md_fifo_status_${variant}_rom PROPERTIES
+                FIXTURES_SETUP md_fifo_status_${variant}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
+            add_test(NAME integration.md_fifo_status_${variant} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_work_ram.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" "${CMAKE_CURRENT_BINARY_DIR}/fifo_status_${variant}.bin" 10
+                "${CMAKE_CURRENT_BINARY_DIR}/md-fifo-status-${variant}")
+            set_tests_properties(integration.md_fifo_status_${variant} PROPERTIES
+                FIXTURES_REQUIRED md_fifo_status_${variant}_rom
+                PASS_REGULAR_EXPRESSION "differing=0" LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
         # TP-106.1: the list of V counter values seen in the vertical blank.
         foreach(mode IN ITEMS hv-pal-v28 hv-pal-v30)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}

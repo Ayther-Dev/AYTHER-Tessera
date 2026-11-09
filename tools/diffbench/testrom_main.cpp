@@ -150,6 +150,13 @@ int main(int argc, char **argv) {
         static_cast<unsigned>(v[0] - '0'), v[2] == 'd', v[5] == '4',
         v[8] == 'v', v[9] == 'r',
         (v[9] == 'n' || v[10] == 'n') ? 240U : 64U, v[9] == 'l');
+  } else if (std::strncmp(argv[1], "fifo-status-", 12) == 0 &&
+             std::strlen(argv[1]) == 21) {
+    // fifo-status-<target 0|1>-<d|b>-<h32|h40>-<a|v>
+    const char *v = argv[1] + 12;
+    rom = tessera::testrom::fifo_status_rom(static_cast<unsigned>(v[0] - '0'),
+                                            v[2] == 'd', v[5] == '4',
+                                            v[8] == 'v');
   } else
     return 2;
   std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);

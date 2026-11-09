@@ -287,6 +287,72 @@ inline std::vector<std::uint8_t> fifo_timing_rom(unsigned target, bool display,
   return rom;
 }
 
+// `fifo_status` (TP-104.3): the FIFO bits of the status register (bit 8 full,
+// bit 9 empty). Synced like fifo_timing, then for n = 0..6 it writes n words
+// back to back and stores status & $0300 right after them and again after a
+// wait long enough to drain the FIFO; then six pairs of one write and one
+// status read show it filling. 20 words at $FF0000.
+inline std::vector<std::uint8_t> fifo_status_rom(unsigned target, bool display,
+                                                 bool h40, bool in_vblank) {
+  std::vector<std::uint8_t> rom(0x600, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER FIFO STAT", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0,
+      0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0,
+      0x0004, // lea $C00004,a1
+      0x45F9, 0x00FF,
+      0x0000,         // lea $FF0000,a2
+      0x32BC, 0x8144, // mode 5, display on
+      0x32BC, 0x8F02, // autoincrement 2
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  const auto wait_status = [&](bool until_set) { // status bit 3 (vblank)
+    c.insert(c.end(),
+             {0x3011, 0x0240, 0x0008,
+              static_cast<std::uint16_t>(until_set ? 0x67F8 : 0x66F8)});
+  };
+  wait_status(true);
+  wait_status(false);
+  if (in_vblank)
+    wait_status(true);
+  c.insert(c.end(),
+           {0x32BC, static_cast<std::uint16_t>(display ? 0x8144 : 0x8104)});
+  c.insert(c.end(),
+           {0x22BC, static_cast<std::uint16_t>(target == 0 ? 0x4000 : 0xC000),
+            0x0000});
+  c.insert(c.end(), {0x303C, 0x0EEE}); // d0 = data
+  const auto store_status = [&] {
+    // move.w (a1),d1; andi.w #$0300,d1; move.w d1,(a2)+
+    c.insert(c.end(), {0x3211, 0x0241, 0x0300, 0x34C1});
+  };
+  for (unsigned n = 0; n <= 6; ++n) {
+    for (unsigned i = 0; i < n; ++i)
+      c.push_back(0x3080); // move.w d0,(a0)
+    store_status();
+    c.insert(c.end(),
+             {0x343C, 0x00C8, 0x51CA, 0xFFFE}); // dbf wait, 2010 cycles
+    store_status();
+  }
+  for (unsigned i = 0; i < 6; ++i) {
+    c.push_back(0x3080);
+    store_status();
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `cpu_drift` (TP-104.3): after syncing to the end of the vertical blanking
 // the 68000 runs a dbf loop of 250 * k iterations (10 cycles each, no VDP
 // access) and reads the HV counter into $FF0000 + 2 * (k - 1), k = 1..32.
