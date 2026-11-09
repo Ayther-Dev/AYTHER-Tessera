@@ -73,11 +73,14 @@ void Vdp::write_control(std::uint16_t value) {
     if (was_mode4 && !mode4()) {
       // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
       // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
+      // The bytes keep their place in gpgx's buffer, so a word that Mode 4
+      // held low byte first is high byte first here (its VRAM region,
+      // mode4_pbc, TP-211.1).
       touch_vram();
       std::array<std::uint8_t, 0x10000> spread{};
       for (unsigned w = 0; w < 0x2000U; ++w) {
-        spread[w * 4U] = vram_[w * 2U];
-        spread[w * 4U + 1U] = vram_[w * 2U + 1U];
+        spread[w * 4U] = vram_[w * 2U + 1U];
+        spread[w * 4U + 1U] = vram_[w * 2U];
       }
       for (std::uint32_t i = 0; i < spread.size(); ++i)
         set_vram(i, spread[i]);

@@ -139,6 +139,14 @@ La región 23 (`FRAME_HASH`, 56 bytes) exige la suscripción `FRAME_HASH` (0x800
 - Primeros frames tras el encendido: mientras la ROM prepara el VDP con la pantalla dibujándose, la CPU de Tessera llega a cada escritura algo antes que gpgx (la causa de EXC-007). Una línea o una entrada de CRAM cae un paso antes, y cambian `video`, `vram` o `cram` en los frames 0–1. `raster_bands` 7 arrastra además la limitación conocida de líneas H32 en un frame H40. Excepción declarada EXC-007 (ampliada al plano `frame_hash`). Están en `frame-hash-timing.txt`; el test nativo los ejecuta y muestra la diferencia sin fallar la suite.
 - Banco: operación `h` en `--stats-script` (`H` añade los hashes que calcula el propio host, para diagnóstico). Un caso cuya ROM es `fx02` usa la ROM FX-02 indicada con `--fx02`.
 
+## Controles en Mode 4 (TP-211.1, medido sobre gpgx r4)
+
+gpgx r4 anuncia las capacidades 0xEFFFF: **sin** el bit 16 (`MODE4_CONTROLS`). Según la ABI, ese bit dice que la supresión de sprites, el peel y la supresión por celda de plano funcionan también en Mode 4; Tessera no sirve esos controles en ningún modo (regiones 6–9, PQ-1).
+
+- LAYER_MASK y LAYER_DIM en Mode 4: gpgx acepta los 16 valores de la máscara (estado 0, también con los bits B y ventana, que no tienen referente; r4 no devuelve `UNSUPPORTED_MODE`). Bit 0 = el fondo, bit 3 = los sprites (TP-205.2). Se escriben y actúan igual que en Mode 5: desde el frame siguiente y solo con `RENDER_CONTROLS` activa.
+- Ajustado con `tests/fixtures/diffbench/mode4-controls.txt`: `mode4_scene` 1, 2, 4, 5, 6, 8, 9, 10 y 11 recorren las 16 máscaras, LAYER_DIM y sus combinaciones; un guion sin `RENDER_CONTROLS` que la activa a mitad; y `mode4_pbc`. El efecto se lee en el vídeo de FRAME_HASH del frame siguiente, junto con VRAM, CRAM y VSRAM, desde el frame 1 (el 0 es el de EXC-007).
+- `mode4_pbc` vuelve a Mode 5 (registro 1 = 0x44). Al salir de Mode 4 gpgx reparte la VRAM (palabra w → 2w) **sin mover los bytes en su búfer**: una palabra que Mode 4 guardaba con el byte bajo primero queda con el alto primero en Mode 5. Medido en la región VRAM; corregido en `Vdp` (TP-211.1).
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

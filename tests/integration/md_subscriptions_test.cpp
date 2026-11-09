@@ -574,6 +574,8 @@ Bytes rom_named(const std::string &name) {
     return rom::modes_sweep_rom(rom::modes_variant(number(12)));
   if (name.rfind("raster-bands-", 0) == 0)
     return rom::raster_bands_rom(rom::raster_variant(number(13)));
+  if (name == "mode4-pbc")
+    return rom::mode4_pbc_rom();
   if (name.rfind("mode4-scene-", 0) == 0)
     return rom::mode4_scene_rom(rom::mode4_variant(number(12)));
   if (name.rfind("delta-probe-", 0) == 0)
@@ -884,6 +886,12 @@ TEST_CASE("frame_hash over FX-02 answers as gpgx did (TP-206.1)" *
 TEST_CASE("frame_hash while the ROM sets the VDP up (TP-206.1)" *
           doctest::may_fail()) {
   CHECK(check_stats_fixture("frame-hash-timing.txt", true) == 38);
+}
+
+// TP-211.1: LAYER_MASK and LAYER_DIM in Mode 4 (mode4_scene, mode4_pbc), read
+// through the FRAME_HASH video of the next frame.
+TEST_CASE("the render controls act in Mode 4 as on gpgx (TP-211.1)") {
+  CHECK(check_stats_fixture("mode4-controls.txt", true) == 11);
 }
 
 // EXC-007 (docs/parity-exceptions.md): the CPU writes a few VRAM words more
