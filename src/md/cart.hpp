@@ -9,6 +9,8 @@
 namespace tessera::md {
 
 inline constexpr std::size_t kMaxRomSize = 16U * 1024U * 1024U; // 16 MiB
+/// The 512-byte header a copier (or the SMD format) puts before the ROM.
+inline constexpr std::size_t kCopierHeader = 512;
 
 inline constexpr std::uint8_t kRegionJapan = 1;
 inline constexpr std::uint8_t kRegionUsa = 2;

@@ -147,6 +147,13 @@ gpgx r4 anuncia las capacidades 0xEFFFF: **sin** el bit 16 (`MODE4_CONTROLS`). S
 - Ajustado con `tests/fixtures/diffbench/mode4-controls.txt`: `mode4_scene` 1, 2, 4, 5, 6, 8, 9, 10 y 11 recorren las 16 máscaras, LAYER_DIM y sus combinaciones; un guion sin `RENDER_CONTROLS` que la activa a mitad; y `mode4_pbc`. El efecto se lee en el vídeo de FRAME_HASH del frame siguiente, junto con VRAM, CRAM y VSRAM, desde el frame 1 (el 0 es el de EXC-007).
 - `mode4_pbc` vuelve a Mode 5 (registro 1 = 0x44). Al salir de Mode 4 gpgx reparte la VRAM (palabra w → 2w) **sin mover los bytes en su búfer**: una palabra que Mode 4 guardaba con el byte bajo primero queda con el alto primero en Mode 5. Medido en la región VRAM; corregido en `Vdp` (TP-211.1).
 
+## Límites y desbordamiento (TP-208.3, medido sobre gpgx r4)
+
+- Límites publicados (`tessera_observation_limits_query_v1`) y aplicados: ROM 16 MiB (`max_rom_bytes`; con cabecera de copiadora de 512 bytes o entrelazado SMD se mide la imagen ya convertida; una imagen mayor: `TESSERA_INVALID_CONTENT`), estado 2 MiB (`max_state_bytes`, el checkpoint no lo supera), diario raster 256 eventos, AUDIO_WRITES 8 192 registros, sprites analizados 128.
+- AUDIO_WRITES (11, 12): registros de 8 bytes (`cycle` u32, `addr` u16, `data`, `chip`), los primeros del frame en orden. Pasado el tope, la cuenta queda en 0x2000, el resto se descarta y no se marca en ninguna parte (la región 16 sigue en 0), como en gpgx. Hasta esta tarea la API nativa no servía 11 y 12 (respondía `UNSUPPORTED_CAPABILITY`).
+- RASTER_JOURNAL (22): pasado el evento 256 el diario se trunca y `dropped` cuenta los descartados; la región entera coincide con gpgx en `raster_bands` 9 y 10.
+- Ajustado con `tests/fixtures/diffbench/limits.txt` (ROM sintética `audio_flood`, unas 16 000 escrituras PSG por frame). AUDIO_WRITES se compara por su cuenta y sus 8 primeros registros sin el ciclo (operación `R<id>,<n>/<stride>:<skip>` del banco): los ciclos difieren como en EXC-001..004 y el ritmo de la CPU (EXC-007) desplaza unas escrituras el punto en que cambia el dato, así que la secuencia completa depende de la fase.
+
 ## Unidad del campo `cycle` de AUDIO_WRITES (TP-011.2)
 El campo `cycle` de cada registro de `AUDIO_WRITES` está en ciclos master (53 693 175 Hz NTSC, 53 203 424 Hz PAL) contados desde el inicio del frame. Medido en gpgx r4 por caja negra (evidencia: `specs/008-AYTHER-tessera-parity/evidence/g0/cycle-base.json`). La secuencia (chip, addr, data) debe coincidir siempre; el ciclo de las escrituras de la 68000 se compara con tolerancia de 200 ciclos master, el de las del Z80 de forma exacta salvo el desfase de arranque.
 

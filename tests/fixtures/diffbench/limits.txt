@@ -1,0 +1,58 @@
+# Limits of plan 2.10 measured on gpgx (spec 008, TP-208.3, RNF-5): AUDIO_WRITES
+# past 8 192 records in a frame (audio_flood, about 16 000 PSG writes per
+# frame) and RASTER_JOURNAL past 256 events (raster_bands 9 and 10). R<id>[,n]
+# reads a region whole: status, size, FNV-1a of its first n bytes, first 8
+# bytes; R<id>,<n>/<stride>:<skip> hashes each <stride>-byte record from
+# byte <skip> on. AUDIO_WRITES is compared by its count and its first 8
+# records without the cycle: the cycles differ as in EXC-001..004 and the
+# CPU's pace (EXC-007) moves by a few writes where d0 changes value, so
+# the whole sequence is phase dependent. Written by
+# tools/diffbench/compare_recompose_stats.py --update; the native side runs the same cases in tests/integration/md_subscriptions_test.cpp.
+
+case audio-flood 10 1:R12.R11,64/8:4.R16;2:R12.R11,64/8:4;3:R12.R11,64/8:4.R16;5:R12.R11,64/8:4 6
+frame=1 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=1 region 11 status=0 size=65536 fnv=501822f4b9611e43 head=0000000100000001
+frame=1 region 16 status=-9 size=4 fnv=315446a086a23133 head=00000000
+frame=2 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=2 region 11 status=0 size=65536 fnv=fe09900a161b7f43 head=0000040100000401
+frame=3 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=3 region 11 status=0 size=65536 fnv=5b4a70e13baae603 head=0000080100000801
+frame=3 region 16 status=-9 size=4 fnv=315446a086a23133 head=00000000
+frame=5 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=5 region 11 status=0 size=65536 fnv=5196fc33211aa183 head=00000f0100000f01
+end
+
+case audio-flood 18 2:R12.R11,64/8:4.R16;4:R12.R11,64/8:4.R16 5
+frame=2 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=2 region 11 status=0 size=65536 fnv=fe09900a161b7f43 head=0000040100000401
+frame=2 region 16 status=0 size=4 fnv=315446a086a23133 head=00000000
+frame=4 region 12 status=0 size=4 fnv=4683a6a123a20693 head=00200000
+frame=4 region 11 status=0 size=65536 fnv=93bddf698654703 head=00000c0100000c01
+frame=4 region 16 status=0 size=4 fnv=315446a086a23133 head=00000000
+end
+
+case raster-bands-9 8 1:R22.R16;2:R22.R16;3:R22.R16 4
+frame=1 region 22 status=0 size=2064 fnv=742ba99c0b4d22cd head=0100000010080000
+frame=1 region 16 status=0 size=4 fnv=d14ef2a8dcd7edc4 head=07000000
+frame=2 region 22 status=0 size=2064 fnv=735fa853fc73d6ec head=0100000010080000
+frame=2 region 16 status=0 size=4 fnv=b3e8f296c49adaf7 head=84000000
+frame=3 region 22 status=0 size=2064 fnv=735fa853fc73d6ec head=0100000010080000
+frame=3 region 16 status=0 size=4 fnv=b3e8f296c49adaf7 head=84000000
+end
+
+case raster-bands-10 8 1:R22.R16;2:R22.R16;3:R22.R16 4
+frame=1 region 22 status=0 size=2064 fnv=d5826de42a99aa7d head=0100000010080000
+frame=1 region 16 status=0 size=4 fnv=5139a2ca35aee008 head=0b000000
+frame=2 region 22 status=0 size=2064 fnv=b9a8ec3a0d781a0f head=0100000010080000
+frame=2 region 16 status=0 size=4 fnv=33d3a2b81d71cd3b head=88000000
+frame=3 region 22 status=0 size=2064 fnv=b9a8ec3a0d781a0f head=0100000010080000
+frame=3 region 16 status=0 size=4 fnv=33d3a2b81d71cd3b head=88000000
+end
+
+case raster-bands-9 1c 2:R22.R16.R12;3:R22.R16 4
+frame=2 region 22 status=0 size=2064 fnv=735fa853fc73d6ec head=0100000010080000
+frame=2 region 16 status=0 size=4 fnv=b3e8f296c49adaf7 head=84000000
+frame=2 region 12 status=0 size=4 fnv=315446a086a23133 head=00000000
+frame=3 region 22 status=0 size=2064 fnv=735fa853fc73d6ec head=0100000010080000
+frame=3 region 16 status=0 size=4 fnv=b3e8f296c49adaf7 head=84000000
+end

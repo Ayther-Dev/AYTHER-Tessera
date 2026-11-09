@@ -376,7 +376,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # TP-206.1: FRAME_HASH, the same way (the timing fixture holds frame 1
         # of the test ROMs, still open on the native side); FX-02 when the
         # build knows it.
-        foreach(fixture IN ITEMS frame-hash:43 frame-hash-timing:38 mode4-controls:11)
+        foreach(fixture IN ITEMS frame-hash:43 frame-hash-timing:38 mode4-controls:11 limits:5)
             string(REPLACE ":" ";" parts "${fixture}")
             list(GET parts 0 name)
             list(GET parts 1 count)

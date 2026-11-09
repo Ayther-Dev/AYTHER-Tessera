@@ -1,6 +1,7 @@
 // Writes the synthetic Mega Drive test ROMs (spec 008, TP-101.10).
 //   tessera_md_testrom bus-sweep|ssf2-sweep|vint-counter <out.bin>
 #include "support/md_delta_testrom.hpp"
+#include "support/md_limits_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 
@@ -60,6 +61,8 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_h_probe_rom(0x00);
   else if (std::strcmp(argv[1], "hv-h40-h") == 0)
     rom = tessera::testrom::hv_h_probe_rom(0x81);
+  else if (std::strcmp(argv[1], "audio-flood") == 0)
+    rom = tessera::testrom::audio_flood_rom();
   else if (std::strcmp(argv[1], "mode4-pbc") == 0)
     rom = tessera::testrom::mode4_pbc_rom();
   else if (std::strncmp(argv[1], "palette-sweep-", 14) == 0)

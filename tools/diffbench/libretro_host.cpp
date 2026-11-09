@@ -450,7 +450,7 @@ RunResult run_libretro(const std::string &core_path,
       if (iface && ops != g_stats_script.end()) {
         std::ofstream so(g_stats_out, std::ios::app);
         std::vector<uint16_t> layers(5u * 320u * 240u);
-        for (const auto &op : ops->second) {
+        for (auto op : ops->second) {
           uint32_t w = 0, h = 0;
           int32_t status = -8;
           // s/m take optional "<flags hex>@<capacity>"; g takes "<out_size>";
@@ -532,6 +532,46 @@ RunResult run_libretro(const std::string &core_path,
                << "/" << st.single_hits << " multi=" << st.multilayer_calls
                << "/" << st.multilayer_hits << " fingerprint=" << std::hex
                << st.controls_fingerprint << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'R') {
+            // TP-208.3: a region read whole, R<id>[,n]: status, byte size,
+            // FNV-1a of its first n bytes (all by default) and the first 8.
+            // R<id>/<stride>:<skip> hashes records of <stride> bytes from
+            // byte <skip> on (AUDIO_WRITES without the cycle, EXC-001..004).
+            const auto slash = op.find('/');
+            size_t stride = 1, skip = 0;
+            if (slash != std::string::npos) {
+              stride = std::stoul(op.substr(slash + 1));
+              skip = std::stoul(op.substr(op.find(':', slash) + 1));
+              op = op.substr(0, slash);
+            }
+            const auto comma = op.find(',');
+            const auto id = static_cast<uint32_t>(std::stoul(op.substr(1, comma - 1)));
+            tessera_obs_region_info_v1 info{};
+            info.struct_size = sizeof(info);
+            const int32_t qs = iface->query_region(id, &info, sizeof(info));
+            std::vector<uint8_t> data(qs == 0 ? info.byte_size : 0u);
+            uint64_t generation = 0;
+            status = iface->read_region(id, 0, data.data(),
+                                        static_cast<uint32_t>(data.size()),
+                                        UINT64_MAX, &generation);
+            size_t n = comma == std::string::npos
+                           ? data.size()
+                           : std::min<size_t>(data.size(),
+                                              std::stoul(op.substr(comma + 1)));
+            uint64_t hash = fnv_seed;
+            std::vector<uint8_t> kept;
+            for (size_t k = 0; k < n; ++k)
+              if (k % stride >= skip) {
+                hash = (hash ^ data[k]) * 1099511628211ull;
+                kept.push_back(data[k]);
+              }
+            so << "frame=" << i << " region " << id << " status=" << status
+               << " size=" << data.size() << " fnv=" << std::hex << hash
+               << " head=";
+            for (size_t k = 0; k < 8 && k < kept.size(); ++k)
+              so << (kept[k] < 16 ? "0" : "") << unsigned{kept[k]};
+            so << std::dec << "\n";
             continue;
           } else if (op[0] == 'h' || op[0] == 'H') {
             // TP-206.1: the FRAME_HASH region against the host's own FNV-1a

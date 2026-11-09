@@ -15,6 +15,7 @@
 #include "md/vdp_render.hpp"
 #include "session/session.hpp"
 #include "support/md_delta_testrom.hpp"
+#include "support/md_limits_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include <tessera/tessera.h>
@@ -181,7 +182,8 @@ bool served(unsigned region) {
          region == 13 || region == 14 || region == 17 || region == 18 ||
          region == 24 || region == 25 || region == 26 || region == 16 ||
          region == 19 || region == 20 || region == 21 || region == 22 ||
-         region == 5 || region == 10 || region == 23;
+         region == 5 || region == 10 || region == 23 || region == 11 ||
+         region == 12;
 }
 } // namespace
 
@@ -574,6 +576,8 @@ Bytes rom_named(const std::string &name) {
     return rom::modes_sweep_rom(rom::modes_variant(number(12)));
   if (name.rfind("raster-bands-", 0) == 0)
     return rom::raster_bands_rom(rom::raster_variant(number(13)));
+  if (name == "audio-flood")
+    return rom::audio_flood_rom();
   if (name == "mode4-pbc")
     return rom::mode4_pbc_rom();
   if (name.rfind("mode4-scene-", 0) == 0)
@@ -659,7 +663,7 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
   std::vector<std::uint16_t> layers(5u * full);
   for (unsigned i = 0; i < frames; ++i) {
     s.step();
-    for (const auto &op : steps[i]) {
+    for (auto op : steps[i]) {
       const auto at = op.find('@');
       const std::uint32_t capacity =
           at == std::string::npos
@@ -687,6 +691,40 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
              << " single=" << st.single_calls << "/" << st.single_hits
              << " multi=" << st.multilayer_calls << "/" << st.multilayer_hits
              << " fingerprint=" << std::hex << st.controls_fingerprint;
+        out.push_back(line.str());
+        continue;
+      }
+      if (op[0] == 'R') {
+        // TP-208.3, as tessera_diffbench prints it (libretro_host.cpp);
+        // R<id>/<stride>:<skip> hashes each record from byte <skip> on.
+        std::size_t stride = 1, skip = 0;
+        if (const auto slash = op.find('/'); slash != std::string::npos) {
+          stride = std::stoul(op.substr(slash + 1));
+          skip = std::stoul(op.substr(op.find(':', slash) + 1));
+          op = op.substr(0, slash);
+        }
+        const auto comma = op.find(',');
+        const auto id =
+            static_cast<std::uint32_t>(std::stoul(op.substr(1, comma - 1)));
+        Bytes data;
+        const auto status = s.read(id, &data);
+        const std::size_t n =
+            comma == std::string::npos
+                ? data.size()
+                : std::min<std::size_t>(data.size(),
+                                        std::stoul(op.substr(comma + 1)));
+        std::uint64_t hash = 1469598103934665603ULL;
+        Bytes kept;
+        for (std::size_t k = 0; k < n; ++k)
+          if (k % stride >= skip) {
+            hash = (hash ^ data[k]) * 1099511628211ULL;
+            kept.push_back(data[k]);
+          }
+        line << "region " << id << " status=" << status
+             << " size=" << data.size() << " fnv=" << std::hex << hash
+             << " head=";
+        for (std::size_t k = 0; k < 8 && k < kept.size(); ++k)
+          line << (kept[k] < 16 ? "0" : "") << unsigned{kept[k]};
         out.push_back(line.str());
         continue;
       }
@@ -886,6 +924,62 @@ TEST_CASE("frame_hash over FX-02 answers as gpgx did (TP-206.1)" *
 TEST_CASE("frame_hash while the ROM sets the VDP up (TP-206.1)" *
           doctest::may_fail()) {
   CHECK(check_stats_fixture("frame-hash-timing.txt", true) == 38);
+}
+
+// TP-208.3 (RNF-5): the ROM limit published by limits_query_v1 is the one
+// session creation applies, and the other limits are those of plan 2.10.
+TEST_CASE("the published limits are the ones applied (TP-208.3)") {
+  const auto create = [](const Bytes &rom) {
+    tessera_context_v1 context = initial<tessera_context_v1>();
+    const Bytes memory(65536, 0);
+    std::array<tessera_backend_info_v1, 4> backends{
+        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
+        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
+    std::uint32_t required{};
+    REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
+                                          &required, &context) == TESSERA_OK);
+    const tessera_backend_info_v1 *native = nullptr;
+    for (std::uint32_t i = 0; i < required && i < backends.size(); ++i)
+      if (std::string_view(backends[i].id) == "megadrive")
+        native = &backends[i];
+    REQUIRE(native != nullptr);
+    const auto configuration =
+        tessera::wire::configuration("megadrive", native->build_id, memory);
+    auto info = initial<tessera_session_create_info_v1>();
+    const auto id = tessera::wire::text("megadrive");
+    info.backend_id = {id.data(), id.size()};
+    info.content = {rom.data(), rom.size()};
+    info.config = {configuration.data(), configuration.size()};
+    info.initial_persistent_memory = {memory.data(), memory.size()};
+    info.system_override = TESSERA_SYSTEM_MEGA_DRIVE;
+    tessera_session handle{};
+    const auto status = tessera_session_create_v1(&info, &handle, &context);
+    if (status == TESSERA_OK)
+      tessera_session_close_v1(handle, &context);
+    return status;
+  };
+  constexpr std::size_t kMiB = 1024 * 1024;
+  CHECK(create(tessera::testrom::sized_rom(16 * kMiB)) == TESSERA_OK);
+  CHECK(create(tessera::testrom::sized_rom(9 * kMiB)) == TESSERA_OK);
+  CHECK(create(tessera::testrom::sized_rom(16 * kMiB + 2)) ==
+        TESSERA_INVALID_CONTENT);
+
+  Native s(tessera::testrom::sized_rom(0x400));
+  auto limits = initial<tessera_observation_limits_v1>();
+  REQUIRE(tessera_observation_limits_query_v1(s.handle, &limits, &s.context) ==
+          TESSERA_OK);
+  CHECK(limits.max_rom_bytes == 16 * kMiB);
+  CHECK(limits.max_state_bytes == 2 * kMiB);
+  CHECK(limits.max_journal_events == 256);
+  CHECK(limits.max_audio_writes == 8192);
+  CHECK(limits.max_parsed_sprites == 128);
+  CHECK(s.checkpoint().size() <= limits.max_state_bytes);
+}
+
+// TP-208.3: past the limits, as gpgx: AUDIO_WRITES keeps the first 8 192
+// records of the frame, RASTER_JOURNAL counts what it dropped.
+TEST_CASE("past the limits the regions answer as gpgx did (TP-208.3)") {
+  CHECK(check_stats_fixture("limits.txt") == 5);
 }
 
 // TP-211.1: LAYER_MASK and LAYER_DIM in Mode 4 (mode4_scene, mode4_pbc), read

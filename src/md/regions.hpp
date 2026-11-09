@@ -24,6 +24,8 @@ inline constexpr std::uint32_t kRegionVram = 1;
 inline constexpr std::uint32_t kRegionCram = 2;
 inline constexpr std::uint32_t kRegionVdpRegs = 3;
 inline constexpr std::uint32_t kRegionVsram = 4;
+inline constexpr std::uint32_t kRegionAudioWrites = 11;
+inline constexpr std::uint32_t kRegionAudioWriteCount = 12;
 inline constexpr std::uint32_t kRegionParsedSprites = 13;
 inline constexpr std::uint32_t kRegionParsedSpriteCount = 14;
 inline constexpr std::uint32_t kRegionRasterFallback = 16;
@@ -50,6 +52,10 @@ constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {
     return 32;
   case kRegionVsram:
     return 128;
+  case kRegionAudioWrites:
+    return 8U * kAudioWriteCapacity;
+  case kRegionAudioWriteCount:
+    return 4;
   case kRegionParsedSprites:
     return 1280;
   case kRegionParsedSpriteCount:
@@ -282,6 +288,23 @@ inline std::vector<std::uint8_t> memory_region(const System &system,
     }
     break;
   }
+  case kRegionAudioWrites: {
+    // tessera_obs_audio_write_v1: cycle (u32), addr (u16), data, chip; the
+    // first 8 192 writes of the frame, the rest of the region zero (past the
+    // limit gpgx keeps the first ones too, TP-208.3).
+    std::size_t at = 0;
+    for (const auto &w : system.audio_writes()) {
+      u32_le(at, w.cycle);
+      word_le(at + 4, w.addr);
+      out[at + 6] = w.data;
+      out[at + 7] = w.chip;
+      at += 8;
+    }
+    break;
+  }
+  case kRegionAudioWriteCount:
+    u32_le(0, static_cast<std::uint32_t>(system.audio_writes().size()));
+    break;
   case kRegionParsedSpriteCount:
     out[0] =
         static_cast<std::uint8_t>(system.renderer().sprite_capture().count);

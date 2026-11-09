@@ -23,29 +23,24 @@ constexpr std::uint64_t kCapabilities = 0x20F;
 /// bound keeps `tick()` exact in 64 bits.
 constexpr std::uint64_t kMaxFrames = 1ULL << 40;
 
-/// The ROM image whose header holds the country field: the content itself
-/// when it is plain, the unwrapped one for a copier header or .smd.
-std::vector<std::uint8_t> plain_header_image(wire::View content) {
-  try {
-    return load_cart(content).rom;
-  } catch (const Failure &) {
-    return {}; // the System refuses it; the region falls back to Americas
-  }
-}
-
 class NativeBackend final : public IEmulatedSystem, public IObservable {
 public:
   NativeBackend(wire::View content, wire::View memory, RegionChoice choice) {
+    // RNF-5: the 16 MiB published by limits_query_v1 (max_rom_bytes), plus a
+    // copier header, as load_cart accepts (TP-208.3).
     require(content.size() >= 512 && content.size() % 2 == 0 &&
-                content.size() <= 8U * 1024U * 1024U,
+                content.size() <= kMaxRomSize + kCopierHeader,
             TESSERA_INVALID_CONTENT, TESSERA_PHASE_CREATE);
     require(memory.size() == 65536 &&
                 std::all_of(memory.begin(), memory.end(),
                             [](std::uint8_t byte) { return byte == 0; }),
             TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
-    std::vector<std::uint8_t> rom(content.begin(), content.end());
+    // The machine runs the plain image: the content itself, or the one
+    // unwrapped from a copier header or .smd; more than 16 MiB, or no SEGA
+    // header, is INVALID_CONTENT (TP-208.3).
+    std::vector<std::uint8_t> rom = load_cart(content).rom;
     // TP-108.4: the header chooses the console unless the caller fixed it.
-    auto config = region_config(choice, plain_header_image(content));
+    auto config = region_config(choice, rom);
     config.pads = {PadType::six_button, PadType::six_button};
     standard_ = config.standard;
     system_ = std::make_unique<System>(std::move(rom), config);
