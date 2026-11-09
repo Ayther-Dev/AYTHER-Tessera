@@ -23,9 +23,11 @@ import sys
 
 # Known framebuffer divergences, declared as (entry id, frame). They were
 # found when the public ROMs entered the corpus (TP-004.3) and are identical
-# on HEAD 6d29fe4, i.e. not caused by later work. Cause NOT diagnosed yet:
-# open item, revisit before G1 closes. Only the frames observed are declared,
-# so a new diverging frame still fails the test.
+# on HEAD 6d29fe4, i.e. not caused by later work. 240p frame 60 is EXC-009
+# of docs/parity-exceptions.md (approved 2026-11-09 for G1): the logo palette
+# animation runs a few frames out of phase with gpgx; reviewed with the 68000
+# DRAM refresh work before G2. Only the frames observed are declared, so a
+# new diverging frame still fails the test.
 # VDP FIFO Testing left the list on 2026-11-09 (TP-104.3: the bits a CRAM,
 # VSRAM or 8-bit VRAM read takes from the FIFO; 9/9 like gpgx).
 DECLARED = {("240p-test-suite-1.32", 60)}

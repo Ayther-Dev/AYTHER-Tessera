@@ -38,8 +38,8 @@ DECLARED = {("sonic1-usa-eur", 1807), ("sonic1-usa-eur", 2410),
 # EXC-005 of docs/parity-exceptions.md: ATTRIBUTION divergence declared by
 # the owner (2026-11-08), runs from power on without input. Phantasy Star IV
 # 480: 3 pixels of line 91 (x 242-244), a VRAM write in the middle of the
-# line; the picture is identical. Cause NOT diagnosed, revisit before G1
-# closes. (EXC-006, VDP FIFO Testing, retired 2026-11-09 with TP-104.3.)
+# line; the picture is identical. Cause NOT diagnosed; reviewed with the
+# 68000 DRAM refresh work before G2 (owner, 2026-11-09). (EXC-006, VDP FIFO Testing, retired 2026-11-09 with TP-104.3.)
 DECLARED_ATTRIBUTION = {("phantasy-star-iv-usa", 480)}
 # Mega Drive pad order of the bench: up down left right B C A start X Y Z mode
 BUTTONS = {"up": 0, "down": 1, "left": 2, "right": 3, "b": 4, "c": 5, "a": 6,
