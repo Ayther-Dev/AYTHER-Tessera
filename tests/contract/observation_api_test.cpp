@@ -62,3 +62,42 @@ TEST_CASE("limites de observación publicados (TP-006.6, RNF-5)") {
   CHECK(out.max_parsed_sprites == 128);
   CHECK(out.max_state_bytes == 2u * 1024 * 1024);
 }
+
+// decltype(&fn) does not need the definition, so the signatures above pass
+// even when an export is missing (rc.2 declared snapshot_capture without
+// defining it). Taking every address links each one against Tessera::core.
+using AnyFn = void (*)();
+#define ADDR(fn) reinterpret_cast<AnyFn>(&fn)
+static const AnyFn kObservationFunctions[] = {
+    ADDR(tessera_observation_region_query_v1),
+    ADDR(tessera_observation_region_read_v1),
+    ADDR(tessera_observation_write_control_v1),
+    ADDR(tessera_observation_snapshot_capture_v1),
+    ADDR(tessera_observation_recompose_v1),
+    ADDR(tessera_observation_recompose_multilayer_v1),
+    ADDR(tessera_observation_recompose_stats_v1),
+    ADDR(tessera_observation_audio_events_poll_v1),
+    ADDR(tessera_observation_audio_transport_stats_v1),
+    ADDR(tessera_observation_subscriptions_get_v1),
+    ADDR(tessera_observation_subscriptions_set_v1),
+    ADDR(tessera_observation_frame_delta_poll_v1),
+    ADDR(tessera_observation_frame_delta_since_v1),
+};
+
+TEST_CASE("the 13 observation functions link against tessera_core") {
+  CHECK(sizeof(kObservationFunctions) / sizeof(kObservationFunctions[0]) == 13);
+  for (const auto fn : kObservationFunctions)
+    CHECK(fn != nullptr);
+}
+
+TEST_CASE("snapshot_capture runs and refuses a session that does not exist "
+          "(TP-302)") {
+  tessera_context_v1 ctx{};
+  ctx.header = {static_cast<uint32_t>(sizeof(ctx)), TESSERA_ABI_MAJOR, 0};
+  tessera_obs_frame_snapshot_v1 snap{};
+  snap.struct_size = 0x5A5A5A5A;
+  CHECK(tessera_observation_snapshot_capture_v1(0, &snap, sizeof(snap), &ctx) ==
+        TESSERA_INVALID_HANDLE);
+  CHECK(snap.struct_size == 0x5A5A5A5A); // untouched
+  CHECK(sizeof(tessera_obs_frame_snapshot_v1) == 48);
+}

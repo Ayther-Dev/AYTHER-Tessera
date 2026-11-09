@@ -422,12 +422,23 @@ private:
     if (subscriptions_.active(TESSERA_OBS_SUB_RASTER_TRACKING)) {
       delta.raster_events = system_->vdp().raster().count;
       delta.raster_dropped = system_->vdp().raster().dropped;
+      // The frame snapshot's fallback_reasons: RASTER_FALLBACK_REASONS as
+      // this frame left it (measured on gpgx: equal to region 16).
+      delta.fallback = system_->vdp().raster().fallback |
+                       (double_resolution(*system_) ? 0x20U : 0U);
     }
+    // The parsed sprites never overflow: the table has 80 entries and the
+    // region 128 (gpgx never set bit 0 over the sprite_limits ROMs).
     if (subscriptions_.active(TESSERA_OBS_SUB_SPRITE_CAPTURE))
       delta.parsed_sprites = system_->renderer().sprite_capture().count;
-    if (subscriptions_.active(TESSERA_OBS_SUB_AUDIO_WRITES))
+    if (subscriptions_.active(TESSERA_OBS_SUB_AUDIO_WRITES)) {
       delta.audio_writes =
           static_cast<std::uint32_t>(system_->audio_writes().size());
+      // gpgx raises AYTHER_OVERFLOW_AUDIO_WRITES once the frame dropped
+      // writes past the 8 192 kept (audio_flood).
+      if (system_->audio_writes_dropped() != 0)
+        delta.overflow |= TESSERA_OBS_OVERFLOW_AUDIO_WRITES;
+    }
     delta_ring_[delta.generation % kDeltaHistory] = delta;
   }
   /// A restore may replace the whole VRAM: the last frame's delta and the

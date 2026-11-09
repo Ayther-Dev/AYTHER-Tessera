@@ -110,10 +110,15 @@ public:
   /// frame_delta (TP-205.4): the delta of the last frame, frozen when it
   /// ended; `generation` counts the frames run. `dirty` has one byte per VRAM
   /// pattern, a bit per row changed.
+  /// `overflow` and `fallback` serve the frame snapshot (capture_snapshot):
+  /// the overflow bits of the frame's counters (bit 0 parsed sprites, bit 1
+  /// audio writes) and RASTER_FALLBACK_REASONS as the frame left them, 0
+  /// while their subscription is idle. The delta itself does not carry them.
   struct FrameDelta {
     std::uint64_t generation;
     std::uint32_t raster_events, parsed_sprites, audio_writes, raster_dropped;
     std::array<std::uint8_t, 2048> dirty;
+    std::uint32_t overflow, fallback;
   };
   [[nodiscard]] virtual std::int32_t frame_delta(FrameDelta & /*out*/) const {
     return -6; // TESSERA_UNSUPPORTED_CAPABILITY

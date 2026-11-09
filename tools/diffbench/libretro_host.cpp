@@ -257,7 +257,8 @@ static std::string g_stats_out;
 void set_stats_script(const std::string &script, const std::string &out) {
   // <frame>:<op>.<op>...;<frame>:... with s = recompose_frame, m =
   // recompose_multilayer, g = get_recompose_stats, p<region>=<hex byte> =
-  // write_control, run after that frame (0 = the first).
+  // write_control, c = capture_snapshot, G<id> = generation of a region
+  // read, run after that frame (0 = the first).
   std::stringstream entries(script);
   for (std::string entry; std::getline(entries, entry, ';');) {
     const auto colon = entry.find(':');
@@ -450,6 +451,7 @@ RunResult run_libretro(const std::string &core_path,
       if (iface && ops != g_stats_script.end()) {
         std::ofstream so(g_stats_out, std::ios::app);
         std::vector<uint16_t> layers(5u * 320u * 240u);
+        static uint64_t generation_base = UINT64_MAX; // c and G (TP-302)
         for (auto op : ops->second) {
           uint32_t w = 0, h = 0;
           int32_t status = -8;
@@ -653,6 +655,51 @@ RunResult run_libretro(const std::string &core_path,
                << dirty_runs(delta.dirty_patterns,
                              sizeof(delta.dirty_patterns))
                << "\n";
+            continue;
+          } else if (op[0] == 'c') {
+            // TP-302 (rc.3): c[out_size] captures the frame snapshot; the
+            // fields gpgx did not write keep the 0x5A filler.
+            tessera_obs_frame_snapshot_v1 snap{};
+            std::memset(&snap, 0x5A, sizeof(snap));
+            const uint32_t size = op.size() > 1
+                                      ? static_cast<uint32_t>(std::stoul(op.substr(1)))
+                                      : static_cast<uint32_t>(sizeof(snap));
+            if (iface->capture_snapshot)
+              status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                  iface->capture_snapshot)(&snap, size);
+            // The generation counts from the first one seen in the run: its
+            // value also counts the host's loading steps, not a contract.
+            if (status == 0 && generation_base == UINT64_MAX)
+              generation_base = snap.snapshot_generation;
+            so << "frame=" << i << " " << op << " status=" << status
+               << " size=" << snap.struct_size
+               << " version=" << snap.snapshot_version << " generation="
+               << (status == 0 ? "+" : "")
+               << (status == 0 ? snap.snapshot_generation - generation_base
+                               : snap.snapshot_generation)
+               << " frame_generation=" << snap.frame_generation << std::hex
+               << " flags=" << snap.flags
+               << " overflow=" << snap.overflow_flags
+               << " fallback=" << snap.fallback_reasons << std::dec
+               << " sprites=" << snap.parsed_sprite_count
+               << " audio=" << snap.audio_write_count << std::hex
+               << " reserved=" << snap.reserved0 << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'G') {
+            // G<id>: a read of 0 bytes of the region, its status and, when it
+            // succeeds, the generation it answers (what the snapshot's must
+            // match), counted as c counts it.
+            uint64_t generation = 0;
+            status = iface->read_region(
+                static_cast<uint32_t>(std::stoul(op.substr(1))), 0, nullptr, 0,
+                UINT64_MAX, &generation);
+            so << "frame=" << i << " " << op << " status=" << status;
+            if (status == 0) {
+              if (generation_base == UINT64_MAX)
+                generation_base = generation;
+              so << " generation=+" << generation - generation_base;
+            }
+            so << "\n";
             continue;
           } else if (op.size() > 2 && op[0] == 'p') {
             const auto eq = op.find('=');

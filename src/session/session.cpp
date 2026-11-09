@@ -83,8 +83,15 @@ void Session::step(const InputState &input, tessera_context_v1 &ctx) {
     explicit Running(std::atomic<bool> &f) : flag(f) { flag = true; }
     ~Running() { flag = false; }
   } running_guard(running);
+  // The generation moves with every frame, and once more when the frame
+  // starts by activating another subscription mask (measured on gpgx r4,
+  // TP-302 snapshot fixture).
+  const auto *observed = machine->observation();
+  const auto active_before = observed ? observed->subscriptions().active : 0U;
   machine->step(input);
   ++generation;
+  if (observed && observed->subscriptions().active != active_before)
+    ++generation;
   if (pending) {
     region_mask = pending->regions;
     event_mask = pending->events;

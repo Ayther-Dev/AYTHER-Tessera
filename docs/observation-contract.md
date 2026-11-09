@@ -124,6 +124,20 @@ Región 17 (ATTRIBUTION), con `ATTRIBUTION`: un byte por píxel del frame dibuja
 - Excepción declarada EXC-007 (`docs/parity-exceptions.md`): cinco guiones en los que la CPU de Tessera escribe la VRAM a un ritmo algo distinto que gpgx (2554 palabras por frame con la pantalla encendida, frente a 2550; una palabra al final de cargar la escena con la pantalla apagada). Cambian las filas sucias junto al límite de un frame y el recuento de sprites del frame que reescribe la tabla de sprites. No es una regla del delta. Están en `frame-delta-timing.txt`; el test nativo los ejecuta y muestra la diferencia sin fallar la suite.
 - Banco: operaciones `d[out_size]`, `D<generación>[,out_size]` (`D-<n>` cuenta hacia atrás desde la última lectura), `S` y `L` (guardar y restaurar más tarde) en `--stats-script`.
 
+## Instantánea del frame (TP-302, v0.2.0-rc.3, medida sobre gpgx r4)
+
+`tessera_observation_snapshot_capture_v1` (`capture_snapshot`) devuelve `tessera_obs_frame_snapshot_v1`, 48 bytes. No exige suscripción. La v0.2.0-rc.2 la declaraba sin definirla, y el Engine la enmascaraba (`FRAME_SNAPSHOT`). Se ajustó con 10 guiones sobre `raster_bands`, `audio_flood`, `sprite_limits`, `fm_psg_sweep`, `modes_sweep` y `delta_probe` (`tests/fixtures/diffbench/frame-snapshot.txt`), que corren igual en gpgx y en Tessera por la API pública.
+
+- `struct_size` 48, `snapshot_version` 1, `reserved0` 0. `flags` vale `CONTENT_LOADED` (1): una sesión siempre tiene contenido, y una llamada durante el frame daría `BUSY`, así que `FRAME_ACTIVE` no aparece nunca.
+- `frame_generation`: la del delta de frame. Cuenta los frames ejecutados (1 tras el primero) y no cambia al restaurar.
+- `parsed_sprite_count` y `audio_write_count`: los contadores del delta del último frame, 0 si su suscripción no está activa y 0 tras una restauración.
+- `fallback_reasons`: RASTER_FALLBACK_REASONS tal como lo dejó el frame (igual a la región 16; 0x23 y 0x20 en `modes_sweep` 23), 0 sin `RASTER_TRACKING` y 0 tras una restauración.
+- `overflow_flags`: el bit 1 (`AUDIO_WRITES`) se activa cuando el frame descartó escrituras por encima de las 8 192 guardadas. El bit 0 (`PARSED_SPRITES`) no se activa nunca en Tessera: la tabla tiene 80 entradas y la región 128, y gpgx tampoco lo activó con las ROM `sprite_limits`.
+- `snapshot_generation` es la generación que devuelven y comprueban las lecturas de región (`actual_generation` / `expected_generation`). Sube 1 por frame, y 1 más si al empezar el frame se activa una máscara de suscripción distinta. También sube 1 por cada `subscriptions_set` aceptado (aunque repita la máscara; uno rechazado no la mueve), por cada control escrito y aceptado, por cada restauración y por cada reinicio. El valor absoluto incluye los pasos de carga del host. Por eso el banco lo imprime relativo a la primera generación vista (`+N`), y solo los incrementos forman parte del contrato.
+- `out_size` menor de 48: `TESSERA_BUFFER_TOO_SMALL` (gpgx -3) y la salida no se toca; mayor: se escriben 48.
+- En el primer frame de `audio_flood`, Tessera hace 1 963 escrituras y gpgx 1 960: es el ritmo de CPU de EXC-007, no una regla de la instantánea. Por eso el guion empieza en el frame 1.
+- Banco: operaciones `c[out_size]` (captura) y `G<id>` (lectura de 0 bytes de una región: estado y, si va bien, su generación) en `--stats-script`.
+
 ## Hash del frame (TP-206.1, medido sobre gpgx r4)
 
 La región 23 (`FRAME_HASH`, 56 bytes) exige la suscripción `FRAME_HASH` (0x800); sin ella, `TESSERA_NOT_SUBSCRIBED` (gpgx -9). Ajustada con los 34 `modes_sweep`, `raster_bands`, `sprite_limits`, `fm_psg_sweep`, `fm_psg_z80`, `mode4_scene`, `delta_probe` y FX-02 (`tests/fixtures/diffbench/frame-hash*.txt`), que corren igual en gpgx y en Tessera por la API pública.

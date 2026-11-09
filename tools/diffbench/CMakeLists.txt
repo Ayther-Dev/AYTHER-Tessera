@@ -450,7 +450,8 @@ if(TESSERA_BUILD_MEGADRIVE)
             LABELS "integration;phase1;md;local" TIMEOUT 300)
         # TP-205.4: frame_delta and frame_delta_since, the same way (the
         # timing fixture holds the cases still open on the native side).
-        foreach(fixture IN ITEMS frame-delta:20 frame-delta-timing:5)
+        # TP-302: capture_snapshot (frame-snapshot) rides the same loop.
+        foreach(fixture IN ITEMS frame-delta:20 frame-delta-timing:5 frame-snapshot:10)
             string(REPLACE ":" ";" parts "${fixture}")
             list(GET parts 0 name)
             list(GET parts 1 count)

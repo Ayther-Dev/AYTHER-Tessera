@@ -658,6 +658,7 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
   }
   std::vector<std::string> out;
   std::uint64_t last_generation = 0;
+  std::uint64_t generation_base = UINT64_MAX; // c and G (TP-302)
   Bytes saved;
   const std::uint32_t full = 320 * 240;
   std::vector<std::uint16_t> layers(5u * full);
@@ -790,6 +791,47 @@ run_stats_script(Observed &s, const std::string &script, unsigned frames) {
         out.push_back(line.str());
         continue;
       }
+      if (op[0] == 'c') {
+        // TP-302, as tessera_diffbench prints it (libretro_host.cpp): the
+        // generation counts from the first one seen in the case.
+        tessera_obs_frame_snapshot_v1 snap{};
+        std::memset(&snap, 0x5A, sizeof(snap));
+        const auto size =
+            op.size() > 1 ? static_cast<std::uint32_t>(std::stoul(op.substr(1)))
+                          : static_cast<std::uint32_t>(sizeof(snap));
+        status = tessera_observation_snapshot_capture_v1(s.handle, &snap, size,
+                                                         &s.context);
+        if (status == TESSERA_OK && generation_base == UINT64_MAX)
+          generation_base = snap.snapshot_generation;
+        line << op << " status=" << status << " size=" << snap.struct_size
+             << " version=" << snap.snapshot_version
+             << " generation=" << (status == TESSERA_OK ? "+" : "")
+             << (status == TESSERA_OK
+                     ? snap.snapshot_generation - generation_base
+                     : snap.snapshot_generation)
+             << " frame_generation=" << snap.frame_generation << std::hex
+             << " flags=" << snap.flags << " overflow=" << snap.overflow_flags
+             << " fallback=" << snap.fallback_reasons << std::dec
+             << " sprites=" << snap.parsed_sprite_count
+             << " audio=" << snap.audio_write_count << std::hex
+             << " reserved=" << snap.reserved0;
+        out.push_back(line.str());
+        continue;
+      }
+      if (op[0] == 'G') {
+        std::uint64_t generation = 0;
+        status = tessera_observation_region_read_v1(
+            s.handle, static_cast<std::uint32_t>(std::stoul(op.substr(1))), 0,
+            nullptr, 0, UINT64_MAX, &generation, &s.context);
+        line << op << " status=" << status;
+        if (status == TESSERA_OK) {
+          if (generation_base == UINT64_MAX)
+            generation_base = generation;
+          line << " generation=+" << generation - generation_base;
+        }
+        out.push_back(line.str());
+        continue;
+      }
       if (op == "S") {
         saved = s.checkpoint();
         status = TESSERA_OK;
@@ -894,6 +936,11 @@ TEST_CASE("recompose_stats answers as gpgx did (TP-205.3)") {
 
 TEST_CASE("frame_delta answers as gpgx did (TP-205.4)") {
   CHECK(check_stats_fixture("frame-delta.txt") == 20);
+}
+
+// TP-302 (rc.3): the frame snapshot and the generation region reads check.
+TEST_CASE("capture_snapshot answers as gpgx did (TP-302)") {
+  CHECK(check_stats_fixture("frame-snapshot.txt") == 10);
 }
 
 // TP-206.1: video, VRAM, CRAM, VSRAM and frame_index byte for byte; the

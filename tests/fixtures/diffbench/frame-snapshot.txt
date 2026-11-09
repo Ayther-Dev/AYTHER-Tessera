@@ -1,0 +1,124 @@
+# capture_snapshot measured on gpgx (spec 008, TP-302, Tessera v0.2.0-rc.3).
+# Written by tools/diffbench/compare_recompose_stats.py --update; the native
+# side runs the same cases in tests/integration/md_subscriptions_test.cpp.
+# c[out_size] captures the snapshot; G<id> reads 0 bytes of a region and
+# prints the generation it answers. Generations print from the first one seen
+# in the case ("+N"): the absolute value also counts the host's loading steps.
+# audio-flood starts at frame 1: the first frame's write count is EXC-007.
+
+case raster-bands-1 0 0:c.G1;1:c;2:c.c47.c48.c100 3
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=0 G1 status=-9
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=2 c status=0 size=48 version=1 generation=+2 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=2 c47 status=-3 size=1515870810 version=1515870810 generation=6510615555426900570 frame_generation=6510615555426900570 flags=5a5a5a5a overflow=5a5a5a5a fallback=5a5a5a5a sprites=1515870810 audio=1515870810 reserved=5a5a5a5a
+frame=2 c48 status=0 size=48 version=1 generation=+2 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=2 c100 status=0 size=48 version=1 generation=+2 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+end
+
+case raster-bands-1 fff 0:c.G1.G13.R16;1:c.R16;2:c.R16;3:c.x.c.S;4:c.R16;5:L.c 6
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=0 G1 status=0 generation=+0
+frame=0 G13 status=0 generation=+0
+frame=0 region 16 status=0 size=4 fnv=315446a086a23133 head=00000000
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=3 sprites=0 audio=0 reserved=0
+frame=1 region 16 status=0 size=4 fnv=516442878400fb80 head=03000000
+frame=2 c status=0 size=48 version=1 generation=+2 frame_generation=3 flags=1 overflow=0 fallback=2 sprites=0 audio=0 reserved=0
+frame=2 region 16 status=0 size=4 fnv=f15eee8fda36b811 head=02000000
+frame=3 c status=0 size=48 version=1 generation=+3 frame_generation=4 flags=1 overflow=0 fallback=2 sprites=0 audio=0 reserved=0
+frame=3 x status=0
+frame=3 c status=0 size=48 version=1 generation=+4 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=3 S status=0
+frame=4 c status=0 size=48 version=1 generation=+5 frame_generation=5 flags=1 overflow=0 fallback=2 sprites=0 audio=0 reserved=0
+frame=4 region 16 status=0 size=4 fnv=f15eee8fda36b811 head=02000000
+frame=5 L status=0
+frame=5 c status=0 size=48 version=1 generation=+7 frame_generation=6 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+end
+
+case audio-flood 10 1:c.d;2:c;3:x.c;4:c 5
+frame=1 c status=0 size=48 version=1 generation=+0 frame_generation=2 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=8192 dropped=0 dirty=none
+frame=2 c status=0 size=48 version=1 generation=+1 frame_generation=3 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=3 x status=0
+frame=3 c status=0 size=48 version=1 generation=+3 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=4 c status=0 size=48 version=1 generation=+4 frame_generation=5 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+end
+
+case audio-flood 0 0:c;1:c.u10.c.u10.c.u0.c;2:c;3:c.u10.c.u10.c;4:c;5:c.u1000.c.u10.c;6:c 7
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 u10 status=0
+frame=1 c status=0 size=48 version=1 generation=+2 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 u10 status=0
+frame=1 c status=0 size=48 version=1 generation=+3 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 u0 status=0
+frame=1 c status=0 size=48 version=1 generation=+4 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=2 c status=0 size=48 version=1 generation=+5 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=3 c status=0 size=48 version=1 generation=+6 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=3 u10 status=0
+frame=3 c status=0 size=48 version=1 generation=+7 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=3 u10 status=0
+frame=3 c status=0 size=48 version=1 generation=+8 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=4 c status=0 size=48 version=1 generation=+10 frame_generation=5 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=5 c status=0 size=48 version=1 generation=+11 frame_generation=6 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=5 u1000 status=-1
+frame=5 c status=0 size=48 version=1 generation=+11 frame_generation=6 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=5 u10 status=0
+frame=5 c status=0 size=48 version=1 generation=+12 frame_generation=6 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+frame=6 c status=0 size=48 version=1 generation=+13 frame_generation=7 flags=1 overflow=2 fallback=0 sprites=0 audio=8192 reserved=0
+end
+
+case audio-flood 0 0:c.u10.c.u20.c;1:c;2:c 3
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=0 u10 status=0
+frame=0 c status=0 size=48 version=1 generation=+1 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=0 u20 status=0
+frame=0 c status=0 size=48 version=1 generation=+2 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 c status=0 size=48 version=1 generation=+4 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=2 c status=0 size=48 version=1 generation=+5 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+end
+
+case sprite-limits-200 2 1:c;3:c;5:c 6
+frame=1 c status=0 size=48 version=1 generation=+0 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=9 audio=0 reserved=0
+frame=3 c status=0 size=48 version=1 generation=+2 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=12 audio=0 reserved=0
+frame=5 c status=0 size=48 version=1 generation=+4 frame_generation=6 flags=1 overflow=0 fallback=0 sprites=12 audio=0 reserved=0
+end
+
+case fm-psg-5 12 0:c;1:c;2:c.d;3:c 4
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=66 reserved=0
+frame=2 c status=0 size=48 version=1 generation=+2 frame_generation=3 flags=1 overflow=0 fallback=0 sprites=0 audio=66 reserved=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=66 dropped=0 dirty=none
+frame=3 c status=0 size=48 version=1 generation=+3 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=66 reserved=0
+end
+
+case modes-sweep-0 24 1:c.p5=0f.c.G1.p5=ff.c.p10=01.c 2
+frame=1 c status=0 size=48 version=1 generation=+0 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 p5=0f status=0
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 G1 status=-9
+frame=1 p5=ff status=-1
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 p10=01 status=0
+frame=1 c status=0 size=48 version=1 generation=+2 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+end
+
+case modes-sweep-23 fff 1:c.R16;2:c.R16 3
+frame=1 c status=0 size=48 version=1 generation=+0 frame_generation=2 flags=1 overflow=0 fallback=23 sprites=0 audio=0 reserved=0
+frame=1 region 16 status=0 size=4 fnv=50b9c3924ab88da0 head=23000000
+frame=2 c status=0 size=48 version=1 generation=+1 frame_generation=3 flags=1 overflow=0 fallback=20 sprites=0 audio=0 reserved=0
+frame=2 region 16 status=0 size=4 fnv=30a9c7ab4d59c353 head=20000000
+end
+
+case delta-probe-0 1 0:c.G1;1:c.G1.S;3:L.c.G1;4:c.G1 5
+frame=0 c status=0 size=48 version=1 generation=+0 frame_generation=1 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=0 G1 status=0 generation=+0
+frame=1 c status=0 size=48 version=1 generation=+1 frame_generation=2 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=1 G1 status=0 generation=+1
+frame=1 S status=0
+frame=3 L status=0
+frame=3 c status=0 size=48 version=1 generation=+4 frame_generation=4 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=3 G1 status=0 generation=+4
+frame=4 c status=0 size=48 version=1 generation=+5 frame_generation=5 flags=1 overflow=0 fallback=0 sprites=0 audio=0 reserved=0
+frame=4 G1 status=0 generation=+5
+end

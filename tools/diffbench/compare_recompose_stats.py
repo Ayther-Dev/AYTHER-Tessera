@@ -10,7 +10,9 @@ writes a control, u<hex> sets the subscriptions, x saves and restores the
 state, S/L save a state and restore it later, d[out_size] polls the frame
 delta, D<generation>[,out_size] asks for the delta since a generation (TP-205.4;
 "D-<n>" counts back from the last poll), h reads FRAME_HASH (TP-206.1; H also
-prints the host's own hashes, for diagnosis). A case rom "fx02" is the FX-02
+prints the host's own hashes, for diagnosis), c[out_size] captures
+the frame snapshot and G<id> reads 0 bytes of a region (TP-302; generations
+print from the first one seen, "+N"). A case rom "fx02" is the FX-02
 synthetic ROM given with --fx02. The fixture keeps what gpgx
 answered; the native side runs the same cases through the public API in
 tests/integration/md_subscriptions_test.cpp.

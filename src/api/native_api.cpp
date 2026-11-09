@@ -731,6 +731,9 @@ tessera_status TESSERA_CALL tessera_observation_subscriptions_set_v1(
     c.start();
     // Los bits desconocidos se rechazan, no se ignoran.
     require(o.set_subscriptions(requested_mask), TESSERA_INVALID_ARGUMENT);
+    // An accepted request moves the generation, even with the same mask; a
+    // refused one does not (measured on gpgx r4).
+    ++s->generation;
     return TESSERA_OK;
   });
 }
@@ -886,6 +889,39 @@ tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
       [generation_from](IObservable &o, IObservable::FrameDelta &delta) {
         return o.frame_delta_since(generation_from, delta);
       });
+}
+/// capture_snapshot (TP-302): the counters of the last frame run, frozen when
+/// it ended, with the session generation that region reads check. Below the
+/// 48 bytes gpgx answers BUFFER_TOO_SMALL and leaves `out` as it was. No
+/// subscription is needed; each counter is 0 while its own is idle.
+tessera_status TESSERA_CALL tessera_observation_snapshot_capture_v1(
+    tessera_session session, tessera_obs_frame_snapshot_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_frame_snapshot_v1));
+    c.start();
+    IObservable::FrameDelta frame{};
+    const std::int32_t status = o.frame_delta(frame);
+    require(status == TESSERA_OK, status);
+    tessera_obs_frame_snapshot_v1 v{};
+    v.struct_size = sizeof(v);
+    v.snapshot_version = 1;
+    v.snapshot_generation = s->generation;
+    v.frame_generation = frame.generation;
+    // A session always holds its content; a capture never lands inside a
+    // frame (the call would be BUSY), so FRAME_ACTIVE never shows.
+    v.flags = TESSERA_OBS_SNAPSHOT_CONTENT_LOADED;
+    v.overflow_flags = frame.overflow;
+    v.fallback_reasons = frame.fallback;
+    v.parsed_sprite_count = frame.parsed_sprites;
+    v.audio_write_count = frame.audio_writes;
+    *out = v;
+    return TESSERA_OK;
+  });
 }
 tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
     tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
