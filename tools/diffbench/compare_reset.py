@@ -9,6 +9,7 @@ Nothing of gpgx is read but what the host observes.
 
 usage: compare_reset.py <md_run> <diffbench> <gpgx_core> <frames> <at> <out_dir>
        [hard] [rom]   `rom` replaces the probe (boot counts then read 0)
+       `rom` may also name a built-in probe: @io, @hv, @vint, @open-bus
 exit:  0 identical, 1 different, 2 a tool failed
 """
 import os
@@ -58,14 +59,91 @@ def probe_io_rom():
     return bytes(rom)
 
 
+
+def header_rom(name, code, extra=()):
+    """A 1 KiB cartridge: stack, entry $200, `code` there, `extra` (address,
+    words) elsewhere."""
+    rom = bytearray(0x400)
+    rom[0:8] = struct.pack(">II", 0xFFFE00, 0x200)
+    rom[0x100:0x110] = b"SEGA MEGA DRIVE "
+    rom[0x120:0x130] = name
+    rom[0x1A4:0x1A8] = struct.pack(">I", len(rom) - 1)
+    rom[0x1F0:0x200] = b"U" + b" " * 15
+    for at, words in ((0x200, code),) + tuple(extra):
+        for i, word in enumerate(words):
+            rom[at + 2 * i:at + 2 * i + 2] = struct.pack(">H", word)
+    return bytes(rom)
+
+
+def probe_hv_rom():
+    """Where the 68000 starts again after a RESET (TP-110.4): in H40 it stores
+    the HV counter it reads first ($FF0120 + 2 x start) and then counts loop
+    turns in $FF0200 with the interrupts masked. gpgx holds the 68000 from
+    the frame start for about 136 lines; the counts and the HV show it."""
+    return header_rom(b"AYTHER RESET H40", [
+        0x33FC, 0x8C81, 0x00C0, 0x0004,  # register 12 = $81: H40
+        0x33FC, 0x8104, 0x00C0, 0x0004,  # register 1 = $04: Mode 5
+        0x3039, 0x00C0, 0x0008,          # move.w $C00008,d0 (HV)
+        0x2239, 0x00FF, 0x0100,          # move.l $FF0100,d1 (starts)
+        0x52B9, 0x00FF, 0x0100,          # addq.l #1,$FF0100
+        0x41F9, 0x00FF, 0x0120,          # lea $FF0120,a0
+        0xD281,                          # add.l d1,d1
+        0x3180, 0x1800,                  # move.w d0,(0,a0,d1.l)
+        0x42B9, 0x00FF, 0x0200,          # clr.l $FF0200
+        0x52B9, 0x00FF, 0x0200,          # loop: addq.l #1,$FF0200
+        0x60F8,                          # bra.s loop
+    ])
+
+
+def probe_vint_rom():
+    """A vertical interrupt left pending (masked) before the RESET is served
+    after it, on gpgx as on the native machine: the handler count after a
+    short unmasked window is stored per start ($FF0140 + 2 x start)."""
+    return header_rom(b"AYTHER RESET VNT", [
+        0x3639, 0x00C0, 0x0004,          # move.w $C00004,d3 (status)
+        0x33FC, 0x8164, 0x00C0, 0x0004,  # register 1 = $64: VINT on
+        0x2239, 0x00FF, 0x0100,          # move.l $FF0100,d1
+        0x52B9, 0x00FF, 0x0100,          # addq.l #1,$FF0100
+        0x41F9, 0x00FF, 0x0120,          # lea $FF0120,a0
+        0xD281,                          # add.l d1,d1
+        0x3183, 0x1800,                  # move.w d3,(0,a0,d1.l)
+        0x46FC, 0x2000,                  # move.w #$2000,sr
+        0x4E71, 0x4E71, 0x4E71, 0x4E71,  # nop x 4
+        0x46FC, 0x2700,                  # move.w #$2700,sr
+        0x43F9, 0x00FF, 0x0140,          # lea $FF0140,a1
+        0x33B9, 0x00FF, 0x0302, 0x1800,  # handler count -> (0,a1,d1.l)
+        0x60FE,                          # bra *
+    ], extra=((0x78, [0x0000, 0x0300]),                  # level 6 vector
+              (0x300, [0x52B9, 0x00FF, 0x0300, 0x4E73])))  # count; rte
+
+
+def probe_open_bus_rom():
+    """Bits 15-10 of the VDP status are the open bus, the word the 68000 has
+    prefetched (the instruction after the read): status reads followed by
+    different instructions, stored from $FF0120."""
+    code = [0x41F9, 0x00FF, 0x0120]      # lea $FF0120,a0
+    for follower in ([0x4E71], [0x70FF], [0xC040], [0x0240, 0xFFFF],
+                     [0x4A40]):
+        code += [0x3639, 0x00C0, 0x0004] + follower + [0x30C3]
+    code += [0x3639, 0x00C0, 0x0004, 0x30C3]  # store right after
+    code += [0x43F9, 0x00C0, 0x0004,          # lea $C00004,a1
+             0x3611, 0x4E71, 0x30C3,          # move.w (a1),d3; nop
+             0x3611, 0x70FF, 0x30C3,          # move.w (a1),d3; moveq
+             0x60FE]
+    return header_rom(b"AYTHER OPEN BUS ", code)
+
+
+PROBES = {"@io": probe_io_rom, "@hv": probe_hv_rom, "@vint": probe_vint_rom,
+          "@open-bus": probe_open_bus_rom}
+
 def main(argv):
     md_run, diffbench, core, frames, at, out_dir = argv[1:7]
     hard = len(argv) > 7 and argv[7] == "hard"
     os.makedirs(out_dir, exist_ok=True)
     rom = os.path.join(out_dir, "reset_probe.md")
-    if len(argv) > 8 and argv[8] == "@io":
+    if len(argv) > 8 and argv[8] in PROBES:
         with open(rom, "wb") as f:
-            f.write(probe_io_rom())
+            f.write(PROBES[argv[8]]())
     elif len(argv) > 8:
         rom = argv[8]
     else:

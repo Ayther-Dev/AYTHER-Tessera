@@ -135,7 +135,11 @@ TEST_CASE("a soft reset is deterministic and keeps the clock going") {
   const auto before = s->cpu().getClock();
   s->soft_reset();
   CHECK(s->cpu().getClock() >= before); // time does not go back
-  CHECK(s->cpu().getClock() - before < 200);
+  // The 68000 is held from the frame start for 466 179 master cycles (about
+  // 136 lines, measured on gpgx, TP-110.4) before the reset sequence.
+  const auto held = s->cpu().getClock() - before;
+  CHECK(held >= 466179 / 7 - 200);
+  CHECK(held < 466179 / 7 + 200);
 }
 
 TEST_CASE("a soft reset keeps the VDP, the PSG and the sound mute") {

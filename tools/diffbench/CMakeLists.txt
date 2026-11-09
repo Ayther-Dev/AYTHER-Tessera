@@ -89,6 +89,35 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(integration.md_mode4-pbc_frame PROPERTIES
             FIXTURES_REQUIRED md_mode4-pbc_rom
             PASS_REGULAR_EXPRESSION "result=identical" LABELS "integration;phase1;md;local" TIMEOUT 120)
+        # TP-110.4: the RESET button against gpgx's retro_reset with the
+        # probes of compare_reset.py: start counts, I/O control, where the
+        # 68000 starts again (held from the frame start), a pending VINT;
+        # resets at frames 100 and 301, compared 3 frames later. The open
+        # bus of the VDP status needs no reset.
+        foreach(case IN ITEMS "probe;100" "probe;301" "@io;100" "@hv;100" "@hv;301"
+                              "@vint;100" "@open-bus;99999")
+            list(GET case 0 probe)
+            list(GET case 1 at)
+            string(REPLACE "@" "" name "${probe}")
+            if(at EQUAL 99999)
+                set(frames 3)
+            else()
+                math(EXPR frames "${at} + 3")
+            endif()
+            set(probe_arg "${probe}")
+            if(probe STREQUAL "probe")
+                set(probe_arg "")
+            endif()
+            add_test(NAME integration.md_reset_${name}_${at} COMMAND ${Python3_EXECUTABLE} -I
+                "${CMAKE_CURRENT_SOURCE_DIR}/compare_reset.py"
+                $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
+                "${TESSERA_DIFFBENCH_GPGX_CORE}" ${frames} ${at}
+                "${CMAKE_CURRENT_BINARY_DIR}/md-reset-${name}-${at}" soft ${probe_arg})
+            set_tests_properties(integration.md_reset_${name}_${at} PROPERTIES
+                PASS_REGULAR_EXPRESSION "work_ram bytes=65536 differing=0"
+                FAIL_REGULAR_EXPRESSION "differing=[1-9]|tool failed"
+                LABELS "integration;phase1;md;local" TIMEOUT 120)
+        endforeach()
         # TP-104.6: every region of mode4_pbc against gpgx. Frame 0 runs in
         # Mode 4 (no sprite or line model there, as for mode4_scene); by
         # frame 8 the ROM is back in Mode 5 and all regions count.

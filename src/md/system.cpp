@@ -134,6 +134,10 @@ void System::reset() {
   z80_master_ = boot_master;
 }
 
+namespace {
+constexpr std::uint64_t kSoftResetHold = 466179; // master cycles
+} // namespace
+
 void System::soft_reset() {
   const auto clock = cpu_.getClock();
   z80_bus_requested_ = false;
@@ -144,8 +148,16 @@ void System::soft_reset() {
   ym_addr_ = 0;
   ym_busy_until_ = 0;
   cpu_.reset();
-  // The reset sequence takes the same 68000 cycles as after a hard reset.
-  cpu_.setClock(clock + 31);
+  // The reset sequence takes the same 68000 cycles as after a hard reset;
+  // before it the 68000 stays halted (TP-110.4).
+  // The hold counts from the start of the frame, not from where the last
+  // instruction left the clock (measured: the restart point does not move
+  // with the reset frame).
+  const std::uint64_t restart =
+      frame_ * cycles_per_frame(config_.standard) + kSoftResetHold;
+  const auto start = static_cast<moira::i64>(
+      (restart + kDivider68k - 1) / kDivider68k); // first CPU cycle at or after
+  cpu_.setClock(std::max(start, clock) + 31);
   update_irq();
 }
 
@@ -474,7 +486,11 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     if (offset < 8) {
-      const std::uint16_t v = vdp_.read_status();
+      // Bits 15-10 of the status are the open bus: the word the CPU has
+      // prefetched, as for $A11100 (measured on gpgx, TP-110.4: the bits
+      // follow the instruction after the read).
+      const std::uint16_t v = static_cast<std::uint16_t>(
+          (vdp_.read_status() & 0x03FFU) | (cpu_.getIRC() & 0xFC00U));
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     if (offset < 0x10) {
