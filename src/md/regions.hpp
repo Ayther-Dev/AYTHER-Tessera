@@ -11,6 +11,7 @@
 #pragma once
 #include "md/system.hpp"
 #include "md/vdp_render.hpp"
+#include "tessera/tessera.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -38,8 +39,9 @@ inline constexpr std::uint32_t kRegionRasterJournal = 22;
 inline constexpr std::uint32_t kRegionPalette = 24;
 inline constexpr std::uint32_t kRegionSpriteOutcome = 25;
 inline constexpr std::uint32_t kRegionZ80Ram = 26;
-/// The work RAM has no AYTHER region id: it is the legacy system memory.
-inline constexpr std::uint32_t kRegionWorkRam = 0x1000;
+/// The work RAM has no ABI region id (it is gpgx's legacy system memory);
+/// Tessera publishes it as its own TESSERA_OBS_REGION_WORK_RAM.
+inline constexpr std::uint32_t kRegionWorkRam = TESSERA_OBS_REGION_WORK_RAM;
 
 /// Size in bytes of a memory region, 0 if the id is not one of them.
 constexpr std::size_t memory_region_size(std::uint32_t id) noexcept {

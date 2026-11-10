@@ -321,6 +321,12 @@ public:
   [[nodiscard]] std::int32_t
   write_control(std::uint32_t id, std::uint32_t offset,
                 std::span<const std::uint8_t> data) override {
+    // Work RAM poke (RF-3.1): region bytes, word-swapped like the read; the
+    // RAM is machine state, so the savestate and checkpoints carry it.
+    if (id == kRegionWorkRam)
+      return poke_memory_region(*system_, id, offset, data)
+                 ? TESSERA_OK
+                 : TESSERA_INVALID_ARGUMENT;
     if (id != kLayerMaskRegion && id != kLayerDimRegion)
       return TESSERA_UNSUPPORTED_CAPABILITY; // AUDIO_MUTE arrives with TP-209
     if (offset != 0 || data.size() != 1 || !valid_control(id, data[0]) ||

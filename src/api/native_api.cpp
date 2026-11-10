@@ -605,6 +605,8 @@ IObservable &observable(Session &s) {
   return *o;
 }
 const observation::RegionRow &region_row(std::uint32_t id) {
+  if (id == TESSERA_OBS_REGION_WORK_RAM)
+    return observation::kWorkRamRow;
   require(id >= 1 && id <= observation::kRegionCount);
   return observation::kRegions[id - 1];
 }

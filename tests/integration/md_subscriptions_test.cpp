@@ -294,6 +294,101 @@ TEST_CASE("reading does not change the machine") {
   CHECK(observed.checkpoint() == control.checkpoint());
 }
 
+TEST_CASE("work RAM read and poke through the public API (TP-301.3)") {
+  // vint_counter adds one to the long at $FF0000 on every vertical interrupt.
+  // The region is word-swapped: the 68000 byte at $FF0000 + n is byte n ^ 1.
+  Observed s(rom_idle());
+  Observed control(rom_idle()); // same frames, never poked
+  tessera_obs_region_info_v1 info{};
+  REQUIRE(tessera_observation_region_query_v1(
+              s.handle, TESSERA_OBS_REGION_WORK_RAM, &info, sizeof(info),
+              &s.context) == TESSERA_OK);
+  CHECK(info.region_id == TESSERA_OBS_REGION_WORK_RAM);
+  CHECK(info.byte_size == 65536);
+  CHECK(info.element_size == 1);
+  CHECK(info.capacity == 65536);
+  CHECK(info.access_flags == (TESSERA_OBS_REGION_ACCESS_READ |
+                              TESSERA_OBS_REGION_ACCESS_CONTROL_WRITE |
+                              TESSERA_OBS_REGION_WORD_SWAPPED_LE));
+  CHECK(info.legacy_memory_id == 2); // RETRO_MEMORY_SYSTEM_RAM
+
+  const auto counter = [&](Observed &o) {
+    std::array<std::uint8_t, 4> b{};
+    std::uint64_t generation = 0;
+    REQUIRE(tessera_observation_region_read_v1(
+                o.handle, TESSERA_OBS_REGION_WORK_RAM, 0, b.data(), 4,
+                UINT64_MAX, &generation, &o.context) == TESSERA_OK);
+    return std::uint32_t{b[1]} << 24 | std::uint32_t{b[0]} << 16 |
+           std::uint32_t{b[3]} << 8 | b[2];
+  };
+  const auto poke = [&](std::uint32_t offset, Bytes data,
+                        std::uint64_t expected = UINT64_MAX,
+                        std::uint64_t *generation = nullptr) {
+    std::uint64_t g = 0;
+    const auto status = tessera_observation_write_control_v1(
+        s.handle, TESSERA_OBS_REGION_WORK_RAM, offset, data.data(),
+        static_cast<std::uint32_t>(data.size()), expected, &g, &s.context);
+    if (generation)
+      *generation = g;
+    return status;
+  };
+
+  // Read with nothing subscribed: the work RAM is always served.
+  s.step(10);
+  control.step(10);
+  REQUIRE(s.state().active_mask == 0);
+  const auto counted = counter(s);
+  CHECK(counted >= 9);
+  CHECK(counted <= 10);
+  Bytes whole;
+  REQUIRE(s.read(TESSERA_OBS_REGION_WORK_RAM, &whole) == TESSERA_OK);
+  REQUIRE(whole.size() == 65536);
+  CHECK(whole[2] == static_cast<std::uint8_t>(counted));
+  CHECK(s.checkpoint() == control.checkpoint()); // reading changed nothing
+
+  // Poke the counter to $1000 (68000 bytes 00 00 10 00 at $FF0000): the
+  // machine runs on from the poked value and the generation advances.
+  std::uint64_t before = 0, after = 0;
+  REQUIRE(tessera_observation_region_read_v1(
+              s.handle, TESSERA_OBS_REGION_WORK_RAM, 0, nullptr, 0, UINT64_MAX,
+              &before, &s.context) == TESSERA_OK);
+  REQUIRE(poke(0, {0x00, 0x00, 0x00, 0x10}, before, &after) == TESSERA_OK);
+  CHECK(after == before + 1);
+  CHECK(counter(s) == 0x1000);
+  s.step();
+  control.step();
+  CHECK(counter(s) == 0x1001);
+  CHECK(counter(control) == counted + 1);
+
+  // The poke is state: the checkpoint differs from the unpoked machine and a
+  // restore brings the poked byte back.
+  REQUIRE(poke(0x8000, {0xAB}) == TESSERA_OK);
+  CHECK(s.checkpoint() != control.checkpoint());
+  const auto saved = s.checkpoint();
+  REQUIRE(poke(0x8000, {0x00}) == TESSERA_OK);
+  REQUIRE(s.restore(saved) == TESSERA_OK);
+  std::array<std::uint8_t, 1> scratch{};
+  std::uint64_t generation = 0;
+  REQUIRE(tessera_observation_region_read_v1(
+              s.handle, TESSERA_OBS_REGION_WORK_RAM, 0x8000, scratch.data(), 1,
+              UINT64_MAX, &generation, &s.context) == TESSERA_OK);
+  CHECK(scratch[0] == 0xAB);
+
+  // Refused writes leave the machine and the generation as they were.
+  REQUIRE(tessera_observation_region_read_v1(
+              s.handle, TESSERA_OBS_REGION_WORK_RAM, 0, nullptr, 0, UINT64_MAX,
+              &before, &s.context) == TESSERA_OK);
+  CHECK(poke(0xFFFF, {1, 2}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(poke(0x10000, {1}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(poke(0, {}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(poke(0, {1}, before + 7) == TESSERA_STALE_EPOCH);
+  REQUIRE(tessera_observation_region_read_v1(
+              s.handle, TESSERA_OBS_REGION_WORK_RAM, 0, nullptr, 0, UINT64_MAX,
+              &after, &s.context) == TESSERA_OK);
+  CHECK(after == before);
+  CHECK(counter(s) == 0x1001);
+}
+
 TEST_CASE("recompose_frame draws the last frame again (TP-205.1)") {
   Observed s(rom_idle());
   std::vector<std::uint16_t> pixels(320 * 240);

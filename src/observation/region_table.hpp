@@ -1,7 +1,7 @@
 // Tabla de regiones de la ABI 1.10 (spec 008, TP-006.5). Medida por caja negra
 // con el banco diferencial sobre gpgx r4: tamaños, flags y ids heredados.
 #pragma once
-#include "tessera/tessera_observation.h"
+#include "tessera/tessera.h"
 
 #include <cstdint>
 
@@ -80,5 +80,18 @@ constexpr std::uint32_t region_gate(std::uint32_t id) noexcept {
 
 inline constexpr std::uint32_t kRegionCount =
     sizeof(kRegions) / sizeof(kRegions[0]);
+
+/// TESSERA_OBS_REGION_WORK_RAM (TP-301.3, RF-3.1): not an ABI 1.10 row. The
+/// 64 KiB work RAM word-swapped as gpgx's legacy RETRO_MEMORY_SYSTEM_RAM (2),
+/// read and control write, served without subscription.
+inline constexpr RegionRow kWorkRamRow{
+    TESSERA_OBS_REGION_WORK_RAM,
+    1,
+    65536,
+    65536,
+    TESSERA_OBS_REGION_ACCESS_READ | TESSERA_OBS_REGION_ACCESS_CONTROL_WRITE |
+        TESSERA_OBS_REGION_WORD_SWAPPED_LE,
+    1,
+    2u};
 
 } // namespace tessera::observation
