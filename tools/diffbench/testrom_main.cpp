@@ -68,6 +68,21 @@ int main(int argc, char **argv) {
   else if (std::strncmp(argv[1], "palette-sweep-", 14) == 0)
     rom = tessera::testrom::palette_sweep_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10)));
+  else if (std::strncmp(argv[1], "modes-hv-", 9) == 0) {
+    // modes-hv-<variant>-<words between HV reads> (TP-209.1 timing probe)
+    char *end = nullptr;
+    const auto id = std::strtoul(argv[1] + 9, &end, 10);
+    // [-<nops before the display write>]
+    const auto every = *end == '-' ? std::strtoul(end + 1, &end, 10) : 256UL;
+    // [-<nops before the CRAM data>]
+    const auto nops = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
+    // [-d: display on before the CRAM data]
+    const auto cram = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
+    rom = tessera::testrom::modes_sweep_rom(
+        tessera::testrom::modes_variant(static_cast<unsigned>(id)),
+        static_cast<unsigned>(every), static_cast<unsigned>(nops),
+        static_cast<unsigned>(cram), std::strcmp(end, "-d") == 0);
+  }
   else if (std::strncmp(argv[1], "modes-sweep-", 12) == 0)
     rom = tessera::testrom::modes_sweep_rom(tessera::testrom::modes_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));

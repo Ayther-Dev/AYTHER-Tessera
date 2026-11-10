@@ -71,6 +71,9 @@ public:
   unsigned field() const noexcept { return field_; }
   /// Draws `line` (0 based). Lines outside the active display are ignored.
   void render_line(const Vdp &vdp, std::uint32_t line);
+  /// Draws the line again and keeps the pixels before `first` as they were
+  /// (the display turned on after the line was drawn, TP-209.1).
+  void redraw_line_from(const Vdp &vdp, std::uint32_t line, unsigned first);
   /// Takes what gpgx reads at the start of `line`, before the CPU runs in it:
   /// the horizontal scroll of both planes, the VSRAM, the shadow/highlight
   /// bit, the scroll mode, plane size and window registers and (through

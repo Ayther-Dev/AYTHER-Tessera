@@ -20,6 +20,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -234,6 +235,7 @@ private:
   bool th2() const noexcept;
   std::uint32_t line_cycle() const noexcept;
   void update_irq() noexcept;
+  void raise_sprite_flags() noexcept;
 
   MachineConfig config_;
   std::uint64_t rom_hash_ = 0;  ///< FNV-1a of the ROM image, for the savestate
@@ -293,6 +295,10 @@ private:
   std::uint32_t current_line_ = 0;
   std::uint32_t frame_start_line_ = 192; // gpgx starts in Mode 4
   std::uint64_t line_start_master_ = 0;
+  // Within a line only (savestates fall on frame boundaries): whether the
+  // line was drawn, and the line cycle at which the display turned on after.
+  bool line_drawn_ = false;
+  std::optional<std::uint32_t> display_on_cycle_;
 
   bool z80_bus_requested_ = false;
   bool z80_reset_released_ = false;

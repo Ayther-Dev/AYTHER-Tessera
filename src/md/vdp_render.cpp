@@ -146,8 +146,10 @@ void Renderer::capture_line(const Vdp &vdp, std::uint32_t line) {
   unsigned index = 0;
   for (unsigned walked = 0; walked < max_frame; ++walked) {
     const std::uint32_t at = table + index * 8U;
+    // Y has 9 bits, 10 in interlace mode 2 (measured on gpgx, sprite_limits
+    // 189 and 190, fifo_status 0-d); the capture stores it masked.
     const unsigned yr =
-        ((byte(at) << 8) | byte(at + 1U)) & (double_res_ ? 0x7FFU : 0x3FFU);
+        ((byte(at) << 8) | byte(at + 1U)) & (double_res_ ? 0x3FFU : 0x1FFU);
     const unsigned size = byte(at + 2U) & 0x0FU;
     const unsigned link = byte(at + 3U) & 0x7FU;
     const unsigned rows = (size & 3U) + 1U;
@@ -388,7 +390,7 @@ void Renderer::sprite_line(const Vdp &vdp, std::uint32_t line,
   for (unsigned walked = 0; walked < max_frame; ++walked) {
     const std::uint32_t at = table + index * 8U;
     const int y = static_cast<int>(((byte(at) << 8) | byte(at + 1U)) &
-                                   (double_res_ ? 0x7FFU : 0x3FFU)) -
+                                   (double_res_ ? 0x3FFU : 0x1FFU)) -
                   (double_res_ ? 256 : 128);
     const unsigned size = byte(at + 2U) & 0x0FU;
     const unsigned link = byte(at + 3U) & 0x7FU;
@@ -836,6 +838,18 @@ void Renderer::render_line(const Vdp &vdp, std::uint32_t line) {
       pixel = (r5 << 3 | r5 >> 2) | ((g6 << 2 | g6 >> 4) << 8) |
               ((b5 << 3 | b5 >> 2) << 16) | 0xFF000000U;
     }
+}
+
+void Renderer::redraw_line_from(const Vdp &vdp, std::uint32_t line,
+                                unsigned first) {
+  if (line >= size_.height || first >= size_.width ||
+      frame_.size() < std::size_t{size_.width} * size_.height)
+    return;
+  const auto row = std::span<std::uint32_t>(frame_).subspan(
+      std::size_t{line} * size_.width, size_.width);
+  const std::vector<std::uint32_t> kept(row.begin(), row.begin() + first);
+  render_line(vdp, line);
+  std::copy(kept.begin(), kept.end(), row.begin());
 }
 
 void Renderer::render_line_m5(const Vdp &vdp, std::uint32_t line) {

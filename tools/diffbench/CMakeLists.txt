@@ -299,11 +299,12 @@ if(TESSERA_BUILD_MEGADRIVE)
         # X = 0 masking and the status flags in work RAM. 0 to 25: random
         # and edge scenes; 100 to 120 and 130 to 176: probes of the columns
         # outside the screen that gpgx keeps for collisions; 180 to 188:
-        # masking and limits with sprites outside the screen. The list is
+        # masking and limits with sprites outside the screen; 189 and 190: the
+        # bits of the Y word (9, 10 in interlace mode 2). The list is
         # sprite_variant() in tests/support/md_testrom.hpp.
         set(sprite_variants)
         foreach(range IN ITEMS "0;25" "100;120" "130;135" "140;145" "150;167"
-                               "170;176" "180;188" "200;211" "220;225")
+                               "170;176" "180;190" "200;211" "220;225")
             list(GET range 0 first)
             list(GET range 1 last)
             foreach(variant RANGE ${first} ${last})
@@ -468,7 +469,7 @@ if(TESSERA_BUILD_MEGADRIVE)
         # TP-206.1: FRAME_HASH, the same way (the timing fixture holds frame 1
         # of the test ROMs, still open on the native side); FX-02 when the
         # build knows it.
-        foreach(fixture IN ITEMS frame-hash:43 frame-hash-timing:38 mode4-controls:11 limits:5)
+        foreach(fixture IN ITEMS frame-hash:71 frame-hash-timing:10 mode4-controls:11 limits:5)
             string(REPLACE ":" ";" parts "${fixture}")
             list(GET parts 0 name)
             list(GET parts 1 count)

@@ -1034,6 +1034,13 @@ struct Scene {
   std::vector<std::uint16_t> vsram; // from index 0
   std::uint8_t reg1 = 0x44;         // final value of register 1
   bool poll_status = false;         // accumulate status bits 5-6 in work RAM
+  // Timing probe (TP-209.1): when not 0, the HV counter is stored at
+  // $FF0000 + 2 * n at the start, after the registers, after every
+  // `hv_every` data words and after the final register 1 write.
+  unsigned hv_every = 0;
+  unsigned nops_before_display = 0; // delay before the final register 1
+  unsigned nops_before_cram = 0;    // delay before the CRAM data
+  bool display_before_cram = false; // final register 1 before the CRAM
 };
 
 inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
@@ -1045,33 +1052,58 @@ inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
   const auto reg = [&](std::uint8_t r, std::uint8_t v) {
     c.insert(c.end(),
              {0x32BC, static_cast<std::uint16_t>(0x8000 | (r << 8) | v)});
+    if (scene.hv_every == 2000000) // probe: HV after every register write
+      c.push_back(0x34D3);
   };
   const auto command = [&](std::uint32_t cmd) {
     c.insert(c.end(), {0x22BC, static_cast<std::uint16_t>(cmd >> 16),
                        static_cast<std::uint16_t>(cmd)});
   };
-  const auto data = [&](std::uint16_t w) { c.insert(c.end(), {0x30BC, w}); };
+  unsigned written = 0;
+  const auto hv = [&] {
+    if (scene.hv_every != 0)
+      c.push_back(0x34D3); // move.w (a3),(a2)+
+  };
+  const auto data = [&](std::uint16_t w) {
+    c.insert(c.end(), {0x30BC, w});
+    if (scene.hv_every != 0 && ++written % scene.hv_every == 0)
+      hv();
+  };
+  if (scene.hv_every != 0) {
+    c.insert(c.end(), {0x45F9, 0x00FF, 0x0000,   // lea $FF0000,a2
+                       0x47F9, 0x00C0, 0x0008}); // lea $C00008,a3 (HV)
+    hv();
+  }
   reg(0, 0x04); // full palette
   reg(1, 0x04); // display off, Mode 5
   reg(15, 2);
   for (const auto &[r, v] : scene.regs)
     reg(r, v);
+  hv();
   for (const auto &[addr, words] : scene.vram) {
     command((0x40000000U | ((addr & 0x3FFFU) << 16)) | ((addr >> 14) & 3U));
     for (const auto w : words)
       data(w);
   }
   if (!scene.cram.empty()) {
+    if (scene.display_before_cram)
+      reg(1, scene.reg1);
     command(0xC0000000U);
-    for (const auto w : scene.cram)
+    c.insert(c.end(), scene.nops_before_cram, 0x4E71); // nop
+    for (const auto w : scene.cram) {
       data(w);
+      if (scene.hv_every == 1000000) // probe: HV after every CRAM word only
+        hv();
+    }
   }
   if (!scene.vsram.empty()) {
     command(0x40000010U);
     for (const auto w : scene.vsram)
       data(w);
   }
+  c.insert(c.end(), scene.nops_before_display, 0x4E71); // nop
   reg(1, scene.reg1);
+  hv();
   if (scene.poll_status) {
     // d1 |= status & $60, stored at $FF0000, forever (overflow and collision
     // flags are cleared by every read, so the loop accumulates them).
@@ -1162,8 +1194,14 @@ struct ModesVariant {
   int hscroll_a = -1;           // first horizontal scroll entry of plane A
 };
 
-inline std::vector<std::uint8_t> modes_sweep_rom(const ModesVariant &v) {
+inline std::vector<std::uint8_t>
+modes_sweep_rom(const ModesVariant &v, unsigned hv_every = 0, unsigned nops = 0,
+                unsigned cram_nops = 0, bool display_first = false) {
   Scene scene;
+  scene.display_before_cram = display_first;
+  scene.hv_every = hv_every;
+  scene.nops_before_display = nops;
+  scene.nops_before_cram = cram_nops;
   scene.regs = {{2, 0x10},   // plane A at $4000
                 {4, 0x06},   // plane B at $C000
                 {3, v.reg3}, // window
@@ -2001,6 +2039,22 @@ inline SpriteVariant sprite_variant(unsigned id) {
         {20, 40, 1, 1, 0x18}, {20, 40, 1, 1, 0x19}, {20, 40, 1, 1, 0x1A},
         {20, 40, 1, 1, 0x1B}, {20, 40, 1, 1, 0x1C}, {20, 40, 1, 1, 0x1D},
         {60, 40, 1, 1, 0x1F}, {70, 40, 1, 1, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 189: // unused bits of the Y word: bit 9, and bits 10 to 15
+    v.sprites = {{20, 40, 2, 2, 0x0F},
+                 {60, 0x200 + 40, 2, 2, 0x1F},
+                 {100, 0xFC00 + 80, 2, 2, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 190: // the same in interlace mode 2: bit 9 counts, bit 10 does not?
+    v.sprites = {{20, 208, 2, 2, 0x0F},
+                 {60, 0x200 + 208, 2, 2, 0x1F},
+                 {100, 0x400 + 248, 2, 2, 0x2F},
+                 {140, 0xF800 + 288, 2, 2, 0x3F}};
+    v.reg12 = 0x06;
     v.planes = false;
     v.poll_status = true;
     break;

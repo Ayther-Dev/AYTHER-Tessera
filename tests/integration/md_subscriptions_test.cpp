@@ -1041,7 +1041,7 @@ TEST_CASE("capture_snapshot answers as gpgx did (TP-302)") {
 // TP-206.1: video, VRAM, CRAM, VSRAM and frame_index byte for byte; the
 // audio field is left out (without_audio).
 TEST_CASE("frame_hash answers as gpgx did (TP-206.1)") {
-  CHECK(check_stats_fixture("frame-hash.txt", true) == 43);
+  CHECK(check_stats_fixture("frame-hash.txt", true) == 71);
 }
 
 // FX-02 comes from the backend probe; without TESSERA_DIFFBENCH_FX02_ROM the
@@ -1058,14 +1058,15 @@ TEST_CASE("frame_hash over FX-02 answers as gpgx did (TP-206.1)" *
 }
 
 // The first frames after power-on, where the test ROMs set the VDP
-// up while it draws: Tessera's CPU reaches each write a little earlier than
-// gpgx (EXC-007, widened to frame_hash), so a line or a CRAM entry lands
-// one step sooner.
+// up while it draws (EXC-007, widened to frame_hash). Since TP-209.1 (line
+// draw point, mid-line display enable) 10 cases remain: the CPU still runs
+// about 7 cycles early from power-on, and the row where the display turns on
+// differs in a few pixels (2 cell vertical scroll, sprites).
 // raster_bands 7 also holds the known H32-in-H40 limitation. It runs and
 // shows the differences without failing the suite.
 TEST_CASE("frame_hash while the ROM sets the VDP up (TP-206.1)" *
           doctest::may_fail()) {
-  CHECK(check_stats_fixture("frame-hash-timing.txt", true) == 38);
+  CHECK(check_stats_fixture("frame-hash-timing.txt", true) == 10);
 }
 
 // TP-208.3 (RNF-5): the ROM limit published by limits_query_v1 is the one

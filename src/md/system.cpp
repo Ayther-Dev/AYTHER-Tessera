@@ -23,6 +23,12 @@ constexpr std::uint64_t kPad6PullUp = 24ULL * 7ULL;
 // How far the Z80 INT leads the vertical interrupt of the 68000, in master
 // cycles.
 constexpr std::uint64_t kZ80IntLead = 1620;
+// Master cycle of the line at which the VDP line is drawn, and at which its
+// pixel 0 would be drawn when the display turns on in the middle of the line
+// (TP-209.1, see run_frame).
+constexpr std::uint64_t kRenderCycle = 800;
+constexpr std::uint32_t kPixelOriginH32 = 674;
+constexpr std::uint32_t kPixelOriginH40 = 704;
 // YM2612 busy time after a data write, master cycles (probe ym-busy-N)
 constexpr std::uint64_t kYmBusy = 1325;
 // The Z80 sees the flag drop later than the 68000 does: polling it from the
@@ -163,6 +169,11 @@ void System::soft_reset() {
 
 void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
 
+void System::raise_sprite_flags() noexcept {
+  const auto flags = renderer_.take_sprite_flags();
+  vdp_.raise_sprite_flags(flags.overflow, flags.collision);
+}
+
 // DRAM refresh: gpgx takes 2 CPU cycles away from the 68000 once every 130
 // cycles it executes (one stolen cycle count per 132 in all: 1.515 %, measured
 // with cpu_drift_long over up to 21 million cycles, TP-104.3).
@@ -226,6 +237,19 @@ void System::run_frame() {
       vdp_.raise_vint();
       update_irq();
     }
+    // The line is drawn kRenderCycle master cycles after its start, not at its
+    // end: a CRAM or register write before that point shows on this line, one
+    // after it on the next (measured, TP-209.1: modes_sweep CRAM sweep with
+    // the display off and on, 760-860 all fit the 413 synthetic ROMs, the CRAM
+    // sweep narrows it to 782-818).
+    line_drawn_ = false;
+    display_on_cycle_.reset();
+    const std::uint64_t draw_master = line_start_master_ + kRenderCycle;
+    run_cpu_until(static_cast<moira::i64>(draw_master / kDivider68k));
+    z80_sync(draw_master);
+    renderer_.render_line(vdp_, line);
+    raise_sprite_flags();
+    line_drawn_ = true;
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
     run_cpu_until(static_cast<moira::i64>(end_master / kDivider68k));
     if (index + 1 == lines) {
@@ -238,9 +262,21 @@ void System::run_frame() {
       z80_int_end_ = int_start + kCyclesPerLine;
     }
     z80_sync(end_master);
-    renderer_.render_line(vdp_, line);
-    const auto flags = renderer_.take_sprite_flags();
-    vdp_.raise_sprite_flags(flags.overflow, flags.collision);
+    if (display_on_cycle_ && (vdp_.reg(1) & 0x40U) != 0) {
+      // The display turned on after the line was drawn: the pixels from the
+      // write on show the picture, the ones before keep the backdrop. Pixel x
+      // is drawn at kPixelOrigin + x * dot (H32 10, H40 8 master cycles;
+      // measured, TP-209.1: modes_sweep 0, 1, 6, 9, 10, 16, raster_bands 0).
+      const bool h40 = (vdp_.reg(12) & 0x81U) != 0;
+      const std::uint32_t origin = h40 ? kPixelOriginH40 : kPixelOriginH32;
+      const std::uint32_t dot = h40 ? 8U : 10U;
+      const std::uint32_t at = *display_on_cycle_;
+      const std::uint32_t first =
+          at <= origin ? 0U : (at - origin + dot - 1U) / dot;
+      renderer_.redraw_line_from(vdp_, line, first);
+      raise_sprite_flags();
+    }
+    line_drawn_ = false;
   }
   ym_.run_to(frame_master + cycles_per_frame(config_.standard));
   psg_.run_to(frame_master + cycles_per_frame(config_.standard));
@@ -566,8 +602,12 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     if (offset < 4)
       vdp_.write_data(v);
     else if (offset < 8) {
+      const bool was_on = (vdp_.reg(1) & 0x40U) != 0;
       vdp_.write_control(v);
       update_irq(); // a register write can enable a pending interrupt
+      if (line_drawn_ && !was_on && (vdp_.reg(1) & 0x40U) != 0 &&
+          !display_on_cycle_)
+        display_on_cycle_ = line_cycle();
     }
     if (const auto stall = vdp_.take_cpu_stall(); stall != 0)
       cpu_.stall(static_cast<int>(stall / kDivider68k)); // DMA owns the bus

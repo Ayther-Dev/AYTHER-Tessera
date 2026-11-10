@@ -305,3 +305,118 @@ frame=4 L status=0
 frame=4 hash status=0 version=1 size=56 frame_index=4 video=c916ac0bebe74383 audio=89686642d2fd612b vram=270fe35ce85904bf cram=306c537b2ff38983 vsram=306c537b2ff38983
 frame=5 hash status=0 version=1 size=56 frame_index=5 video=c916ac0bebe74383 audio=d4edd7fe26e7ecf3 vram=a641825cebfff29e cram=306c537b2ff38983 vsram=306c537b2ff38983
 end
+
+# Frame 1 of the test ROMs (from frame-hash-timing.txt, TP-209.1, 2026-11-10):
+# the ROM sets the VDP up while it draws.
+
+case modes-sweep-0 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a58c11a7b9035044 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-1 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=15cc64bedb6da2ad audio=9afc658419cff2b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+end
+
+case modes-sweep-2 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=b0d90c2373f73142 audio=9afc658419cff2b vram=80e566230c45d637 cram=ea3a4af12c5a9dd6 vsram=f8444293127078a6
+end
+
+case modes-sweep-5 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=96e4c528abd1d61a audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-6 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=5a667917f0f1b029 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-7 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=d848ed8cc74ddbf3 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-8 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=9b70eea74c5f8298 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-9 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=893d3cc1616eb665 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-10 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=174b61fcbf743b71 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-11 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=3e9a51152299fa38 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-12 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=adc6cd6aee54a013 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-13 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=f7c77fcf4cd16207 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-17 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=d287bb897c9eee6f audio=9afc658419cff2b vram=8b9f26fcf906d912 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-18 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a552949623f4be72 audio=9afc658419cff2b vram=515fb143a9abc4ea cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-19 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a50e40af22cf897f audio=9afc658419cff2b vram=aa5d05340b6c4417 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-20 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=35331ea6f6f1e0ba audio=9afc658419cff2b vram=45d8239953ec88c8 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-21 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=80a956e44c1bfc79 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-22 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a58c11a7b9035044 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-23 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=6cdc759af5688b5f audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-24 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=9b303a5fc53c4c21 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-26 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a40fdb959200536a audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-27 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=646cd50b9b5eeefa audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-28 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a58c11a7b9035044 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-29 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=e2099dea16ae8912 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-31 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=4e8f8363cad5811a audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-32 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=e405f37714acfcb audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-33 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=617f22eb3159c455 audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case raster-bands-1 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=631fffce9585b73e audio=9afc658419cff2b vram=a62d9c040e78e465 cram=5a2b18fa59e08532 vsram=306c537b2ff38983
+end
