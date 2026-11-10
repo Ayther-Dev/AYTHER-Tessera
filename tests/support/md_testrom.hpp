@@ -934,6 +934,43 @@ inline std::vector<std::uint8_t> hv_h_probe_rom(std::uint8_t reg12) {
 
 namespace tessera::testrom {
 
+// `mode4_vram` (TP-209.1 (d)): fills the 32768 VRAM words with their own index
+// in Mode 5, then goes to Mode 4 (`back` false) or to Mode 4 and back to Mode
+// 5 (`back` true), display off. The VRAM region shows the permutation through
+// which Mode 4 sees the VRAM, and that a round trip loses nothing.
+inline std::vector<std::uint8_t> mode4_vram_rom(bool back) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER MODE4VRAM", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1
+      0x32BC, 0x8104,         // Mode 5, display off
+      0x32BC, 0x8F02,         // autoincrement 2
+      0x22BC, 0x4000, 0x0000, // VRAM write at $0000
+      0x323C, 0x7FFF,         // move.w #$7FFF,d1
+      0x7000,                 // moveq #0,d0
+      0x3080,                 // .loop move.w d0,(a0)
+      0x5240,                 // addq.w #1,d0
+      0x51C9, 0xFFFA,         // dbf d1,.loop
+      0x32BC, 0x8100,         // Mode 4, display off
+  };
+  if (back)
+    c.insert(c.end(), {0x32BC, 0x8104}); // Mode 5 again
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `mode4_pbc` (TP-104.6): the VDP stays in Mode 4 (register 1 bit 2 clear), as
 // a Power Base Converter game leaves it. It writes VRAM with the byte and word
 // accesses of the 68000 through the control and data ports and reads it back
@@ -1038,9 +1075,10 @@ struct Scene {
   // $FF0000 + 2 * n at the start, after the registers, after every
   // `hv_every` data words and after the final register 1 write.
   unsigned hv_every = 0;
-  unsigned nops_before_display = 0; // delay before the final register 1
-  unsigned nops_before_cram = 0;    // delay before the CRAM data
-  bool display_before_cram = false; // final register 1 before the CRAM
+  unsigned nops_before_display = 0;  // delay before the final register 1
+  unsigned nops_before_cram = 0;     // delay before the CRAM data
+  bool display_before_cram = false;  // final register 1 before the CRAM
+  bool mode4_before_display = false; // Mode 4 (display off) before it
 };
 
 inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
@@ -1101,6 +1139,8 @@ inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
     for (const auto w : scene.vsram)
       data(w);
   }
+  if (scene.mode4_before_display)
+    reg(1, 0x00); // Mode 4, display off: the final write leaves Mode 4
   c.insert(c.end(), scene.nops_before_display, 0x4E71); // nop
   reg(1, scene.reg1);
   hv();
@@ -1196,9 +1236,11 @@ struct ModesVariant {
 
 inline std::vector<std::uint8_t>
 modes_sweep_rom(const ModesVariant &v, unsigned hv_every = 0, unsigned nops = 0,
-                unsigned cram_nops = 0, bool display_first = false) {
+                unsigned cram_nops = 0, bool display_first = false,
+                bool mode4_first = false) {
   Scene scene;
   scene.display_before_cram = display_first;
+  scene.mode4_before_display = mode4_first;
   scene.hv_every = hv_every;
   scene.nops_before_display = nops;
   scene.nops_before_cram = cram_nops;

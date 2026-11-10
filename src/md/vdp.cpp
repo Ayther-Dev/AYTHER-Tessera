@@ -72,21 +72,8 @@ void Vdp::write_control(std::uint16_t value) {
       // of palettes 1 to 3 take the CRAM value (measured, raster_bands 12-14).
       transparent_cram_ = {cram_[16], cram_[32], cram_[48]};
     }
-    if (was_mode4 && !mode4()) {
-      // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
-      // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
-      // The bytes keep their place in gpgx's buffer, so a word that Mode 4
-      // held low byte first is high byte first here (its VRAM region,
-      // mode4_pbc, TP-211.1).
-      touch_vram();
-      std::array<std::uint8_t, 0x10000> spread{};
-      for (unsigned w = 0; w < 0x2000U; ++w) {
-        spread[w * 4U] = vram_[w * 2U + 1U];
-        spread[w * 4U + 1U] = vram_[w * 2U];
-      }
-      for (std::uint32_t i = 0; i < spread.size(); ++i)
-        set_vram(i, spread[i]);
-    }
+    if (was_mode4 != mode4())
+      remap_vram(mode4());
     if ((regs_[0] & 0x02U) == 0)
       hv_latched_ = false; // clearing the latch enable releases the counter
     code_ = 0;
@@ -197,6 +184,37 @@ void Vdp::replay(const RasterEvent &event) noexcept {
   default:
     break;
   }
+}
+
+// gpgx keeps a single VRAM and Mode 4 sees it through a permutation: Mode 4
+// word k (bytes 2k and 2k + 1 of its region) is Mode 5 word mode4_word(k)
+// with its two bytes swapped. Below $2000 the low bit of the word moves to
+// bit 8 within each block of 512 words; above, only the bytes swap
+// (measured on gpgx over the 32768 words, TP-209.1 (d): a Mode 5 -> 4 -> 5
+// round trip leaves the VRAM as it was; mode4_pbc's writes land in Mode 5
+// word 2k because they stay below word $100). Tessera stores the VRAM in the
+// layout of the current mode, so a mode change applies the permutation.
+namespace {
+constexpr std::uint32_t mode4_word(std::uint32_t k) noexcept {
+  return k < 0x2000U ? (k & ~0x1FFU) | ((k & 0xFFU) << 1) | ((k >> 8) & 1U) : k;
+}
+} // namespace
+
+void Vdp::remap_vram(bool to_mode4) {
+  touch_vram();
+  std::array<std::uint8_t, 0x10000> out{};
+  for (std::uint32_t k = 0; k < 0x8000U; ++k) {
+    const std::uint32_t w = mode4_word(k);
+    if (to_mode4) {
+      out[2U * k] = vram_[2U * w + 1U];
+      out[2U * k + 1U] = vram_[2U * w];
+    } else {
+      out[2U * w] = vram_[2U * k + 1U];
+      out[2U * w + 1U] = vram_[2U * k];
+    }
+  }
+  for (std::uint32_t i = 0; i < out.size(); ++i)
+    set_vram(i, out[i]);
 }
 
 int Vdp::raster_line() const noexcept {

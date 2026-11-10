@@ -190,6 +190,8 @@ private:
   bool display_blank() const noexcept;
   /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).
   bool mode4() const noexcept { return (regs_[1] & 0x04U) == 0; }
+  /// Moves the VRAM between the Mode 5 and the Mode 4 layouts (vdp.cpp).
+  void remap_vram(bool to_mode4);
   /// Master cycles that `slots` external-bus slots last in the current mode.
   std::uint64_t dma_cycles(std::uint64_t slots) const noexcept;
   std::uint32_t slots_per_line() const noexcept;

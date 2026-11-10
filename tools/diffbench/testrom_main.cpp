@@ -63,6 +63,10 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_h_probe_rom(0x81);
   else if (std::strcmp(argv[1], "audio-flood") == 0)
     rom = tessera::testrom::audio_flood_rom();
+  else if (std::strcmp(argv[1], "mode4-vram-0") == 0)
+    rom = tessera::testrom::mode4_vram_rom(false);
+  else if (std::strcmp(argv[1], "mode4-vram-1") == 0)
+    rom = tessera::testrom::mode4_vram_rom(true);
   else if (std::strcmp(argv[1], "mode4-pbc") == 0)
     rom = tessera::testrom::mode4_pbc_rom();
   else if (std::strncmp(argv[1], "palette-sweep-", 14) == 0)
@@ -76,12 +80,13 @@ int main(int argc, char **argv) {
     const auto every = *end == '-' ? std::strtoul(end + 1, &end, 10) : 256UL;
     // [-<nops before the CRAM data>]
     const auto nops = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
-    // [-d: display on before the CRAM data]
+    // [-d: display on before the CRAM data | -m: Mode 4 before the display]
     const auto cram = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
     rom = tessera::testrom::modes_sweep_rom(
         tessera::testrom::modes_variant(static_cast<unsigned>(id)),
         static_cast<unsigned>(every), static_cast<unsigned>(nops),
-        static_cast<unsigned>(cram), std::strcmp(end, "-d") == 0);
+        static_cast<unsigned>(cram), std::strcmp(end, "-d") == 0,
+        std::strcmp(end, "-m") == 0);
   }
   else if (std::strncmp(argv[1], "modes-sweep-", 12) == 0)
     rom = tessera::testrom::modes_sweep_rom(tessera::testrom::modes_variant(

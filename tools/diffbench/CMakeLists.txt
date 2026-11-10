@@ -316,6 +316,9 @@ if(TESSERA_BUILD_MEGADRIVE)
         foreach(variant RANGE 1 11)
             list(APPEND frame_roms mode4-scene-${variant})
         endforeach()
+        # mode4_vram (TP-209.1 (d)): the permutation through which Mode 4
+        # sees the VRAM (0, ends in Mode 4) and a lossless round trip (1).
+        list(APPEND frame_roms mode4-vram-0 mode4-vram-1)
         foreach(variant IN LISTS sprite_variants)
             list(APPEND frame_roms sprite-limits-${variant})
         endforeach()
