@@ -99,18 +99,28 @@ TEST_CASE("the log holds the last frame only") {
 
 TEST_CASE(
     "past 8 192 writes in a frame the first ones stay and the rest count") {
+  // fm-psg-4 writes the PSG 9 000 times from the start of every vertical
+  // blanking. Every frame overflows on its own: the log and the dropped
+  // counter start again at each frame, an overflow never carries over (gpgx
+  // reports 8 192 writes in every frame from frame 2 on).
   auto system = make(tessera::testrom::fm_psg_sweep_rom(4));
-  for (int i = 0; i < 8; ++i)
+  system.run_frame(); // the program waits for the first blanking
+  CHECK(system.audio_writes().empty());
+  for (int frame = 1; frame < 8; ++frame) {
+    CAPTURE(frame);
     system.run_frame();
-  CHECK(system.audio_writes().size() == kAudioWriteCapacity);
-  CHECK(system.audio_writes_dropped() > 0);
-  CHECK(system.audio_writes().front().data == 0x80);
-  CHECK(system.audio_writes()[1].data == 0x81);
-  // cycles never go backwards
-  std::uint32_t last = 0;
-  for (const auto &w : system.audio_writes()) {
-    CHECK(w.cycle >= last);
-    last = w.cycle;
+    REQUIRE(system.audio_writes().size() == kAudioWriteCapacity);
+    CHECK(system.audio_writes_dropped() == 9000 - kAudioWriteCapacity);
+    CHECK(system.audio_writes().front().data == 0x80);
+    CHECK(system.audio_writes()[1].data == 0x81);
+    CHECK(system.audio_writes().back().data ==
+          0x80 + ((kAudioWriteCapacity - 1) & 0x1F));
+    // cycles never go backwards
+    std::uint32_t last = 0;
+    for (const auto &w : system.audio_writes()) {
+      CHECK(w.cycle >= last);
+      last = w.cycle;
+    }
   }
 }
 

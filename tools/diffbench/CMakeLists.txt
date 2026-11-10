@@ -538,8 +538,11 @@ if(TESSERA_BUILD_MEGADRIVE)
         # blanking flag, whose poll phase moves the cycles by up to one poll
         # (200 master cycles) but never the sequence. fm-psg-z80 is the Z80
         # side and matches to the cycle.
+        # fm-psg-4 floods the PSG (9 000 writes a frame, every frame over the
+        # 8 192 kept); registering it keeps its ROM in step with the generator
+        # (a stale build ROM ended in a bra.w past the image, TP-209.1).
         foreach(mode IN ITEMS fm-psg-0-once fm-psg-1-once fm-psg-2-once fm-psg-3-once
-                fm-psg-0 fm-psg-1 fm-psg-2 fm-psg-3 fm-psg-z80)
+                fm-psg-0 fm-psg-1 fm-psg-2 fm-psg-3 fm-psg-4 fm-psg-z80)
             add_test(NAME integration.md_${mode}_rom COMMAND tessera_md_testrom ${mode}
                 "${CMAKE_CURRENT_BINARY_DIR}/${mode}.bin")
             set_tests_properties(integration.md_${mode}_rom PROPERTIES
@@ -564,7 +567,13 @@ if(TESSERA_BUILD_MEGADRIVE)
                 PASS_REGULAR_EXPRESSION "differing=0 "
                 LABELS "integration;phase1;md;local" TIMEOUT 120)
             # TP-107.6: the same ROMs through the event transport (RAW_WRITE and
-            # FRAME records, and the static part of the transport stats).
+            # FRAME records, and the static part of the transport stats). Not
+            # fm-psg-4: its flood overflows the 8 191 event ring on both sides
+            # and gpgx also queues the events its audio probe derives, so the
+            # records kept and the drop counters cannot match.
+            if(mode STREQUAL "fm-psg-4")
+                continue()
+            endif()
             add_test(NAME integration.md_${mode}_events COMMAND ${Python3_EXECUTABLE} -I
                 "${CMAKE_CURRENT_SOURCE_DIR}/compare_audio_events.py"
                 $<TARGET_FILE:tessera_md_run> $<TARGET_FILE:tessera_diffbench>
