@@ -1,0 +1,124 @@
+# Plane 3 exceptions (spec 008, TP-209.1, D-3, RF-10.5), read by
+# `parity_bench check` (AYTHER Engine). Golden = libretro gpgx, candidate =
+# tessera_native, every ROM registered in tools/diffbench/CMakeLists.txt, 8
+# frames from power-on with a neutral pad.
+#
+#   <rom> <frame> <subplane> <EXC-nnn>
+#
+# rom: a catalogued ROM or `*`; frame: N, N-M or `*` (every dumped frame).
+# Strict accounting: the check fails on a divergence no line declares AND on a
+# declared tuple that no longer diverges, so an exception that a fix retires
+# must be deleted here and in docs/parity-exceptions.md. Every id is a row of
+# docs/parity-exceptions.md.
+
+# EXC-008: PCM at 48 kHz (Tessera) vs 44.1 kHz (gpgx); never equal by design.
+* * pcm EXC-008
+
+# EXC-001: chip_writes differs only in `cycle`; chip_seq is identical.
+fm-psg-0 2-8 chip_writes EXC-001
+fm-psg-1 2-8 chip_writes EXC-001
+fm-psg-2 2-8 chip_writes EXC-001
+fm-psg-3 2-8 chip_writes EXC-001
+fm-psg-4 2-8 chip_writes EXC-001
+fm-psg-0-once 1-2 chip_writes EXC-001
+fm-psg-1-once 1 chip_writes EXC-001
+fm-psg-2-once 1 chip_writes EXC-001
+fm-psg-3-once 1 chip_writes EXC-001
+ym-busy-0 1 chip_writes EXC-001
+ym-busy-1 1 chip_writes EXC-001
+ym-busy-2 1 chip_writes EXC-001
+ym-busy-3 1 chip_writes EXC-001
+ym-busy-4 1 chip_writes EXC-001
+ym-busy-8 1 chip_writes EXC-001
+z80-bank-0 2 chip_writes EXC-001
+z80-bank-2 2 chip_writes EXC-001
+z80-bank-3 2 chip_writes EXC-001
+z80-bank-4 2 chip_writes EXC-001
+
+# EXC-007 (A): CPU rate, one VRAM word more while the scene loads.
+mode4-scene-1 1 scene EXC-007
+mode4-scene-1 1 plane_cells EXC-007
+mode4-scene-2 1 scene EXC-007
+mode4-scene-2 1 plane_cells EXC-007
+mode4-scene-3 1 scene EXC-007
+mode4-scene-3 1 plane_cells EXC-007
+mode4-scene-4 1 scene EXC-007
+mode4-scene-4 1 plane_cells EXC-007
+mode4-scene-5 1 scene EXC-007
+mode4-scene-5 1 plane_cells EXC-007
+mode4-scene-6 1 scene EXC-007
+mode4-scene-6 1 plane_cells EXC-007
+mode4-scene-7 1 scene EXC-007
+mode4-scene-7 1 plane_cells EXC-007
+mode4-scene-8 1 scene EXC-007
+mode4-scene-8 1 plane_cells EXC-007
+mode4-scene-9 1 scene EXC-007
+mode4-scene-9 1 plane_cells EXC-007
+mode4-scene-10 1 scene EXC-007
+mode4-scene-10 1 plane_cells EXC-007
+mode4-scene-11 1 scene EXC-007
+mode4-scene-11 1 plane_cells EXC-007
+mode4-vram-0 2 scene EXC-007
+mode4-vram-0 2 plane_cells EXC-007
+mode4-vram-1 2 scene EXC-007
+mode4-vram-1 2 plane_cells EXC-007
+
+# EXC-007 (B): boot offset (~49 master cycles) and the display-on row, frame 2.
+modes-sweep-3 2 palette EXC-007
+modes-sweep-4 2 palette EXC-007
+modes-sweep-14 2 palette EXC-007
+modes-sweep-30 2 palette EXC-007
+modes-sweep-15 2 fb EXC-007
+modes-sweep-15 2 tiles EXC-007
+modes-sweep-16 2 fb EXC-007
+modes-sweep-16 2 tiles EXC-007
+modes-sweep-25 2 fb EXC-007
+modes-sweep-25 2 tiles EXC-007
+raster-bands-17 2 fb EXC-007
+raster-bands-17 2 tiles EXC-007
+raster-bands-24 2 fb EXC-007
+raster-bands-24 2 tiles EXC-007
+sprite-limits-0 2 fb EXC-007
+sprite-limits-0 2 tiles EXC-007
+sprite-limits-204 2 fb EXC-007
+sprite-limits-204 2 tiles EXC-007
+sprite-limits-220 2 fb EXC-007
+sprite-limits-220 2 tiles EXC-007
+sprite-limits-225 2 fb EXC-007
+sprite-limits-225 2 tiles EXC-007
+sprite-limits-2 2 fb EXC-007
+sprite-limits-2 2 tiles EXC-007
+sprite-limits-2 2 raster EXC-007
+sprite-limits-208 2 fb EXC-007
+sprite-limits-208 2 tiles EXC-007
+sprite-limits-208 2 raster EXC-007
+sprite-limits-11 2 fb EXC-007
+sprite-limits-11 2 tiles EXC-007
+sprite-limits-11 2 sprites EXC-007
+sprite-limits-221 2 sprites EXC-007
+sprite-limits-221 2 attribution EXC-007
+sprite-limits-224 2 sprites EXC-007
+sprite-limits-224 2 attribution EXC-007
+
+# EXC-010: Mode 5 <-> Mode 4 switch frame (raster reasons, mid-line palette).
+mode4-scene-1 1 raster EXC-010
+mode4-scene-2 1 raster EXC-010
+mode4-scene-3 1 raster EXC-010
+mode4-scene-4 1 raster EXC-010
+mode4-scene-5 1 raster EXC-010
+mode4-scene-6 1 raster EXC-010
+mode4-scene-7 1 raster EXC-010
+mode4-scene-8 1 raster EXC-010
+mode4-scene-9 1 raster EXC-010
+mode4-scene-10 1 raster EXC-010
+mode4-scene-11 1 raster EXC-010
+mode4-vram-0 7 raster EXC-010
+mode4-vram-1 7 raster EXC-010
+mode4-pbc 1 fb EXC-010
+
+# EXC-011: dma_fifo frame 1, gpgx 0x10 vs Tessera 0x40 (cause not diagnosed).
+dma_fifo 1 raster EXC-011
+
+# EXC-012: H32 lines inside an H40 frame, columns 256-319.
+raster-bands-7 2-8 fb EXC-012
+raster-bands-7 2-8 tiles EXC-012
