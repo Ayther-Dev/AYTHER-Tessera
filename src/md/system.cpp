@@ -8,6 +8,17 @@ std::uint16_t dup(std::uint8_t v) {
 // Extra Z80 T-states of an access to the 68000 bus through the bank window.
 constexpr unsigned kZ80RomWait = 3;
 constexpr unsigned kZ80VdpWait = 3;
+// 68000 time, in master cycles, that one access of the Z80 to the 68000 bus
+// takes (bank window read or write, VDP window write). Measured, TP-209.2:
+// z80_steal, the 68000 counting a 30-cycle loop over the 224 active lines
+// while the Z80 reads the ROM through the window every 28 + 4n T-states loses
+// 71.7-72.3 master cycles per access for n = 1-16 (69.4 for n = 0); reads and
+// writes cost the same and a read of the Z80's own RAM costs nothing. The Z80
+// side is unchanged (z80_bank_rate: 50 T-states per pass on both cores).
+// Known residue: when the Z80 period is a multiple of 105 master cycles every
+// access lands at the same point of the 68000 loop and gpgx takes 10 cycles at
+// all seven phases (z80_steal -f), where this rounding takes 11 at two of them.
+constexpr std::uint64_t kZ80BusSteal = 72;
 // Master cycles between the release of the reset line and the first Z80 fetch
 // (gpgx fm_psg_z80: every write of the payload is stamped 67 cycles later).
 constexpr std::uint64_t kZ80ResetDelay = 67;
@@ -706,6 +717,16 @@ void System::z80_bank_write(std::uint8_t value) noexcept {
       ((z80_bank_ >> 1) | ((value & 1U) << 8)) & 0x1FFU);
 }
 
+// The 68000 is held for kZ80BusSteal master cycles. The 68000 clock counts in
+// 68000 cycles, so each access takes the 68000 cycles whose boundaries fall in
+// [z80_master_, z80_master_ + kZ80BusSteal): 72/7 on average and no state.
+void System::z80_take_68k_bus() noexcept {
+  const std::uint64_t from = (z80_master_ + kDivider68k - 1) / kDivider68k;
+  const std::uint64_t to =
+      (z80_master_ + kZ80BusSteal + kDivider68k - 1) / kDivider68k;
+  cpu_.stall(static_cast<int>(to - from));
+}
+
 std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
   wait = 0;
   if (address < 0x4000)
@@ -718,6 +739,7 @@ std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
       (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);
   if (classify(a) == Target::rom) {
     wait = kZ80RomWait;
+    z80_take_68k_bus();
     return bus_.read8(a);
   }
   return 0xFF; // gpgx: work RAM and the rest read back open
@@ -739,6 +761,7 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
       // The VDP window of the Z80 (68000 bus): 3 wait states for each access,
       // counted before the write is stamped (gpgx fm_psg_z80).
       wait = kZ80VdpWait;
+      z80_take_68k_bus();
       if ((address & 0xFFF9U) == 0x7F11U)
         psg_write(value,
                   z80_master_ + std::uint64_t{kZ80VdpWait} * kDividerZ80);
@@ -747,6 +770,10 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
     const std::uint32_t a =
         (std::uint32_t{z80_bank_} << 15) | (address & 0x7FFFU);
     const Target t = classify(a);
+    // A write through the window waits like a read (z80_steal 0-w and 0: the
+    // same 68000 count on gpgx, so the same Z80 pass and the same wait).
+    wait = kZ80RomWait;
+    z80_take_68k_bus();
     if (t == Target::work_ram || t == Target::rom)
       bus_.write8(a, value);
   }

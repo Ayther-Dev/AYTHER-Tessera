@@ -211,6 +211,8 @@ private:
   std::uint8_t z80_read(std::uint16_t address, unsigned &wait);
   void z80_write(std::uint16_t address, std::uint8_t value, unsigned &wait);
   void z80_bank_write(std::uint8_t value) noexcept;
+  /// The Z80 takes the 68000 bus for one access: the 68000 loses that time.
+  void z80_take_68k_bus() noexcept;
   std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
   void z80_wait();

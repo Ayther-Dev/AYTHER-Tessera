@@ -121,6 +121,22 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_muldiv_groups());
   else if (std::strcmp(argv[1], "cpu-timing") == 0)
     rom = tessera::testrom::cpu_timing_rom();
+  else if (std::strncmp(argv[1], "z80-steal-", 10) == 0) {
+    // z80-steal-<n>[-w|-r|-p|-t|-f]: read (default), write, own-RAM read, PSG,
+    // read with n T-states of filler, phase n of a 35 T-state loop
+    char *end = nullptr;
+    const auto nops =
+        static_cast<unsigned>(std::strtoul(argv[1] + 10, &end, 10));
+    const unsigned access = std::strcmp(end, "-w") == 0   ? 1U
+                            : std::strcmp(end, "-r") == 0 ? 2U
+                            : std::strcmp(end, "-p") == 0 ? 3U
+                            : std::strcmp(end, "-t") == 0 ? 4U
+                            : std::strcmp(end, "-f") == 0 ? 5U
+                                                          : 0U;
+    rom = tessera::testrom::z80_steal_rom(nops, access);
+  } else if (std::strncmp(argv[1], "z80-bank-rate-", 14) == 0)
+    rom = tessera::testrom::z80_bank_rate_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10)));
   else if (std::strncmp(argv[1], "z80-bank-", 9) == 0)
     rom = tessera::testrom::z80_bank_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 9, nullptr, 10)));

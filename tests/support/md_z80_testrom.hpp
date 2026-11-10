@@ -569,6 +569,192 @@ inline std::vector<std::uint8_t> z80_contention_rom(unsigned variant) {
   return detail::z80_rom_image("AYTHER Z80 CONT", a.code, p);
 }
 
+// `z80_bank_rate` (TP-209.2): the Z80 counts in HL and stores it at $1F00 on
+// every pass (inc hl ; [ld a,($8000)] ; ld ($1F00),hl ; jr: 34 T-states, 47
+// with the read of the ROM through the window in variant 1). For six lines L
+// the 68000 holds the Z80 in reset, waits for the end of the vertical blank,
+// releases it, polls the HV counter until line L, takes the bus and logs the
+// counter: the Z80 passes in L lines of master time, measured by the VDP and
+// not by the 68000, so a 68000 slowed by the Z80 does not bias it.
+inline std::vector<std::uint8_t> z80_bank_rate_rom(unsigned variant) {
+  Z80Asm a;
+  a.ld_sp(0x1FFF);
+  if (variant == 1) {
+    a.ld_hl(0x6000);
+    a.ld_de(0x0000);
+    a.call(kZ80SetBank);
+  }
+  if (variant == 2) { // dense: 4 reads of 29 T-states per count
+    a.ld_hl(0x6000);
+    a.ld_de(0x0000);
+    a.call(kZ80SetBank);
+  }
+  a.ld_hl(0);
+  const std::size_t loop = a.here();
+  a.inc_hl();
+  if (variant == 1)
+    a.ld_a_mem(0x8000);
+  if (variant == 2) {
+    a.db({0x06, 0x04}); // ld b,4
+    const std::size_t inner = a.here();
+    a.ld_a_mem(0x8000);
+    a.db({0x10, static_cast<std::uint8_t>(static_cast<int>(inner) -
+                                          static_cast<int>(a.here() + 2))});
+  }
+  a.ld_mem_hl(0x1F00);
+  a.jr_to(loop);
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  detail::M68kProgram p;
+  p.prologue();
+  p.w(0x4DF9); // lea $C00004,a6
+  p.l(0x00C00004);
+  p.w(0x47F9); // lea $C00008,a3
+  p.l(0x00C00008);
+  p.w(0x3CBC); // move.w #..,(a6): mode 5, display on
+  p.w(0x8144);
+  p.w(0x3CBC); // H40
+  p.w(0x8C81);
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(a.code.size()));
+  p.reset_pin(0x0000);
+  p.request(0x0000);
+  for (unsigned n = 1; n <= 6; ++n) {
+    const auto line = static_cast<std::uint16_t>(32 * n);
+    p.reset_pin(0x0000);
+    p.w(0x3016); // move.w (a6),d0: wait for blanking, then for its end
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x67F8);
+    p.w(0x3016);
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x66F8);
+    p.w(0x3013); // the blank flag drops at line $FF: wait for line 0
+    p.w(0x0C40); // move.w (a3),d0 ; cmpi.w #$E000,d0 ; bcc.s *-8
+    p.w(0xE000);
+    p.w(0x64F8);
+    p.reset_pin(0x0100); // the Z80 starts
+    p.w(0x3013);         // poll: move.w (a3),d0
+    p.w(0x0C40);         //       cmpi.w #line<<8,d0
+    p.w(static_cast<std::uint16_t>(line << 8));
+    p.w(0x65F8); //       bcs.s poll
+    p.w(0x34C0); // move.w d0,(a2)+: the HV seen
+    p.request(0x0100);
+    p.w(0x0814); // btst #0,(a4) ; bne.s *-4: wait for the grant
+    p.w(0x0000);
+    p.w(0x66FA);
+    p.w(0x7200); // moveq #0,d1
+    p.w(0x1239); // move.b ($A01F01),d1
+    p.l(0x00A01F01);
+    p.w(0xE149); // lsl.w #8,d1
+    p.w(0x1239); // move.b ($A01F00),d1
+    p.l(0x00A01F00);
+    p.w(0x34C1); // move.w d1,(a2)+
+    p.request(0x0000);
+  }
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER Z80 RATE", a.code, p);
+}
+
+// `z80_steal` (TP-209.2): how much 68000 time one Z80 access to the 68000 bus
+// costs. The Z80 loops on `ld a,($8000)` (ROM through the window, bank 0),
+// `nops` NOPs and `jr` (28 + 4 x nops T-states with the 3 wait states);
+// `access` 1 makes it a write `ld ($8000),a` (ROM, ignored), 2 a read of its
+// own RAM (no 68000 bus), 3 `ld a,$9F ; ld ($7F11),a` (PSG), 4 a read with
+// `nops` T-states of filler instead of NOPs, 5 a read every 35 T-states (a
+// multiple of 105 master cycles: every access at the same phase of the 68000
+// clock) after `nops` T-states of filler that choose that phase, and nops = 99
+// keeps the Z80 in reset. For four
+// frames the 68000 counts passes of a 30-cycle loop (addq ; btst ; beq) from
+// the end of the vertical blank to its start, the 224 active lines, and logs
+// the count: fewer passes than with the Z80 in reset is 68000 time taken.
+inline std::vector<std::uint8_t> z80_steal_rom(unsigned nops,
+                                               unsigned access = 0) {
+  Z80Asm a;
+  // `t` T-states of filler: ld a,n (7), inc de (6) and nop (4).
+  const auto filler = [&](unsigned t) {
+    for (unsigned sevens = 0; sevens <= t / 7; ++sevens)
+      for (unsigned sixes = 0; sixes <= t / 6; ++sixes) {
+        const unsigned used = 7 * sevens + 6 * sixes;
+        if (used > t || (t - used) % 4 != 0)
+          continue;
+        for (unsigned i = 0; i < sevens; ++i)
+          a.db({0x3E, 0x00});
+        for (unsigned i = 0; i < sixes; ++i)
+          a.db({0x13});
+        for (unsigned i = 0; i < (t - used) / 4; ++i)
+          a.db({0x00});
+        return;
+      }
+  };
+  a.ld_sp(0x1FFF);
+  a.ld_hl(0x6000);
+  a.ld_de(0x0000);
+  a.call(kZ80SetBank);
+  if (access == 5) // phase: `nops` T-states before a 35 T-state loop
+    filler(nops);
+  const std::size_t loop = a.here();
+  if (access == 1)
+    a.db({0x32, 0x00, 0x80}); // ld ($8000),a
+  else if (access == 2)
+    a.ld_a_mem(0x1000);
+  else if (access == 3) {
+    a.ld_a(0x9F);       // PSG: channel 0 silent
+    a.ld_mem_a(0x7F11); // through the 68000 bus (VDP window)
+  } else
+    a.ld_a_mem(0x8000);
+  if (access == 4) {
+    filler(nops);
+  } else if (access == 5) {
+    filler(7);
+  } else {
+    for (unsigned i = 0; i < nops && nops != 99; ++i)
+      a.db({0x00});
+  }
+  a.jr_to(loop);
+  a.org(kZ80SetBank);
+  z80_setbank_routine(a);
+  detail::M68kProgram p;
+  p.prologue();
+  p.w(0x4DF9); // lea $C00004,a6
+  p.l(0x00C00004);
+  p.w(0x3CBC); // move.w #..,(a6): mode 5, display on
+  p.w(0x8144);
+  p.w(0x3CBC); // H40
+  p.w(0x8C81);
+  p.request(0x0100);
+  p.reset_pin(0x0100);
+  p.wait_grant();
+  p.upload(kPayloadAt, static_cast<std::uint16_t>(a.code.size()));
+  p.reset_pin(0x0000);
+  if (nops != 99) {
+    p.reset_pin(0x0100);
+    p.request(0x0000);
+  }
+  for (unsigned n = 0; n < 4; ++n) {
+    p.w(0x3016); // move.w (a6),d0: wait for blanking, then for its end
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x67F8);
+    p.w(0x3016);
+    p.w(0x0240);
+    p.w(0x0008);
+    p.w(0x66F8);
+    p.w(0x7200); // moveq #0,d1
+    p.w(0x5241); // count: addq.w #1,d1          (4)
+    p.w(0x082E); //        btst #3,1(a6)         (16, low status byte)
+    p.w(0x0003);
+    p.w(0x0001);
+    p.w(0x67F6); //        beq.s count           (10)
+    p.w(0x34C1); // move.w d1,(a2)+
+  }
+  p.w(0x60FE);
+  return detail::z80_rom_image("AYTHER Z80 STEAL", a.code, p);
+}
+
 // `z80_int` (TP-106.3): the Z80 runs a counter in HL (inc hl ; jr, 18 T-states
 // per pass) in interrupt mode 1; its handler (at $0038) logs HL at every entry
 // into the Z80 RAM from $1000 on (index at $1F02). The entries per frame and
