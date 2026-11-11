@@ -2,6 +2,7 @@
 // writes, VRAM/CRAM/VSRAM access with auto-increment, DMA from the 68000 bus,
 // status flags, vertical interrupt and basic H/V counters.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "md/state_io.hpp"
 #include "md/vdp.hpp"
 #include <doctest/doctest.h>
 
@@ -340,6 +341,89 @@ TEST_CASE("a VRAM fill crossing into the blanking speeds up there") {
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(blanking + rest + 3420);
   CHECK((v.read_status() & 0x0002) == 0);
+}
+
+// TP-209.2 (Sonic 1 frame 356): gpgx writes a fill a line at a time. When a
+// line starts, the bytes of every slot due before the end of its segment
+// (140 master cycles before the next line in H40) are in the VRAM; the busy
+// bit keeps its own timing (measured on gpgx: VRAM at the frame end and the
+// picture of a fill over plane A).
+namespace {
+// Fill bytes in the VRAM after a fill of `length` bytes of $AB at $0100: the
+// data word writes two, then each fill byte one, the first over the word.
+unsigned fill_bytes(const Vdp &v, unsigned length) {
+  unsigned n = 0;
+  for (unsigned i = 0; i < length + 2; ++i)
+    n += v.vram()[0x100 + i] == 0xAB ? 1U : 0U;
+  return n;
+}
+void start_fill(Vdp &v, std::uint32_t line, std::uint64_t at,
+                std::uint16_t length) {
+  reg(v, 1, 0x54);  // mode 5, DMA enabled, display on
+  reg(v, 12, 0x81); // H40: 18 slots per drawn line
+  reg(v, 15, 1);
+  v.set_line_start(0);
+  v.begin_line(line);
+  v.set_time(at);
+  dma_regs(v, length, 0, 0x80);
+  dma_command(v, 0x0100, 1);
+  v.write_data(0xABAB);
+}
+} // namespace
+
+TEST_CASE("a VRAM fill writes its bytes a line at a time") {
+  Vdp v(Standard::ntsc);
+  start_fill(v, 10, 0, 400);
+  // first slot 345 after the data word, segment end 3420 - 140
+  const auto due = [](std::uint64_t end) {
+    return static_cast<unsigned>((end - 345) * 18 / 3420);
+  };
+  CHECK(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == due(3280) + 1);
+  v.set_line_start(3420);
+  v.begin_line(11);
+  CHECK(fill_bytes(v, 400) == due(3420 + 3280) + 1);
+  // a status read leaves the fill alone (games poll the busy bit)
+  v.set_time(3500);
+  CHECK((v.read_status() & 0x0002) != 0);
+  CHECK(fill_bytes(v, 400) == due(3420 + 3280) + 1);
+  // a control or data port access writes what is left first
+  v.write_control(0x8F02);
+  CHECK_FALSE(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == 401);
+}
+
+TEST_CASE("a fill started at the end of a drawn line is written at once") {
+  Vdp v(Standard::ntsc);
+  // data word 3100 master cycles into the line: gpgx writes the whole fill
+  start_fill(v, 10, 3100, 400);
+  CHECK_FALSE(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == 401);
+  CHECK((v.read_status() & 0x0002) != 0); // the busy bit is unchanged
+  // 3000 is before that window: nothing is due before the segment end
+  Vdp w(Standard::ntsc);
+  start_fill(w, 10, 3000, 400);
+  CHECK(w.fill_pending());
+  CHECK(fill_bytes(w, 400) == 2);
+}
+
+TEST_CASE("a savestate taken during a fill goes on with it") {
+  Vdp v(Standard::ntsc);
+  start_fill(v, 10, 0, 400);
+  std::vector<std::uint8_t> state;
+  StateWriter out(state);
+  v.save(out);
+  Vdp w(Standard::ntsc);
+  StateReader in(state);
+  w.load(in);
+  REQUIRE(in.finished());
+  CHECK(w.fill_pending());
+  for (Vdp *p : {&v, &w}) {
+    p->set_line_start(3 * 3420);
+    p->begin_line(13);
+  }
+  CHECK(fill_bytes(w, 400) == fill_bytes(v, 400));
+  CHECK(v.vram() == w.vram());
 }
 
 TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {

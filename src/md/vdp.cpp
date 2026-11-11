@@ -9,6 +9,7 @@ std::uint32_t Vdp::active_lines() const noexcept {
 }
 
 void Vdp::write_control(std::uint16_t value) {
+  fill_flush();
   if (mode4() && !pending_second_ && (value & 0xC000U) != 0x8000U) {
     // gpgx (vdp_68k_ctrl_w): in mode 4 there is no second command word, every
     // control word is a complete command, so a trailing 0 word of a long write
@@ -263,6 +264,7 @@ void Vdp::track_vram_write(std::uint32_t address, std::uint16_t before,
 }
 
 void Vdp::write_data(std::uint16_t value) {
+  fill_flush();
   pending_second_ = false;
   if (dma_pending_) {
     dma_pending_ = false;
@@ -450,6 +452,81 @@ std::uint64_t Vdp::fill_end(std::uint64_t start, std::uint64_t slots,
   }
 }
 
+// Master cycle of the first slot of a VRAM fill whose data word came at
+// `start`: the start latency of fill_end.
+std::int64_t Vdp::fill_first_slot(std::uint64_t start) const noexcept {
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const auto t = static_cast<std::int64_t>(start);
+  if ((regs_[1] & 0x40U) == 0 || blank_at(start))
+    return t - 85;
+  return t + (h40 ? 345 : 390);
+}
+
+// Slots of a fill whose first slot is at `first` that are done by `until`,
+// with the rates and segments of fill_end.
+std::uint64_t Vdp::fill_slots_by(std::int64_t first,
+                                 std::uint64_t until) const noexcept {
+  const auto end = static_cast<std::int64_t>(until);
+  if (end <= first)
+    return 0;
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const std::uint64_t blank_rate = h40 ? 204U : 166U;
+  const std::uint64_t display_rate = h40 ? 18U : 16U;
+  if ((regs_[1] & 0x40U) == 0)
+    return static_cast<std::uint64_t>(end - first) * blank_rate /
+           kCyclesPerLine;
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t active = active_lines();
+  const std::int64_t origin =
+      static_cast<std::int64_t>(line_start_) - (h40 ? 150 : 160);
+  std::uint64_t acc = 0; // slot x cycle units
+  std::int64_t t = first;
+  while (t < end) {
+    const std::int64_t rel = t - origin;
+    const std::int64_t k =
+        rel >= 0 ? rel / kCyclesPerLine
+                 : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+    const std::int64_t line =
+        ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+    const bool blank = line >= active && line + 1 != total;
+    const std::int64_t seg_end = origin + (k + 1) * kCyclesPerLine;
+    const std::int64_t stop = std::min(seg_end, end);
+    acc += static_cast<std::uint64_t>(stop - t) *
+           (blank ? blank_rate : display_rate);
+    t = stop;
+  }
+  return acc / kCyclesPerLine;
+}
+
+// End of the block of fill slots the current line writes: 140/150 master
+// cycles (H40/H32) before the next line starts, next to where fill_end
+// changes rate (measured on gpgx, TP-209.2: VRAM at the frame end, +-1 byte).
+std::uint64_t Vdp::fill_chunk_end() const noexcept {
+  return line_start_ + kCyclesPerLine -
+         ((regs_[12] & 0x81U) != 0 ? 140U : 150U);
+}
+
+// Writes the fill bytes up to `slots` slots from its start (one byte a slot).
+void Vdp::fill_write(std::uint64_t slots) noexcept {
+  const std::uint64_t total = std::uint64_t{fill_.written} + fill_.remaining;
+  const std::uint64_t target = std::min(slots, total);
+  while (fill_.written < target) {
+    set_vram(fill_.address ^ 1U, fill_.byte, true);
+    fill_.address = static_cast<std::uint16_t>(fill_.address + fill_.step);
+    ++fill_.written;
+    --fill_.remaining;
+  }
+  if (fill_.remaining == 0)
+    fill_.active = false;
+}
+
+// Writes what is left of the fill at once: before a data or control port
+// access, whose effect on a fill in progress is not measured.
+void Vdp::fill_flush() noexcept {
+  if (fill_.active)
+    fill_write(std::uint64_t{fill_.written} + fill_.remaining);
+}
+
 // Whether the line that master cycle `t` falls in is blanked, with the
 // current registers. Unlike display_blank() it looks at the line of `t`, not
 // at the current one, which lags behind while the 68000 is held by the FIFO.
@@ -505,6 +582,7 @@ void Vdp::fifo_write(std::uint16_t value) {
 }
 
 std::uint16_t Vdp::read_data() {
+  fill_flush();
   pending_second_ = false;
   if (mode4()) {
     // Mode 4 VRAM read (gpgx vdp_68k_data_r_m4): the word of the even address,
@@ -571,14 +649,31 @@ void Vdp::run_dma(std::uint16_t first_data) {
   if (mode == 2) { // VRAM fill: the data word, then its high byte
     fifo_record(first_data);
     put(first_data);
-    const auto byte = static_cast<std::uint8_t>(first_data >> 8);
     touch_vram();
     if (length != 0 && raster_line() >= 0)
       raster_.fallback |= 0x40U;
-    for (std::uint32_t i = 0; i < length; ++i) {
-      set_vram(address_ ^ 1U, byte, true);
-      address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
-    }
+    // The bytes reach the VRAM a line at a time (begin_line): now, those of
+    // the slots before the end of the current segment. gpgx writes the whole
+    // fill at once when its data word comes in the last ~400 master cycles of
+    // a line drawn at the display rate (measured on gpgx: frame-end VRAM and
+    // the picture of a fill over plane A, TP-209.2, scratchpad pfill/).
+    fill_ = {true,
+             static_cast<std::uint8_t>(first_data >> 8),
+             regs_[15],
+             address_,
+             length,
+             0,
+             fill_first_slot(now_)};
+    address_ = static_cast<std::uint16_t>(address_ + length * regs_[15]);
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    const std::int64_t rel = static_cast<std::int64_t>(now_) -
+                             static_cast<std::int64_t>(line_start_);
+    const bool at_once =
+        !blank_at(now_) && rel >= (h40 ? 3025 : 2975) && rel < 3394;
+    if (at_once)
+      fill_flush();
+    else
+      fill_write(fill_slots_by(fill_.first, fill_chunk_end()));
   } else { // VRAM copy
     auto from = static_cast<std::uint16_t>(source >> 1);
     touch_vram();
@@ -706,6 +801,12 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
 
 void Vdp::begin_line(std::uint32_t line, bool raise_vint) {
   line_ = line;
+  if (fill_.active) {
+    // The line's block: every slot due before the end of its segment, before
+    // the line is drawn (measured on gpgx, TP-209.2: the picture of a fill
+    // over plane A, every line H40 and H32; the VRAM at the frame end).
+    fill_write(fill_slots_by(fill_.first, fill_chunk_end()));
+  }
   if (line == 0)
     hint_counter_ = regs_[10];
   // The counter runs on the lines 0..active inclusive (gpgx); in the rest of
@@ -764,6 +865,13 @@ void Vdp::save(StateWriter &w) const {
   w.u64(line_start_);
   w.u64(busy_until_);
   w.u64(cpu_stall_);
+  w.boolean(fill_.active);
+  w.u8(fill_.byte);
+  w.u8(fill_.step);
+  w.u16(fill_.address);
+  w.u32(fill_.remaining);
+  w.u32(fill_.written);
+  w.i64(fill_.first);
   w.array(fifo_done_);
   w.u32(fifo_head_);
   w.u32(fifo_count_);
@@ -800,6 +908,16 @@ void Vdp::load(StateReader &r) {
   line_start_ = r.u64();
   busy_until_ = r.u64();
   cpu_stall_ = r.u64();
+  fill_.active = r.boolean();
+  fill_.byte = r.u8();
+  fill_.step = r.u8();
+  fill_.address = r.u16();
+  fill_.remaining = r.u32();
+  fill_.written = r.u32();
+  fill_.first = r.i64();
+  if (fill_.active && (fill_.remaining == 0 || fill_.remaining > 0x10000U ||
+                       fill_.written > 0x10000U))
+    r.fail();
   r.array(fifo_done_);
   fifo_head_ = r.u32();
   fifo_count_ = r.u32();

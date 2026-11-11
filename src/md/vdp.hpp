@@ -34,6 +34,9 @@ public:
   // `raise_vint` false leaves the vertical interrupt to the caller, which
   // raises it `vint_cycle()` master cycles into the line (gpgx).
   void begin_line(std::uint32_t line, bool raise_vint = true);
+  /// Whether a VRAM fill still has bytes to write (they reach the VRAM a line
+  /// at a time, at begin_line).
+  bool fill_pending() const noexcept { return fill_.active; }
   std::uint32_t vint_cycle() const noexcept {
     return (regs_[12] & 0x81U) != 0 ? 788U : 770U;
   }
@@ -186,6 +189,12 @@ private:
                           bool colour_ram = false) const noexcept;
   std::uint64_t fill_end(std::uint64_t start, std::uint64_t slots,
                          bool copy) const noexcept;
+  std::int64_t fill_first_slot(std::uint64_t start) const noexcept;
+  std::uint64_t fill_slots_by(std::int64_t first,
+                              std::uint64_t until) const noexcept;
+  std::uint64_t fill_chunk_end() const noexcept;
+  void fill_write(std::uint64_t slots) noexcept;
+  void fill_flush() noexcept;
   std::uint64_t slot_service(std::uint64_t start,
                              unsigned slots) const noexcept;
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
@@ -262,6 +271,19 @@ private:
   std::uint64_t line_start_ = 0;
   std::uint64_t busy_until_ = 0;
   std::uint64_t cpu_stall_ = 0;
+  // A VRAM fill whose bytes are not all in the VRAM yet. gpgx writes them a
+  // line at a time: when a line starts, every slot due before the end of its
+  // segment (fill_end) is already written (measured, TP-209.2).
+  struct PendingFill {
+    bool active = false;
+    std::uint8_t byte = 0;
+    std::uint8_t step = 0;       // auto-increment when the fill started
+    std::uint16_t address = 0;   // next byte, before the ^1 of the fill
+    std::uint32_t remaining = 0; // bytes still to write
+    std::uint32_t written = 0;   // bytes written so far
+    std::int64_t first = 0;      // master cycle of the first slot
+  };
+  PendingFill fill_;
   std::array<std::uint64_t, 4> fifo_done_{};
   unsigned fifo_head_ = 0;
   unsigned fifo_count_ = 0;

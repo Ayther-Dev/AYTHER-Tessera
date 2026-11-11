@@ -100,7 +100,7 @@ std::uint64_t fnv1a(std::span<const std::uint8_t> bytes) noexcept {
   return hash;
 }
 constexpr std::uint32_t kStateMagic = 0x53444D54; // "TMDS"
-constexpr std::uint32_t kStateVersion = 1;
+constexpr std::uint32_t kStateVersion = 2;
 constexpr std::uint32_t kStateEnd = 0x444E4553; // "SEND"
 } // namespace
 
