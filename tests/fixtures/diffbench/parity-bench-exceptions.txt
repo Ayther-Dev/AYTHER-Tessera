@@ -15,21 +15,15 @@
 * * pcm EXC-008
 
 # EXC-001: chip_writes differs only in `cycle`; chip_seq is identical.
-fm-psg-0 2-8 chip_writes EXC-001
-fm-psg-1 2-8 chip_writes EXC-001
+fm-psg-0 2-6 chip_writes EXC-001
+fm-psg-1 2 chip_writes EXC-001
+fm-psg-1 7-8 chip_writes EXC-001
 fm-psg-2 2-8 chip_writes EXC-001
 fm-psg-3 2-8 chip_writes EXC-001
-fm-psg-4 2-8 chip_writes EXC-001
-fm-psg-0-once 1-2 chip_writes EXC-001
-fm-psg-1-once 1 chip_writes EXC-001
-fm-psg-2-once 1 chip_writes EXC-001
-fm-psg-3-once 1 chip_writes EXC-001
-ym-busy-0 1 chip_writes EXC-001
-ym-busy-1 1 chip_writes EXC-001
-ym-busy-2 1 chip_writes EXC-001
-ym-busy-3 1 chip_writes EXC-001
-ym-busy-4 1 chip_writes EXC-001
-ym-busy-8 1 chip_writes EXC-001
+fm-psg-4 2 chip_writes EXC-001
+fm-psg-4 4 chip_writes EXC-001
+fm-psg-4 6 chip_writes EXC-001
+fm-psg-4 8 chip_writes EXC-001
 z80-bank-0 2 chip_writes EXC-001
 z80-bank-2 2 chip_writes EXC-001
 z80-bank-3 2 chip_writes EXC-001
@@ -78,8 +72,6 @@ raster-bands-17 2 fb EXC-007
 raster-bands-17 2 tiles EXC-007
 raster-bands-24 2 fb EXC-007
 raster-bands-24 2 tiles EXC-007
-sprite-limits-0 2 fb EXC-007
-sprite-limits-0 2 tiles EXC-007
 sprite-limits-204 2 fb EXC-007
 sprite-limits-204 2 tiles EXC-007
 sprite-limits-220 2 fb EXC-007
@@ -92,12 +84,12 @@ sprite-limits-2 2 raster EXC-007
 sprite-limits-208 2 fb EXC-007
 sprite-limits-208 2 tiles EXC-007
 sprite-limits-208 2 raster EXC-007
-sprite-limits-11 2 fb EXC-007
-sprite-limits-11 2 tiles EXC-007
 sprite-limits-11 2 sprites EXC-007
 sprite-limits-221 2 sprites EXC-007
 sprite-limits-221 2 attribution EXC-007
 sprite-limits-224 2 sprites EXC-007
+sprite-limits-224 2 fb EXC-007
+sprite-limits-224 2 tiles EXC-007
 sprite-limits-224 2 attribution EXC-007
 
 # EXC-010: Mode 5 <-> Mode 4 switch frame (raster reasons, mid-line palette).
