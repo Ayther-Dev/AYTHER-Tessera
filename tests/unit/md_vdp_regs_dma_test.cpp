@@ -381,6 +381,28 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   CHECK(v.take_cpu_stall() == 0);
 }
 
+// Streets of Rage 2 frame 2183: 0x1740 words started at line 232 with the
+// display on still have more than a picture's slots left at the last line of
+// the frame. They take the next picture at the display rate and finish in the
+// next blanking, about line 233 (gpgx: V $E9 of the next frame). Counting the
+// last line as a wrapped display line ran them on at the display rate through
+// that blanking too, 91 lines late (TP-209.2, scratchpad sor2/probe/ldma.py).
+TEST_CASE("a 68000 DMA from the blanking takes the next blanking's rate") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x54); // display on, DMA enabled
+  reg(v, 12, 0x81);
+  reg(v, 15, 2);
+  v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
+  v.begin_line(232);
+  v.set_line_start(232ULL * 3420);
+  v.set_time(232ULL * 3420 + 100);
+  dma_regs(v, 0x1740, 0xFFA900, 0x00);
+  dma_command(v, 0x4A40, 1);
+  const std::uint64_t stall = v.take_cpu_stall();
+  CHECK(stall > 262ULL * 3420);
+  CHECK(stall < 265ULL * 3420);
+}
+
 // TP-106.2 (RF-2.2): gpgx raises the horizontal interrupt on lines 0..224
 // (the line after the active display included) with register 10 = 0, and
 // only the vertical blank counter reload stops it after that.

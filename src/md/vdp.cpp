@@ -373,8 +373,16 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
       t = line_end;
       continue;
     }
+    // The last line of the frame takes the display rate too; the display
+    // lines that follow it are the whole next picture, not a wrapped count
+    // (a 68000 DMA started in the blanking that still has more than a
+    // picture's slots there ran on at the display rate through the next
+    // blanking: Streets of Rage 2 frame 2183, 0x1740 words from line 232,
+    // 91 lines late; scratchpad sor2/probe/ldma.py).
     const std::uint64_t lines_left =
-        active - 1U - static_cast<std::uint64_t>(wrapped);
+        static_cast<std::uint64_t>(wrapped) + 1U == total_lines
+            ? active
+            : active - 1U - static_cast<std::uint64_t>(wrapped);
     if (slots > 2ULL * active_per_line && lines_left > 1) {
       std::uint64_t m = (slots - 1U) / active_per_line;
       if (m > lines_left - 1)
