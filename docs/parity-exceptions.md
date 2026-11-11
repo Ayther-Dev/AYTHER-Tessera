@@ -24,6 +24,12 @@ Plano 3 (`parity_bench`, TP-209.1): las divergencias declaradas están, tupla a 
 
 **Condición común (2026-11-07):** cada excepción solo vale mientras no afecte a ningún identificador de TP-209.3 (hash de estado, firma de audio, etc.). Si el desfase de ciclos cambia un identificador, deja de ser una excepción y hay que arreglar el modelo de refresco del 68000 antes de declarar paridad de identidades. Esa corrección es línea de trabajo explícita antes de G2. Gunstar Heroes no tiene escrituras en 600 frames y no necesita excepción.
 
+## Defectos abiertos (no son excepciones)
+
+Divergencias que cambian un identificador y por eso no pueden declararse aquí; se arreglan antes de cerrar G2.
+
+- **FIFO del VDP con la pantalla activa** (TP-209.2, diagnosticado 2026-11-11). Sonic 1 termina la carga de la pantalla de título (frames 362–372, pantalla encendida en H40, IPL del 68000 enmascarado) un frame más tarde que gpgx, y va +1 frame por detrás el resto de la partida. Sonda de caja negra: 2 400 escrituras `move.l` al puerto de datos con la pantalla encendida en H40 terminan ~5 líneas más tarde que en gpgx (HV $B023 frente a $ABA8); con la pantalla apagada el desfase es constante. El 68000 no es el límite: darle 20 000 ciclos de más no cambia el resultado. Causa: el ritmo con que la FIFO se vacía en pantalla activa (ranuras de acceso). El resto del mapa de sincronía del corpus (Sonic 1 en el frame 965, Golden Axe, SoR2) no está diagnosticado.
+
 ## Retiradas
 
 - EXC-006 (attribution, vdp-fifo-testing, aprobada 2026-11-08): retirada el 2026-11-09 con TP-104.3. La causa no era el timing de ciclos sino tres comportamientos funcionales del puerto de datos: una lectura de CRAM, VSRAM o de 8 bits de VRAM toma de la entrada del FIFO que va a escribirse los bits que la memoria no da. Tessera da 9/9 como gpgx; framebuffer y atribución idénticos en todos los puntos.
