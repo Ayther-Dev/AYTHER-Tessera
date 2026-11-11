@@ -27,6 +27,21 @@ constexpr std::uint64_t kZ80BusSteal = 72;
 // release phases, 51 is the only lead that stamps every Z80 write the same,
 // TP-209.2). A fixed 67 matched one phase only.
 constexpr std::uint64_t kZ80ResumeLead = 51;
+// A bus request takes effect at the same lead after the write, and the Z80 is
+// not stopped in the middle of an instruction: it runs on its own clock every
+// instruction that starts before that instant, the last one to its end, and
+// its accesses are stamped at their own cycle (gpgx, TP-209.2, scratchpad
+// bus/grant.py: 5 Z80 instruction mixes x 24-40 request phases, holds of 0 to
+// 40 NOPs; the window fits 51 exactly). Whatever the last instruction ran past
+// the release is not paid back: the Z80 resumes at z80_resume_at() anyway
+// (ex (sp),hl with no hold, 24/24; keeping the later clock fits 14/24).
+constexpr std::uint64_t kZ80GrantLead = 51;
+// The frame ends the same way: the instructions that start before the end of
+// the frame plus this lead run to their end in it, and their accesses go to
+// its log, stamped past its length (gpgx, scratchpad bus/fend.py: a free Z80
+// loop at its 21 phases; starts up to the end + 15 belong to the frame, from
+// the end + 30 to the next one).
+constexpr std::uint64_t kZ80FrameLead = 30;
 std::uint64_t z80_resume_at(std::uint64_t master) noexcept {
   const std::uint64_t at = master + kZ80ResumeLead;
   return (at + kDividerZ80 - 1) / kDividerZ80 * kDividerZ80;
@@ -62,11 +77,17 @@ constexpr std::uint32_t kPixelOriginH40 = 718;
 constexpr std::uint64_t kYmBusy = 1287;
 constexpr std::uint64_t kYmClock = 42;
 constexpr std::uint64_t kYmEdge = 28;
-// The Z80 sees the flag drop later than the 68000 does: polling it from the
-// Z80 (fm-busy-z80-N probes, TP-107.7) puts the end between 1336 and about
-// 1395 master cycles after the write, the 68000 probes (ym-busy-N) at no more
-// than 1330. One Z80 clock more on its writes satisfies both.
-constexpr std::uint64_t kZ80YmBusyExtra = 15;
+// The busy time is the same for Z80 data writes (Z80 write then Z80 poll at
+// 4 forms x 90 phases fits only an extra of -40 to +1; the 15 that TP-107.7
+// added was the late view of the Z80, below).
+// The Z80 reads the status as it was some time before its read cycle: as of
+// the end of its instruction minus 85 master cycles, so 55 before the read for
+// the instructions that end 2 T-states after it (ld a,(nn), ld a,(hl)) and 40
+// for bit b,(hl) / bit b,(ix+d), whose read cycle has one more T-state
+// (gpgx, TP-209.2, scratchpad bus/ymz.py: 68000 data write, Z80 poll at
+// 90 phases per form: 51-56, 51-56, 39-41, 36-44).
+constexpr std::uint64_t kZ80StatusLag = 55;
+constexpr std::uint64_t kZ80StatusLagBit = 40;
 } // namespace
 
 namespace {
@@ -245,12 +266,26 @@ FreeBus refresh_free_kind(const moira::Moira &cpu, std::uint16_t opcode,
 }
 } // namespace
 
+// A refresh due exactly at an instruction boundary does not move the reads of
+// the instruction that follows: gpgx stamps them from before the stall, its
+// writes from after it (Gunstar Heroes frame 109: a btst #7,(a0) poll right
+// after such a refresh still sees the YM2612 busy; bus/hs.py: a move.b #v,1(a0)
+// in the same place writes 14 master cycles later; a refresh that fell due
+// inside the previous instruction moves both, ym-busy-N and fm-psg-N-once).
 void System::run_cpu_until(moira::i64 target) {
+  moira::i64 refreshed_at = -1;
+  const auto start_of = [&](moira::i64 now) {
+    const auto at = refreshed_at >= 0 ? refreshed_at : now;
+    refreshed_at = -1;
+    return at;
+  };
   while (cpu_.getClock() < target) {
     const auto clock = cpu_.getClock();
     if (clock >= refresh_due_) {
+      const auto due = refresh_due_;
       cpu_.stall(kRefreshCost);
       refresh_due_ = clock + kRefreshPeriod;
+      refreshed_at = clock == due ? clock : -1;
       continue;
     }
     // An instruction that starts more than 128 cycles before the request
@@ -260,6 +295,7 @@ void System::run_cpu_until(moira::i64 target) {
       const auto until = std::min(target, far);
       while (cpu_.getClock() < until) {
         instr_start_ = cpu_.getClock();
+        read_start_ = start_of(instr_start_);
         cpu_.execute();
       }
       continue;
@@ -268,6 +304,7 @@ void System::run_cpu_until(moira::i64 target) {
     int window = 0;
     const FreeBus kind = refresh_free_kind(cpu_, cpu_.getIRD(), window);
     instr_start_ = clock;
+    read_start_ = start_of(clock);
     cpu_.execute();
     if (kind == FreeBus::none)
       continue;
@@ -359,6 +396,8 @@ void System::run_frame() {
       z80_int_end_ = int_start + kCyclesPerLine;
     }
     z80_sync(end_master);
+    if (index + 1 == lines && z80_running())
+      z80_run_whole(end_master + kZ80FrameLead); // its next T-state is on time
     if (display_on_cycle_ && (vdp_.reg(1) & 0x40U) != 0) {
       // The display turned on after the line was drawn: the pixels from the
       // write on show the picture, the ones before keep the backdrop. Pixel x
@@ -672,11 +711,11 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     if (offset == 0x1100) {
       z80_sync_now();
       const bool request = word ? (value & 0x0100U) != 0 : (value & 1U) != 0;
-      if (request && z80_running())
-        z80_.finish_instruction(); // the Z80 grants the bus between
-                                   // instructions
+      if (request && z80_running() &&
+          z80_run_whole(bus_control_stamp() + kZ80GrantLead))
+        z80_.hold(1); // the T-state the next instruction took, paid on resume
       if (!z80_running() && !request && z80_reset_released_)
-        z80_master_ = z80_resume_at(cpu_.getClock() * kDivider68k);
+        z80_master_ = z80_resume_at(bus_control_stamp());
       z80_bus_requested_ = request;
     } else if (offset == 0x1200) {
       z80_sync_now();
@@ -684,7 +723,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
       if (!released)
         z80_.soft_reset();
       else if (!z80_reset_released_)
-        z80_master_ = z80_resume_at(cpu_.getClock() * kDivider68k);
+        z80_master_ = z80_resume_at(bus_control_stamp());
       z80_reset_released_ = released;
     }
     break;
@@ -694,12 +733,14 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     vdp_.set_time(cpu_.getClock() * kDivider68k);
     if (offset >= 0x10 && offset < 0x18) {
       // The PSG sits on the odd (low) byte lane of $C00010-$C00017. gpgx
-      // takes the write one 68000 cycle before the access (TP-209.2: every
-      // PSG record of fm-psg-0..3-once 7 master cycles early, the YM records
-      // of the same lists, same instruction forms, exact).
+      // takes the write 9 cycles after the start of its instruction, one
+      // before the YM2612 data write of the same form (TP-209.2: every PSG
+      // record of fm-psg-0..3-once, move.b #v,d16(An), 7 master cycles before
+      // the access; Gunstar Heroes frame 109, move.b #v,(An), 4 cycles after
+      // the access 1 cycle earlier rule).
       if (word || (offset & 1U) != 0)
         psg_write(static_cast<std::uint8_t>(value),
-                  cpu_.getClock() * kDivider68k - kDivider68k);
+                  static_cast<std::uint64_t>(instr_start_ + 9) * kDivider68k);
       break;
     }
     if (offset < 4)
@@ -737,6 +778,25 @@ void System::z80_sync(std::uint64_t master) {
     z80_.tick();
     z80_master_ += kDividerZ80;
   }
+}
+
+// Runs the Z80 on its own clock through every instruction that starts before
+// `master`, the last one to its end (the Z80 stops between two instructions).
+// The core reports the end of an instruction one T-state into the next one:
+// true when that next one starts at `master` or later, so one of its T-states
+// has run already.
+bool System::z80_run_whole(std::uint64_t master) {
+  bool done = z80_.instruction_done();
+  for (unsigned guard = 0; guard < 4096; ++guard) {
+    z80_.set_int(z80_master_ < z80_int_end_);
+    z80_.tick();
+    z80_master_ += kDividerZ80;
+    const bool now_done = z80_.instruction_done();
+    if (now_done && !done && z80_master_ - kDividerZ80 >= master)
+      return true;
+    done = now_done;
+  }
+  return false;
 }
 
 // What the 68000 reads from the Z80 area when the Z80 does not answer: the
@@ -787,8 +847,19 @@ void System::log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
 // lasts longer (Sonic 1's sound driver polls with move.b $A04000.l; 12 read
 // and write forms x 8 phases match exactly, TP-209.2, scratchpad
 // fifo/ymform.py).
+// The bus request and reset writes ($A11100, $A11200) are taken from the
+// start of the instruction as well: the leads above were measured with
+// move.w #imm,(An), whose write comes 6 cycles after its start, and the same
+// leads fit move.w Dn,(An) (2 cycles), move.w Dn,abs.l and the byte forms
+// only from the start of the instruction (TP-209.2, scratchpad bus/grant.py
+// REQF/RELF).
+std::uint64_t System::bus_control_stamp() const noexcept {
+  return static_cast<std::uint64_t>(instr_start_ + 6) * kDivider68k;
+}
+
 std::uint64_t System::ym_stamp(bool write) const noexcept {
-  return static_cast<std::uint64_t>(instr_start_ + (write ? 10 : 2)) *
+  return static_cast<std::uint64_t>(write ? instr_start_ + 10
+                                          : read_start_ + 2) *
          kDivider68k;
 }
 
@@ -826,6 +897,19 @@ void System::z80_bank_write(std::uint8_t value) noexcept {
       ((z80_bank_ >> 1) | ((value & 1U) << 8)) & 0x1FFU);
 }
 
+// How long before its read cycle the Z80 sees the YM2612 status: the bit
+// test forms (CB 46+8b, DD/FD CB d 46+8b) read in a 4 T-state cycle. The
+// opcode bytes are behind the PC, in the Z80 RAM where sound drivers run.
+std::uint64_t System::z80_status_lag() const noexcept {
+  const auto at = [&](unsigned back) -> int {
+    const unsigned a = (z80_.pc() - back) & 0xFFFFU;
+    return a < 0x4000 ? z80_ram_[a & 0x1FFFU] : -1;
+  };
+  const bool bit = (at(1) & 0xC7) == 0x46 &&
+                   (at(2) == 0xCB || (at(3) == 0xCB && (at(4) | 0x20) == 0xFD));
+  return bit ? kZ80StatusLagBit : kZ80StatusLag;
+}
+
 // The 68000 is held for kZ80BusSteal master cycles. The 68000 clock counts in
 // 68000 cycles, so each access takes the 68000 cycles whose boundaries fall in
 // [z80_master_, z80_master_ + kZ80BusSteal): 72/7 on average and no state.
@@ -840,8 +924,10 @@ std::uint8_t System::z80_read(std::uint16_t address, unsigned &wait) {
   wait = 0;
   if (address < 0x4000)
     return z80_ram_[address & 0x1FFFU];
-  if (address < 0x6000)
-    return ym_status(z80_master_);
+  if (address < 0x6000) {
+    const std::uint64_t seen = z80_master_ - z80_status_lag();
+    return ym_status(seen);
+  }
   if (address < 0x8000)
     return 0xFF;
   const std::uint32_t a =
@@ -861,8 +947,6 @@ void System::z80_write(std::uint16_t address, std::uint8_t value,
     z80_ram_[address & 0x1FFFU] = value;
   } else if (address < 0x6000) {
     ym_write(address, value, z80_master_, false); // the rest is TP-107
-    if ((address & 1U) != 0)
-      ym_busy_until_ += kZ80YmBusyExtra;
   } else if (address < 0x8000) {
     if ((address & 0xFF00U) == 0x6000U)
       z80_bank_write(value);

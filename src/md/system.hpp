@@ -208,6 +208,7 @@ private:
   /// Runs the Z80 up to `master` (it only advances while it owns its bus).
   void z80_sync(std::uint64_t master);
   void z80_sync_now() { z80_sync(cpu_.getClock() * kDivider68k); }
+  bool z80_run_whole(std::uint64_t master);
   std::uint8_t z80_read(std::uint16_t address, unsigned &wait);
   void z80_write(std::uint16_t address, std::uint8_t value, unsigned &wait);
   void z80_bank_write(std::uint8_t value) noexcept;
@@ -218,6 +219,7 @@ private:
   /// 68000 clock at the start of the instruction being executed: gpgx stamps
   /// the 68000 YM2612 accesses by instruction, not by bus cycle (TP-209.2).
   moira::i64 instr_start_ = 0;
+  moira::i64 read_start_ = 0; ///< instr_start_ for the reads (refresh rule)
   void z80_wait();
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
@@ -289,6 +291,8 @@ private:
       0; ///< latch: (part << 8) | register of the last address write
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
+  std::uint64_t bus_control_stamp() const noexcept;
+  std::uint64_t z80_status_lag() const noexcept;
   std::uint64_t ym_stamp(bool write) const noexcept;
   void psg_write(std::uint8_t value, std::uint64_t now);
   std::uint64_t ym_busy_until_ = 0; ///< master cycle the YM busy flag drops
