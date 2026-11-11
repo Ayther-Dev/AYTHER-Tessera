@@ -302,15 +302,16 @@ TEST_CASE("registers above 10 are ignored while the VDP is in mode 4") {
 
 TEST_CASE("a VRAM fill keeps the busy bit set for one slot per byte") {
   Vdp v(Standard::ntsc);
-  reg(v, 1, 0x14); // mode 5, DMA enabled, display off (blanking: 167 slots)
+  reg(v, 1, 0x14); // mode 5, DMA enabled, display off (blanking: 166 slots)
   reg(v, 15, 1);
   v.set_time(1000);
   dma_regs(v, 0x20, 0, 0x80);
   dma_command(v, 0x0100, 1);
   v.write_data(0xAB00);
   CHECK((v.read_status() & 0x0002) != 0);
-  // the end of the last slot, rounded up (Vdp::slots_end)
-  const std::uint64_t duration = (0x20ULL * 3420 + 166) / 167;
+  // the end of the last slot, rounded up, less the blanking start latency
+  // of a fill (Vdp::fill_end, measured on gpgx)
+  const std::uint64_t duration = (0x20ULL * 3420 + 165) / 166 - 85;
   v.set_time(1000 + duration - 1);
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(1000 + duration);
@@ -324,7 +325,7 @@ TEST_CASE("a VRAM fill keeps the busy bit set for one slot per byte") {
 TEST_CASE("a VRAM fill crossing into the blanking speeds up there") {
   Vdp v(Standard::ntsc);
   reg(v, 1, 0x54);  // mode 5, DMA enabled, display on
-  reg(v, 12, 0x81); // H40: 18 slots per drawn line, 205 per blanked line
+  reg(v, 12, 0x81); // H40: 18 slots per drawn line, 204 per blanked line
   reg(v, 15, 1);
   v.begin_line(220);
   v.set_line_start(0);
@@ -332,9 +333,9 @@ TEST_CASE("a VRAM fill crossing into the blanking speeds up there") {
   dma_regs(v, 0x0FFF, 0, 0x80); // 4095 bytes
   dma_command(v, 0x0100, 1);
   v.write_data(0xAB00);
-  // 4 drawn lines give at most 4 * 18 bytes; the rest goes at 205 per line.
+  // 4 drawn lines give at most 4 * 18 bytes; the rest goes at 204 per line.
   const std::uint64_t blanking = 4ULL * 3420;
-  const std::uint64_t rest = (0xFFFULL - 4 * 18) * 3420 / 205;
+  const std::uint64_t rest = (0xFFFULL - 4 * 18) * 3420 / 204;
   v.set_time(blanking + rest - 3420);
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(blanking + rest + 3420);
@@ -348,9 +349,9 @@ TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
   set_write(v, 0x0000, 1);
   v.write_data(0x0123);
   v.write_data(0x1234);
-  v.set_time(0);
-  dma_regs(v, 4, 0, 0xC0);
-  reg(v, 21, 0); // copy source is a VRAM byte address
+  v.set_time(1000);
+  dma_regs(v, 0x40, 0, 0xC0); // long enough to outlast the start latency
+  reg(v, 21, 0);              // copy source is a VRAM byte address
   reg(v, 22, 0);
 
   v.write_control(0x0200);
@@ -358,9 +359,12 @@ TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
   // every byte lands at (dest ^ 1) from (source ^ 1)
   CHECK(v.vram()[0x201] == 0x23);
   CHECK(v.vram()[0x203] == 0x01);
-  const std::uint64_t duration = (4ULL * 2 * 3420 + 166) / 167;
+  // two slots per byte, less the blanking start latency of a copy
+  const std::uint64_t duration = (0x40ULL * 2 * 3420 + 165) / 166 - 170;
   CHECK((v.read_status() & 0x0002) != 0);
-  v.set_time(duration);
+  v.set_time(1000 + duration - 1);
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(1000 + duration);
   CHECK((v.read_status() & 0x0002) == 0);
 }
 

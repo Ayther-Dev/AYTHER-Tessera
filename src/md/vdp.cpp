@@ -389,6 +389,57 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
   return t;
 }
 
+// Master cycle at which a VRAM fill or copy of `slots` slots (one per fill
+// byte, two per copied byte) started at `start` is done. Unlike the 68000
+// FIFO, these slots are evenly spread over the line, 18/16 (H40/H32) while
+// the display is drawn and 204/166 while it is blanked, and the rate changes
+// 150/160 master cycles before the V counter ticks into the next line, in
+// both directions. The start latency depends on the kind of transfer and on
+// where it starts. All measured on gpgx with dense status reads after a
+// fixed CPU delay (TP-209.2, scratchpad fifo/dense.py, xfit.py, xval.py).
+std::uint64_t Vdp::fill_end(std::uint64_t start, std::uint64_t slots,
+                            bool copy) const noexcept {
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const std::uint64_t blank_rate = h40 ? 204U : 166U;
+  const std::uint64_t display_rate = h40 ? 18U : 16U;
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t active = active_lines();
+  // Work in slot x cycle units so a partial line keeps its fraction.
+  std::uint64_t rem = slots * kCyclesPerLine;
+  std::int64_t t = static_cast<std::int64_t>(start);
+  // A negative latency never ends a transfer before it starts.
+  auto done = [start](std::int64_t at, std::uint64_t cycles) {
+    const std::int64_t end = at + static_cast<std::int64_t>(cycles);
+    return end > static_cast<std::int64_t>(start)
+               ? static_cast<std::uint64_t>(end)
+               : start;
+  };
+  if ((regs_[1] & 0x40U) == 0)
+    return done(t - (copy ? 170 : 85), (rem + blank_rate - 1) / blank_rate);
+  if (blank_at(start))
+    t -= copy ? 170 : 85;
+  else
+    t += copy ? 40 : (h40 ? 345 : 390);
+  const std::int64_t origin =
+      static_cast<std::int64_t>(line_start_) - (h40 ? 150 : 160);
+  for (;;) {
+    const std::int64_t rel = t - origin;
+    const std::int64_t k =
+        rel >= 0 ? rel / kCyclesPerLine
+                 : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+    const std::int64_t line =
+        ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+    const bool blank = line >= active && line + 1 != total;
+    const std::uint64_t rate = blank ? blank_rate : display_rate;
+    const std::int64_t seg_end = origin + (k + 1) * kCyclesPerLine;
+    const std::uint64_t cap = static_cast<std::uint64_t>(seg_end - t) * rate;
+    if (rem <= cap)
+      return done(t, (rem + rate - 1) / rate);
+    rem -= cap;
+    t = seg_end;
+  }
+}
+
 // Whether the line that master cycle `t` falls in is blanked, with the
 // current registers. Unlike display_blank() it looks at the line of `t`, not
 // at the current one, which lags behind while the 68000 is held by the FIFO.
@@ -502,7 +553,7 @@ void Vdp::run_dma(std::uint16_t first_data) {
   // line gives the slots of its own kind: a fill started while the display is
   // drawn speeds up when the blanking starts, and one started in the blanking
   // slows down when the display starts (measured on gpgx, TP-209.2).
-  busy_until_ = slots_end(now_, mode == 2 ? length : 2ULL * length, false);
+  busy_until_ = fill_end(now_, mode == 2 ? length : 2ULL * length, mode != 2);
   if (mode == 2) { // VRAM fill: the data word, then its high byte
     fifo_record(first_data);
     put(first_data);
