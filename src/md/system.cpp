@@ -19,9 +19,18 @@ constexpr unsigned kZ80VdpWait = 3;
 // access lands at the same point of the 68000 loop and gpgx takes 10 cycles at
 // all seven phases (z80_steal -f), where this rounding takes 11 at two of them.
 constexpr std::uint64_t kZ80BusSteal = 72;
-// Master cycles between the release of the reset line and the first Z80 fetch
-// (gpgx fm_psg_z80: every write of the payload is stamped 67 cycles later).
-constexpr std::uint64_t kZ80ResetDelay = 67;
+// When the 68000 gives the bus back or releases the reset line (the same
+// stamps, 70 phases), the Z80 resumes on its own clock: at the
+// first Z80 cycle edge (a multiple of 15 master cycles, frames are whole Z80
+// cycles) at or after the write plus 51 master cycles (gpgx fm_psg_z80 with
+// 0 to 69 NOPs before the release and 0 to 39 before the whole program: 110
+// release phases, 51 is the only lead that stamps every Z80 write the same,
+// TP-209.2). A fixed 67 matched one phase only.
+constexpr std::uint64_t kZ80ResumeLead = 51;
+std::uint64_t z80_resume_at(std::uint64_t master) noexcept {
+  const std::uint64_t at = master + kZ80ResumeLead;
+  return (at + kDividerZ80 - 1) / kDividerZ80 * kDividerZ80;
+}
 // A six-button pad that sees no change of TH for this long starts its sequence
 // again (gpgx pad_latch-2: the ID of the second low half survives a pause of up
 // to 12 540 68000 cycles and is gone from 12 910; the cycles in between depend
@@ -36,12 +45,23 @@ constexpr std::uint64_t kPad6PullUp = 24ULL * 7ULL;
 constexpr std::uint64_t kZ80IntLead = 1620;
 // Master cycle of the line at which the VDP line is drawn, and at which its
 // pixel 0 would be drawn when the display turns on in the middle of the line
-// (TP-209.1, see run_frame).
+// (TP-209.1, see run_frame). The origins were measured again with the
+// refresh model of TP-209.2, which no longer runs the 68000 one refresh
+// stall (14 master cycles) early: a display turned on in the middle of the
+// line, moved in 2 cycle steps over 62 phases, lands on the gpgx pixel at
+// all of them only with 688 (H32) and 718 (H40).
 constexpr std::uint64_t kRenderCycle = 800;
-constexpr std::uint32_t kPixelOriginH32 = 674;
-constexpr std::uint32_t kPixelOriginH40 = 704;
-// YM2612 busy time after a data write, master cycles (probe ym-busy-N)
-constexpr std::uint64_t kYmBusy = 1325;
+constexpr std::uint32_t kPixelOriginH32 = 688;
+constexpr std::uint32_t kPixelOriginH40 = 718;
+// YM2612 busy flag after a data write (TP-209.2, ym-busy-N with the write
+// moved over all 6 phases of the YM clock and over frames 0 to 5, 1482 cases):
+// it drops at a YM clock edge (every 42 master cycles, MCLK / 7 / 6), the
+// first at or after the write plus kYmBusy. The edges restart with each frame
+// (a frame is not a whole number of YM clocks) at kYmEdge cycles from its
+// start. A flat 1325 cycles matched 1023 of the 1152 frame 0 cases.
+constexpr std::uint64_t kYmBusy = 1287;
+constexpr std::uint64_t kYmClock = 42;
+constexpr std::uint64_t kYmEdge = 28;
 // The Z80 sees the flag drop later than the 68000 does: polling it from the
 // Z80 (fm-busy-z80-N probes, TP-107.7) puts the end between 1336 and about
 // 1395 master cycles after the write, the 68000 probes (ym-busy-N) at no more
@@ -100,6 +120,13 @@ std::uint8_t System::io_version() const noexcept {
   return v;
 }
 
+namespace {
+// First DRAM refresh request after a hard reset, in 68000 cycles from the
+// first instruction (TP-209.2, measured: the first stall falls where a
+// request 62 to 64 cycles in would put it, with three instruction mixes).
+constexpr moira::i64 kFirstRefresh = 64;
+} // namespace
+
 void System::reset() {
   vdp_ = Vdp(config_.standard);
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
@@ -147,7 +174,7 @@ void System::reset() {
   constexpr moira::i64 kBootCpuCycles = 31;
   cpu_.setClock(
       static_cast<moira::i64>(boot_master / kDivider68k + kBootCpuCycles));
-  refresh_due_ = cpu_.getClock() + 130;
+  refresh_due_ = cpu_.getClock() + kFirstRefresh;
   z80_master_ = boot_master;
 }
 
@@ -185,20 +212,74 @@ void System::raise_sprite_flags() noexcept {
   vdp_.raise_sprite_flags(flags.overflow, flags.collision);
 }
 
-// DRAM refresh: gpgx takes 2 CPU cycles away from the 68000 once every 130
-// cycles it executes (one stolen cycle count per 132 in all: 1.515 %, measured
-// with cpu_drift_long over up to 21 million cycles, TP-104.3).
+namespace {
+// DRAM refresh of the 68000 (TP-209.2, measured on gpgx as a black box with
+// the master cycle stamps of PSG writes, see docs/clean-room-register.md):
+// a refresh is requested 128 CPU cycles after the previous one started. A
+// request that is due at an instruction boundary costs the 68000 2 cycles
+// there and the next one comes 128 cycles after that boundary. A register
+// count shift (ASd/LSd/ROXd/ROd Dx,Dy) leaves the bus free during its first
+// 2n + 2 cycles (n = Dx & 63, n >= 1): a request that falls in them is served
+// at no cost and the next one comes 128 cycles after it. DIVU and DIVS do the
+// same during their first L - 4 cycles (L = the whole instruction, at most
+// 128), except when the quotient overflows.
+constexpr moira::i64 kRefreshPeriod = 128;
+constexpr int kRefreshCost = 2;
+
+enum class FreeBus : std::uint8_t { none, shift, divide };
+
+/// Kind of free bus window of the instruction about to run (`opcode`); for a
+/// shift, `window` gets its length.
+FreeBus refresh_free_kind(const moira::Moira &cpu, std::uint16_t opcode,
+                          int &window) {
+  // 1110 ccc d ss 1 tt rrr with ss != 11: count in data register ccc
+  if ((opcode & 0xF020U) == 0xE020U && (opcode & 0x00C0U) != 0x00C0U) {
+    const auto n = static_cast<int>(cpu.getD((opcode >> 9) & 7U) & 0x3FU);
+    window = 2 * n + 2;
+    return n == 0 ? FreeBus::none : FreeBus::shift;
+  }
+  // 1000 rrr 011 mmmrrr (DIVU) / 1000 rrr 111 mmmrrr (DIVS)
+  if ((opcode & 0xF0C0U) == 0x80C0U)
+    return FreeBus::divide;
+  return FreeBus::none;
+}
+} // namespace
+
 void System::run_cpu_until(moira::i64 target) {
   while (cpu_.getClock() < target) {
-    if (refresh_due_ > target) {
-      cpu_.executeUntil(target);
-      break;
+    const auto clock = cpu_.getClock();
+    if (clock >= refresh_due_) {
+      cpu_.stall(kRefreshCost);
+      refresh_due_ = clock + kRefreshPeriod;
+      continue;
     }
-    cpu_.executeUntil(refresh_due_);
-    if (cpu_.getClock() >= refresh_due_) {
-      cpu_.stall(2);
-      refresh_due_ = cpu_.getClock() + 130;
+    // An instruction that starts more than 128 cycles before the request
+    // cannot absorb it (the longest free window is 128 cycles).
+    const auto far = refresh_due_ - kRefreshPeriod + 1;
+    if (clock < far) {
+      cpu_.executeUntil(std::min(target, far));
+      continue;
     }
+    const auto pc = cpu_.getPC0();
+    int window = 0;
+    const FreeBus kind = refresh_free_kind(cpu_, cpu_.getIRD(), window);
+    cpu_.execute();
+    if (kind == FreeBus::none)
+      continue;
+    // Only when the instruction itself ran to its end: not an interrupt taken
+    // in its place, nor a division by zero (the PC moves on by the opcode and
+    // its extension words, at most 8 bytes).
+    const auto next = cpu_.getPC0();
+    if (next <= pc || next > pc + 8)
+      continue;
+    if (kind == FreeBus::divide) {
+      if ((cpu_.getSR() & 0x0002U) != 0) // V: the quotient overflowed
+        continue;
+      window = static_cast<int>(
+          std::min<moira::i64>(cpu_.getClock() - clock - 4, kRefreshPeriod));
+    }
+    while (refresh_due_ >= clock && refresh_due_ < clock + window)
+      refresh_due_ += kRefreshPeriod;
   }
 }
 
@@ -491,15 +572,16 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   switch (target) {
   case Target::z80_area: {
     z80_sync_now();
-    z80_wait();
     if (!z80_bus_granted())
       return open_bus(offset, word);
+    const std::uint64_t at = cpu_.getClock() * kDivider68k; // before the wait
+    z80_wait();
     const std::uint32_t a = offset & 0x7FFFU;
     std::uint8_t v;
     if (a < 0x4000)
       v = z80_ram_[a & 0x1FFFU];
     else if (a < 0x6000)
-      v = ym_status(cpu_.getClock() * kDivider68k);
+      v = ym_status(at);
     else if (a < 0x7F00)
       v = 0xFF;
     else
@@ -551,8 +633,11 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
   }
 }
 
-// The 68000 loses one cycle on every access to the Z80 area (gpgx: the copy
-// of the sound driver of Streets of Rage 2, 8 KiB of byte writes, ends in the
+// The 68000 loses one cycle on every access to the Z80 area while it holds
+// the Z80 bus; without the bus (Z80 running or in reset) the access is open
+// and costs nothing more (TP-209.2, HV probe: 8.19 cycles per move.b on gpgx
+// either way, 9.20 with the bus). The cycle itself was measured with the copy
+// of the sound driver of Streets of Rage 2 (8 KiB of byte writes end in the
 // same frame only with exactly one; 0.7 from the first 40-access probe was
 // short and made the title lag a frame behind from its frame 156).
 void System::z80_wait() { cpu_.stall(1); }
@@ -562,16 +647,17 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
   switch (target) {
   case Target::z80_area: {
     z80_sync_now();
-    z80_wait();
     if (!z80_bus_granted())
       break; // the area does not answer without the bus
+    const std::uint64_t at = cpu_.getClock() * kDivider68k; // before the wait
+    z80_wait();
     const std::uint32_t a = offset & 0x7FFFU;
     const auto v = word ? static_cast<std::uint8_t>(value >> 8) // high byte
                         : static_cast<std::uint8_t>(value);
     if (a < 0x4000)
       z80_ram_[a & 0x1FFFU] = v;
     else if (a < 0x6000)
-      ym_write(a, v, cpu_.getClock() * kDivider68k, word);
+      ym_write(a, v, at, word);
     else if ((a & 0xFF00U) == 0x6000U)
       z80_bank_write(v);
     break;
@@ -587,7 +673,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
         z80_.finish_instruction(); // the Z80 grants the bus between
                                    // instructions
       if (!z80_running() && !request && z80_reset_released_)
-        z80_master_ = cpu_.getClock() * kDivider68k + kZ80ResetDelay; // resumes
+        z80_master_ = z80_resume_at(cpu_.getClock() * kDivider68k);
       z80_bus_requested_ = request;
     } else if (offset == 0x1200) {
       z80_sync_now();
@@ -595,7 +681,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
       if (!released)
         z80_.soft_reset();
       else if (!z80_reset_released_)
-        z80_master_ = cpu_.getClock() * kDivider68k;
+        z80_master_ = z80_resume_at(cpu_.getClock() * kDivider68k);
       z80_reset_released_ = released;
     }
     break;
@@ -604,10 +690,13 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
         word ? value : dup(static_cast<std::uint8_t>(value));
     vdp_.set_time(cpu_.getClock() * kDivider68k);
     if (offset >= 0x10 && offset < 0x18) {
-      // The PSG sits on the odd (low) byte lane of $C00010-$C00017.
+      // The PSG sits on the odd (low) byte lane of $C00010-$C00017. gpgx
+      // takes the write one 68000 cycle before the access (TP-209.2: every
+      // PSG record of fm-psg-0..3-once 7 master cycles early, the YM records
+      // of the same lists, same instruction forms, exact).
       if (word || (offset & 1U) != 0)
         psg_write(static_cast<std::uint8_t>(value),
-                  cpu_.getClock() * kDivider68k);
+                  cpu_.getClock() * kDivider68k - kDivider68k);
       break;
     }
     if (offset < 4)
@@ -708,8 +797,13 @@ void System::ym_write(std::uint32_t address, std::uint8_t value,
   }
   // The busy time was measured on data writes by byte and on every word write
   // (ym-busy-N probes, SoR2 corpus).
-  if ((address & 1U) != 0 || word)
-    ym_busy_until_ = now + kYmBusy;
+  if ((address & 1U) != 0 || word) {
+    const std::uint64_t frame_start =
+        frame_ * cycles_per_frame(config_.standard);
+    const std::uint64_t from = now + kYmBusy - frame_start + kYmClock - kYmEdge;
+    ym_busy_until_ = frame_start + (from + kYmClock - 1) / kYmClock * kYmClock -
+                     (kYmClock - kYmEdge);
+  }
 }
 
 void System::z80_bank_write(std::uint8_t value) noexcept {

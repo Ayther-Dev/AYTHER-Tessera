@@ -533,11 +533,12 @@ if(TESSERA_BUILD_MEGADRIVE)
     if(Python3_Interpreter_FOUND AND TESSERA_DIFFBENCH_GPGX_CORE)
         # TP-107.2/107.3: AUDIO_WRITES (plane 2) of the last frame against gpgx.
         # The "-once" ROMs run their list in frame 0 with no synchronisation
-        # (cycles within one 68000 cycle: the refresh stall lands on another
-        # instruction); the others repeat it once per frame, locked to the
-        # blanking flag, whose poll phase moves the cycles by up to one poll
-        # (200 master cycles) but never the sequence. fm-psg-z80 is the Z80
-        # side and matches to the cycle.
+        # and match to the cycle (TP-209.2: they needed 7 while the YM write
+        # was stamped after the Z80 area wait and the PSG write at the access);
+        # the others repeat it once per frame, locked to the blanking flag,
+        # whose poll phase moves the cycles by up to one poll (200 master
+        # cycles) but never the sequence. fm-psg-z80 is the Z80 side and
+        # matches to the cycle.
         # fm-psg-4 floods the PSG (9 000 writes a frame, every frame over the
         # 8 192 kept); registering it keeps its ROM in step with the generator
         # (a stale build ROM ended in a bra.w past the image, TP-209.1).
@@ -549,13 +550,10 @@ if(TESSERA_BUILD_MEGADRIVE)
                 FIXTURES_SETUP md_${mode}_rom LABELS "integration;phase1;md;local" TIMEOUT 30)
             if(mode MATCHES "once$|z80$")
                 set(audio_frames 1)
-                set(audio_tolerance 7)
+                set(audio_tolerance 0)
             else()
                 set(audio_frames 8)
                 set(audio_tolerance 200)
-            endif()
-            if(mode STREQUAL "fm-psg-z80")
-                set(audio_tolerance 0)
             endif()
             add_test(NAME integration.md_${mode} COMMAND ${Python3_EXECUTABLE} -I
                 "${CMAKE_CURRENT_SOURCE_DIR}/compare_audio.py"
