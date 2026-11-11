@@ -1,5 +1,7 @@
 #include "md/system.hpp"
 
+#include <bit>
+
 namespace tessera::md {
 namespace {
 std::uint16_t dup(std::uint8_t v) {
@@ -243,21 +245,42 @@ namespace {
 // 2n + 2 cycles (n = Dx & 63, n >= 1): a request that falls in them is served
 // at no cost and the next one comes 128 cycles after it. DIVU and DIVS do the
 // same during their first L - 4 cycles (L = the whole instruction, at most
-// 128), except when the quotient overflows.
+// 128), except when the quotient overflows. MOVEM.L with n registers, in
+// either direction and in every addressing mode, serves a request that falls
+// due from 4 to 8n cycles after it starts at no cost (pfill/mvsum.py, n = 1,
+// 2, 4, 6, 8 over every even phase), from 2 when the instruction before it
+// was a MOVEM of either size (pfill/pre.py); MOVEM.W serves none. Sonic's level
+// drawing loop saves its registers with one around each block, and without
+// this window Tessera fell 2155 master cycles behind gpgx over 16 rows.
 constexpr moira::i64 kRefreshPeriod = 128;
 constexpr int kRefreshCost = 2;
 
-enum class FreeBus : std::uint8_t { none, shift, divide };
+enum class FreeBus : std::uint8_t { none, shift, divide, movem };
+
+/// MOVEM of either size: 0100 1d00 1s mmmrrr with mmm != 000 (that is EXT).
+constexpr bool is_movem(std::uint16_t opcode) noexcept {
+  return (opcode & 0xFB80U) == 0x4880U && (opcode & 0x0038U) != 0;
+}
 
 /// Kind of free bus window of the instruction about to run (`opcode`); for a
-/// shift, `window` gets its length.
+/// shift or a MOVEM.L, `from` and `window` get its bounds in cycles from the
+/// start of the instruction (`from` inclusive, `window` exclusive);
+/// `after_movem` tells that the instruction before it was a MOVEM.
 FreeBus refresh_free_kind(const moira::Moira &cpu, std::uint16_t opcode,
-                          int &window) {
+                          bool after_movem, int &from, int &window) {
+  from = 0;
   // 1110 ccc d ss 1 tt rrr with ss != 11: count in data register ccc
   if ((opcode & 0xF020U) == 0xE020U && (opcode & 0x00C0U) != 0x00C0U) {
     const auto n = static_cast<int>(cpu.getD((opcode >> 9) & 7U) & 0x3FU);
     window = 2 * n + 2;
     return n == 0 ? FreeBus::none : FreeBus::shift;
+  }
+  // MOVEM.L (s = 1), register mask in IRC
+  if (is_movem(opcode) && (opcode & 0x0040U) != 0) {
+    const int n = std::popcount(cpu.getIRC());
+    from = after_movem ? 2 : 4;
+    window = 8 * n + 1;
+    return n == 0 ? FreeBus::none : FreeBus::movem;
   }
   // 1000 rrr 011 mmmrrr (DIVU) / 1000 rrr 111 mmmrrr (DIVS)
   if ((opcode & 0xF0C0U) == 0x80C0U)
@@ -274,6 +297,10 @@ FreeBus refresh_free_kind(const moira::Moira &cpu, std::uint16_t opcode,
 // inside the previous instruction moves both, ym-busy-N and fm-psg-N-once).
 void System::run_cpu_until(moira::i64 target) {
   moira::i64 refreshed_at = -1;
+  // Whether the last instruction run was a MOVEM; it starts false at each
+  // call, which only misses a MOVEM.L whose request falls 2 cycles in right
+  // after a MOVEM that ended the previous slice.
+  bool after_movem = false;
   const auto start_of = [&](moira::i64 now) {
     const auto at = refreshed_at >= 0 ? refreshed_at : now;
     refreshed_at = -1;
@@ -296,13 +323,18 @@ void System::run_cpu_until(moira::i64 target) {
       while (cpu_.getClock() < until) {
         instr_start_ = cpu_.getClock();
         read_start_ = start_of(instr_start_);
+        after_movem = is_movem(cpu_.getIRD());
         cpu_.execute();
       }
       continue;
     }
     const auto pc = cpu_.getPC0();
+    int from = 0;
     int window = 0;
-    const FreeBus kind = refresh_free_kind(cpu_, cpu_.getIRD(), window);
+    const auto opcode = cpu_.getIRD();
+    const FreeBus kind =
+        refresh_free_kind(cpu_, opcode, after_movem, from, window);
+    after_movem = is_movem(opcode);
     instr_start_ = clock;
     read_start_ = start_of(clock);
     cpu_.execute();
@@ -320,7 +352,7 @@ void System::run_cpu_until(moira::i64 target) {
       window = static_cast<int>(
           std::min<moira::i64>(cpu_.getClock() - clock - 4, kRefreshPeriod));
     }
-    while (refresh_due_ >= clock && refresh_due_ < clock + window)
+    while (refresh_due_ >= clock + from && refresh_due_ < clock + window)
       refresh_due_ += kRefreshPeriod;
   }
 }
