@@ -309,10 +309,35 @@ TEST_CASE("a VRAM fill keeps the busy bit set for one slot per byte") {
   dma_command(v, 0x0100, 1);
   v.write_data(0xAB00);
   CHECK((v.read_status() & 0x0002) != 0);
-  const std::uint64_t duration = 0x20ULL * 3420 / 167;
+  // the end of the last slot, rounded up (Vdp::slots_end)
+  const std::uint64_t duration = (0x20ULL * 3420 + 166) / 167;
   v.set_time(1000 + duration - 1);
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(1000 + duration);
+  CHECK((v.read_status() & 0x0002) == 0);
+}
+
+// TP-209.2 (Sonic 1 title load): a fill started while the display is drawn
+// takes the display slots only until the blanking starts; gpgx then finishes
+// it at the blanking rate. Before, the rate of the first line was used for the
+// whole fill, about 228 lines for 4095 bytes in H40.
+TEST_CASE("a VRAM fill crossing into the blanking speeds up there") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x54);  // mode 5, DMA enabled, display on
+  reg(v, 12, 0x81); // H40: 18 slots per drawn line, 205 per blanked line
+  reg(v, 15, 1);
+  v.begin_line(220);
+  v.set_line_start(0);
+  v.set_time(0);
+  dma_regs(v, 0x0FFF, 0, 0x80); // 4095 bytes
+  dma_command(v, 0x0100, 1);
+  v.write_data(0xAB00);
+  // 4 drawn lines give at most 4 * 18 bytes; the rest goes at 205 per line.
+  const std::uint64_t blanking = 4ULL * 3420;
+  const std::uint64_t rest = (0xFFFULL - 4 * 18) * 3420 / 205;
+  v.set_time(blanking + rest - 3420);
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(blanking + rest + 3420);
   CHECK((v.read_status() & 0x0002) == 0);
 }
 
@@ -333,7 +358,7 @@ TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
   // every byte lands at (dest ^ 1) from (source ^ 1)
   CHECK(v.vram()[0x201] == 0x23);
   CHECK(v.vram()[0x203] == 0x01);
-  const std::uint64_t duration = 4ULL * 2 * 3420 / 167;
+  const std::uint64_t duration = (4ULL * 2 * 3420 + 166) / 167;
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(duration);
   CHECK((v.read_status() & 0x0002) == 0);

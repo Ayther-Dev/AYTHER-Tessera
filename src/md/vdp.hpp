@@ -188,6 +188,7 @@ private:
                              unsigned slots) const noexcept;
   std::uint16_t live_hv(std::uint32_t line_cycle) const noexcept;
   bool display_blank() const noexcept;
+  bool blank_at(std::uint64_t t) const noexcept;
   /// Register 1 bit 2 clear: the SMS compatible Mode 4 (Power Base Converter).
   bool mode4() const noexcept { return (regs_[1] & 0x04U) == 0; }
   /// Moves the VRAM between the Mode 5 and the Mode 4 layouts (vdp.cpp).

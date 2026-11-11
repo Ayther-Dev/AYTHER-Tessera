@@ -389,11 +389,35 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
   return t;
 }
 
+// Whether the line that master cycle `t` falls in is blanked, with the
+// current registers. Unlike display_blank() it looks at the line of `t`, not
+// at the current one, which lags behind while the 68000 is held by the FIFO.
+bool Vdp::blank_at(std::uint64_t t) const noexcept {
+  if ((regs_[1] & 0x40U) == 0)
+    return true;
+  const std::int64_t rel =
+      static_cast<std::int64_t>(t) - static_cast<std::int64_t>(line_start_);
+  const std::int64_t k = rel >= 0
+                             ? rel / kCyclesPerLine
+                             : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t line =
+      ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+  return line >= static_cast<std::int64_t>(active_lines()) && line + 1 != total;
+}
+
 // Completion time of an entry of `slots` external slots started at `start`.
+// The rate is that of the line the entry starts in, not the line of the
+// write: a burst that holds the 68000 across the end of the display speeds
+// up when the blanking starts (measured on gpgx, TP-209.2). An entry started
+// in the last drawn line keeps its display slot even if that falls in the
+// next line.
 std::uint64_t Vdp::slot_service(std::uint64_t start,
                                 unsigned slots) const noexcept {
-  if (display_blank())
-    return start + dma_cycles(slots);
+  if (blank_at(start)) {
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    return start + std::uint64_t{slots} * kCyclesPerLine / (h40 ? 205U : 167U);
+  }
   return next_slot(start, slots == 2U);
 }
 
@@ -474,8 +498,11 @@ void Vdp::run_dma(std::uint16_t first_data) {
     finish_dma(length, true);
     return;
   }
-  // Fill: one slot per byte; copy: two slots per byte (read and write).
-  busy_until_ = now_ + dma_cycles(mode == 2 ? length : 2ULL * length);
+  // Fill: one slot per byte; copy: two slots per byte (read and write). Each
+  // line gives the slots of its own kind: a fill started while the display is
+  // drawn speeds up when the blanking starts, and one started in the blanking
+  // slows down when the display starts (measured on gpgx, TP-209.2).
+  busy_until_ = slots_end(now_, mode == 2 ? length : 2ULL * length, false);
   if (mode == 2) { // VRAM fill: the data word, then its high byte
     fifo_record(first_data);
     put(first_data);
