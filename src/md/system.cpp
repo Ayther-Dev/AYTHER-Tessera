@@ -257,12 +257,17 @@ void System::run_cpu_until(moira::i64 target) {
     // cannot absorb it (the longest free window is 128 cycles).
     const auto far = refresh_due_ - kRefreshPeriod + 1;
     if (clock < far) {
-      cpu_.executeUntil(std::min(target, far));
+      const auto until = std::min(target, far);
+      while (cpu_.getClock() < until) {
+        instr_start_ = cpu_.getClock();
+        cpu_.execute();
+      }
       continue;
     }
     const auto pc = cpu_.getPC0();
     int window = 0;
     const FreeBus kind = refresh_free_kind(cpu_, cpu_.getIRD(), window);
+    instr_start_ = clock;
     cpu_.execute();
     if (kind == FreeBus::none)
       continue;
@@ -574,14 +579,13 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
     z80_sync_now();
     if (!z80_bus_granted())
       return open_bus(offset, word);
-    const std::uint64_t at = cpu_.getClock() * kDivider68k; // before the wait
     z80_wait();
     const std::uint32_t a = offset & 0x7FFFU;
     std::uint8_t v;
     if (a < 0x4000)
       v = z80_ram_[a & 0x1FFFU];
     else if (a < 0x6000)
-      v = ym_status(at);
+      v = ym_status(ym_stamp(false));
     else if (a < 0x7F00)
       v = 0xFF;
     else
@@ -649,7 +653,6 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     z80_sync_now();
     if (!z80_bus_granted())
       break; // the area does not answer without the bus
-    const std::uint64_t at = cpu_.getClock() * kDivider68k; // before the wait
     z80_wait();
     const std::uint32_t a = offset & 0x7FFFU;
     const auto v = word ? static_cast<std::uint8_t>(value >> 8) // high byte
@@ -657,7 +660,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
     if (a < 0x4000)
       z80_ram_[a & 0x1FFFU] = v;
     else if (a < 0x6000)
-      ym_write(a, v, at, word);
+      ym_write(a, v, ym_stamp(true), word);
     else if ((a & 0xFF00U) == 0x6000U)
       z80_bank_write(v);
     break;
@@ -775,6 +778,18 @@ void System::log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
   }
   audio_log_.push_back(
       {static_cast<std::uint32_t>(now - log_origin_), addr, data, chip});
+}
+
+// gpgx stamps a 68000 YM2612 access from the start of its instruction, not
+// at its bus cycle: a status read 2 CPU cycles after the start, a write 10.
+// For move.b (An) reads and d16(An) writes that is the bus cycle itself;
+// with an absolute address the read is seen 8 cycles early, so the busy flag
+// lasts longer (Sonic 1's sound driver polls with move.b $A04000.l; 12 read
+// and write forms x 8 phases match exactly, TP-209.2, scratchpad
+// fifo/ymform.py).
+std::uint64_t System::ym_stamp(bool write) const noexcept {
+  return static_cast<std::uint64_t>(instr_start_ + (write ? 10 : 2)) *
+         kDivider68k;
 }
 
 void System::psg_write(std::uint8_t value, std::uint64_t now) {

@@ -375,8 +375,9 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
   dma_regs(v, 16, 0x400, 0x00);
   dma_command(v, 0x0000, 1);
-  // A VRAM word takes two external slots (measured on gpgx, TP-104.4).
-  CHECK(v.take_cpu_stall() == (2ULL * 16 * 3420 + 166) / 167);
+  // A VRAM word takes two external slots (measured on gpgx, TP-104.4), 166
+  // per blanked H32 line (TP-209.2).
+  CHECK(v.take_cpu_stall() == (2ULL * 16 * 3420 + 165) / 166);
   CHECK(v.take_cpu_stall() == 0);
 }
 

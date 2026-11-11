@@ -215,6 +215,9 @@ private:
   void z80_take_68k_bus() noexcept;
   std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
+  /// 68000 clock at the start of the instruction being executed: gpgx stamps
+  /// the 68000 YM2612 accesses by instruction, not by bus cycle (TP-209.2).
+  moira::i64 instr_start_ = 0;
   void z80_wait();
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
@@ -286,6 +289,7 @@ private:
       0; ///< latch: (part << 8) | register of the last address write
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
+  std::uint64_t ym_stamp(bool write) const noexcept;
   void psg_write(std::uint8_t value, std::uint64_t now);
   std::uint64_t ym_busy_until_ = 0; ///< master cycle the YM busy flag drops
   std::uint8_t ym_status(std::uint64_t now);

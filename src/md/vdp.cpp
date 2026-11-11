@@ -340,8 +340,10 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
   const bool h40 = (regs_[12] & 0x81U) != 0;
   // In the blanking a CRAM or VSRAM word takes 3 % more than one slot
   // (measured on gpgx with dma_timing: 2175 against 2100 units for 2048).
+  // VRAM gets 204/166 slots per blanked line, as the fill DMA (fixed-delay
+  // probe over 4000 slots, TP-209.2).
   const std::uint32_t per_line =
-      (h40 ? 205U : 167U) * (colour_ram ? 1000U : 1031U) / 1031U;
+      colour_ram ? (h40 ? 205U : 167U) * 1000U / 1031U : (h40 ? 204U : 166U);
   const std::uint32_t active_per_line = h40 ? 18U : 16U;
   const std::uint32_t total_lines = lines_per_frame(standard_);
   const std::uint32_t active = active_lines();
@@ -465,7 +467,11 @@ bool Vdp::blank_at(std::uint64_t t) const noexcept {
 // next line.
 std::uint64_t Vdp::slot_service(std::uint64_t start,
                                 unsigned slots) const noexcept {
-  if (blank_at(start)) {
+  // The blanking rate starts 150/160 master cycles before the V counter
+  // ticks out of the last drawn line, as for the fill DMA (measured on gpgx
+  // with fixed-delay bursts that cross into the blanking, TP-209.2).
+  const std::uint64_t early = (regs_[12] & 0x81U) != 0 ? 150U : 160U;
+  if (blank_at(start) || blank_at(start + early)) {
     const bool h40 = (regs_[12] & 0x81U) != 0;
     return start + std::uint64_t{slots} * kCyclesPerLine / (h40 ? 205U : 167U);
   }
