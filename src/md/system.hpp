@@ -207,7 +207,7 @@ private:
   }
   /// Runs the Z80 up to `master` (it only advances while it owns its bus).
   void z80_sync(std::uint64_t master);
-  void z80_sync_now() { z80_sync(cpu_.getClock() * kDivider68k); }
+  void z80_sync_now() { z80_sync(cpu_master()); }
   bool z80_run_whole(std::uint64_t master);
   std::uint8_t z80_read(std::uint16_t address, unsigned &wait);
   void z80_write(std::uint16_t address, std::uint8_t value, unsigned &wait);
@@ -216,6 +216,21 @@ private:
   void z80_take_68k_bus() noexcept;
   std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
+  /// Master cycles the 68000 clock is ahead of its CPU-cycle count (0 to 6).
+  /// gpgx counts the 68000 in master cycles and a DMA holds it for a master
+  /// count that is not a whole number of CPU cycles: the remainder stays
+  /// (measured, black box: the cycle stamps after each 68000-to-VDP DMA move
+  /// off the 7-cycle grid by the DMA's own remainder, and the next frame
+  /// starts from there; scratchpad dac/dmarom.py, TP-209.2).
+  std::uint64_t psi_ = 0;
+  std::uint64_t cpu_master() const noexcept {
+    return static_cast<std::uint64_t>(cpu_.getClock()) * kDivider68k + psi_;
+  }
+  /// Runs the 68000 while its master clock is short of `master` by a whole
+  /// CPU cycle or more.
+  void run_cpu_until_master(std::uint64_t master) {
+    run_cpu_until(static_cast<moira::i64>((master - psi_) / kDivider68k));
+  }
   /// 68000 clock at the start of the instruction being executed: gpgx stamps
   /// the 68000 YM2612 accesses by instruction, not by bus cycle (TP-209.2).
   moira::i64 instr_start_ = 0;
@@ -241,6 +256,7 @@ private:
   std::array<PadPort, 2> pad_port_{};
   bool th2() const noexcept;
   std::uint32_t line_cycle() const noexcept;
+  std::uint32_t read_line_cycle() const noexcept;
   void update_irq() noexcept;
   void raise_sprite_flags() noexcept;
 
@@ -292,6 +308,34 @@ private:
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
   std::uint64_t bus_control_stamp() const noexcept;
+  /// CPU cycles the acknowledge of an interrupt of `level` adds at 68000
+  /// clock `clock`.
+  int interrupt_ack_cycles(std::uint8_t level, moira::i64 clock) const noexcept;
+  /// Interrupt mask at the start of the previous instruction and of the one
+  /// about to run (an interrupt taken now was unmasked by the previous one
+  /// when its level is not above `mask_before_`).
+  std::uint8_t mask_before_ = 7;
+  std::uint8_t mask_now_ = 7;
+  /// 68000 clock at the start of those two instructions.
+  moira::i64 start_before_ = 0;
+  moira::i64 start_now_ = 0;
+  /// Interrupt level the VDP drives and the 68000 clock it last rose at.
+  std::uint8_t irq_level_ = 0;
+  moira::i64 irq_raised_at_ = 0;
+  void note_irq_level() noexcept {
+    const auto level = vdp_.irq_level();
+    if (level > irq_level_)
+      irq_raised_at_ = cpu_.getClock();
+    irq_level_ = level;
+  }
+  void note_mask() noexcept {
+    mask_before_ = mask_now_;
+    mask_now_ = static_cast<std::uint8_t>((cpu_.getSR() >> 8) & 7U);
+    start_before_ = start_now_;
+    start_now_ = cpu_.getClock();
+  }
+  /// 68000 clock at which the last refresh stall ended (-1: none).
+  moira::i64 refresh_stall_end_ = -1;
   std::uint64_t z80_status_lag() const noexcept;
   std::uint64_t ym_stamp(bool write) const noexcept;
   void psg_write(std::uint8_t value, std::uint64_t now);

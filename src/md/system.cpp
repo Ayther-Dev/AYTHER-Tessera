@@ -102,8 +102,25 @@ std::uint64_t fnv1a(std::span<const std::uint8_t> bytes) noexcept {
   return hash;
 }
 constexpr std::uint32_t kStateMagic = 0x53444D54; // "TMDS"
-constexpr std::uint32_t kStateVersion = 2;
+constexpr std::uint32_t kStateVersion = 3;
 constexpr std::uint32_t kStateEnd = 0x444E4553; // "SEND"
+
+// Interrupt acknowledge (autovector): the 68000 waits for the E clock, one
+// period every 10 CPU cycles counted from the frame start. Measured on gpgx
+// as a black box (dac/ probe ROMs int_*, sw_mul, dm, TP-209.2): the wait is
+// kAckBase + (kAckPhase - q) mod 10 cycles, q = CPU cycle of the boundary.
+constexpr int kEClockPeriod = 10;
+constexpr int kAckBase = 5;
+constexpr int kAckPhase = 2;
+// When a refresh stall ends right at that boundary, q is taken this many CPU
+// cycles earlier (int_mulu probe).
+constexpr moira::i64 kAckRefreshBack = 2;
+// The vertical interrupt is taken at the first instruction boundary at or
+// after kVintLead master cycles before vint_cycle (int_nop, int_divl probes)
+// when the interrupt mask is below kVintLeadMask.
+constexpr moira::i64 kVdpReadLead = 10;
+constexpr std::uint64_t kVintLead = 63;
+constexpr unsigned kVintLeadMask = 4; // interrupt mask that cancels the lead
 } // namespace
 
 namespace {
@@ -128,10 +145,30 @@ System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
     return bus_.read16(address);
   });
-  cpu_.set_interrupt_hook([this](std::uint8_t level) {
+  cpu_.set_interrupt_hook([this](std::uint8_t level, moira::i64 clock) {
     vdp_.acknowledge(level);
     update_irq();
+    return interrupt_ack_cycles(level, clock);
   });
+}
+
+int System::interrupt_ack_cycles(std::uint8_t level,
+                                 moira::i64 clock) const noexcept {
+  // An interrupt that was already waiting when the previous instruction
+  // started, and that this instruction unmasked (MOVE to SR, RTE), is taken
+  // without the E clock wait (raster-bands 4, 5, 6 and 26, frame 2). One that
+  // rose during that instruction waits (Gunstar Heroes: the VINT rises during
+  // the RTE of its line 224 handler).
+  if (level <= mask_before_ && irq_raised_at_ < start_before_)
+    return 0;
+  // A refresh stall that ends right at the boundary does not move the phase
+  // the acknowledge sees: it is measured from before the stall.
+  const moira::i64 at =
+      clock == refresh_stall_end_ ? clock - kAckRefreshBack : clock;
+  const auto t =
+      static_cast<std::uint64_t>(at) * kDivider68k + psi_ - log_origin_;
+  const auto cpu = static_cast<int>((t / kDivider68k) % kEClockPeriod);
+  return kAckBase + (kAckPhase + kEClockPeriod - cpu) % kEClockPeriod;
 }
 
 std::uint8_t System::io_version() const noexcept {
@@ -183,6 +220,14 @@ void System::reset() {
   line_start_master_ = 0;
   cpu_.reset();
   refresh_due_ = 0;
+  psi_ = 0;
+  refresh_stall_end_ = -1;
+  mask_before_ = 7;
+  mask_now_ = 7;
+  start_before_ = 0;
+  start_now_ = 0;
+  irq_level_ = 0;
+  irq_raised_at_ = 0;
   // On a hard reset the 68000 starts at a fixed point of the frame, not at its
   // beginning: gpgx (genesis.c, gen_reset) measured on hardware that the first
   // HV counter read is $9F21 (NTSC) or $8421 (PAL), i.e. line 159 (132) and
@@ -228,7 +273,10 @@ void System::soft_reset() {
   update_irq();
 }
 
-void System::update_irq() noexcept { cpu_.setIPL(vdp_.irq_level()); }
+void System::update_irq() noexcept {
+  note_irq_level();
+  cpu_.setIPL(vdp_.irq_level());
+}
 
 void System::raise_sprite_flags() noexcept {
   const auto flags = renderer_.take_sprite_flags();
@@ -311,6 +359,7 @@ void System::run_cpu_until(moira::i64 target) {
     if (clock >= refresh_due_) {
       const auto due = refresh_due_;
       cpu_.stall(kRefreshCost);
+      refresh_stall_end_ = cpu_.getClock();
       refresh_due_ = clock + kRefreshPeriod;
       refreshed_at = clock == due ? clock : -1;
       continue;
@@ -324,6 +373,7 @@ void System::run_cpu_until(moira::i64 target) {
         instr_start_ = cpu_.getClock();
         read_start_ = start_of(instr_start_);
         after_movem = is_movem(cpu_.getIRD());
+        note_mask();
         cpu_.execute();
       }
       continue;
@@ -337,6 +387,7 @@ void System::run_cpu_until(moira::i64 target) {
     after_movem = is_movem(opcode);
     instr_start_ = clock;
     read_start_ = start_of(clock);
+    note_mask();
     cpu_.execute();
     if (kind == FreeBus::none)
       continue;
@@ -379,7 +430,11 @@ void System::run_frame() {
       vdp_.cancel_hint();
       vdp_.power_on_hint_counter();
     }
-    update_irq();
+    // A horizontal interrupt raised at the line start is taken at the next
+    // instruction boundary, like the vertical one (Gunstar Heroes HINT entry
+    // in lines 221-224 against gpgx, PSG markers).
+    note_irq_level();
+    cpu_.set_ipl_sampled(vdp_.irq_level());
     if (index == 0) {
       // GEOMETRY_PENDING counts the size changes of this frame, from its
       // first line on (measured, raster_bands 18: a change before line 0
@@ -396,12 +451,24 @@ void System::run_frame() {
     if (index == 0 && frame_ != 0) {
       // The vertical interrupt comes vint_cycle cycles after the frame start
       // (gpgx), so a horizontal interrupt of that same line is served first.
+      // Taken at the first boundary kVintLead master cycles early, unless a
+      // handler of level 4 or more runs then: there it waits for vint_cycle
+      // itself (Sonic 1 DAC identities vs raster-bands 1, 9 and 10).
+      const auto vint = line_start_master_ + vdp_.vint_cycle() - psi_;
       run_cpu_until(static_cast<moira::i64>(
-          (line_start_master_ + vdp_.vint_cycle()) / kDivider68k));
+          (vint - kVintLead + kDivider68k - 1) / kDivider68k));
+      if (((cpu_.getSR() >> 8) & 7U) >= kVintLeadMask)
+        run_cpu_until(
+            static_cast<moira::i64>((vint + kDivider68k - 1) / kDivider68k));
       // The VDP holds the Z80 INT line for one scanline from the vertical
       // interrupt, whether or not the 68000 enables it (gpgx z80_int probe).
       vdp_.raise_vint();
-      update_irq();
+      // Taken at the next instruction boundary (gpgx), not one instruction
+      // later through Moira's sampled IPL: Sonic 1 and Gunstar Heroes entered
+      // their handler up to one instruction late, which moved the DAC stream
+      // of the Z80 across frame boundaries (TP-209.2).
+      note_irq_level();
+      cpu_.set_ipl_sampled(vdp_.irq_level());
     }
     // The line is drawn kRenderCycle master cycles after its start, not at its
     // end: a CRAM or register write before that point shows on this line, one
@@ -411,13 +478,13 @@ void System::run_frame() {
     line_drawn_ = false;
     display_on_cycle_.reset();
     const std::uint64_t draw_master = line_start_master_ + kRenderCycle;
-    run_cpu_until(static_cast<moira::i64>(draw_master / kDivider68k));
+    run_cpu_until_master(draw_master);
     z80_sync(draw_master);
     renderer_.render_line(vdp_, line);
     raise_sprite_flags();
     line_drawn_ = true;
     const std::uint64_t end_master = line_start_master_ + kCyclesPerLine;
-    run_cpu_until(static_cast<moira::i64>(end_master / kDivider68k));
+    run_cpu_until_master(end_master);
     if (index + 1 == lines) {
       // The Z80 INT of the next vertical interrupt starts kZ80IntLead master
       // cycles before the 68000 sees it (gpgx z80_int probe) and lasts one
@@ -524,7 +591,7 @@ std::uint8_t System::io_read(std::uint32_t offset) noexcept {
     const std::uint8_t ctrl = io_ctrl_[port];
     const std::uint16_t pressed = pads_[port];
     const bool six = config_.pads[port] == PadType::six_button;
-    pad_settle(port, cpu_.getClock() * kDivider68k);
+    pad_settle(port, cpu_master());
     const bool th = pad_port_[port].th;
     const unsigned phase = six ? pad_port_[port].phase : 0;
     std::uint8_t in;
@@ -573,9 +640,23 @@ bool System::th2() const noexcept {
 }
 
 std::uint32_t System::line_cycle() const noexcept {
-  const std::uint64_t master = cpu_.getClock() * kDivider68k;
+  const std::uint64_t master = cpu_master();
   return master > line_start_master_
              ? static_cast<std::uint32_t>(master - line_start_master_)
+             : 0U;
+}
+
+// line_cycle for a VDP status or HV read: stamped kVdpReadLead cycles from
+// the start of the instruction, whatever its form, and a refresh due exactly
+// at that boundary does not move it, as for the YM2612 reads (read_start_;
+// dense V counter polls with move.b abs.l and cmp.b #imm,abs.l against gpgx,
+// 2026-11-12).
+std::uint32_t System::read_line_cycle() const noexcept {
+  const std::uint64_t at =
+      static_cast<std::uint64_t>(read_start_ + kVdpReadLead) * kDivider68k +
+      psi_;
+  return at > line_start_master_
+             ? static_cast<std::uint32_t>(at - line_start_master_)
              : 0U;
 }
 
@@ -619,7 +700,7 @@ void System::pad_notify(unsigned port, bool control_write,
 
 void System::io_write(std::uint32_t offset, std::uint8_t value) noexcept {
   const bool th_before = th2();
-  const std::uint64_t now = cpu_.getClock() * kDivider68k;
+  const std::uint64_t now = cpu_master();
   switch (offset) {
   case 0x03:
   case 0x05:
@@ -684,7 +765,7 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
     return word ? 0xFFFFU : 0xFFU;
   }
   case Target::vdp: {
-    vdp_.set_time(cpu_.getClock() * kDivider68k);
+    vdp_.set_time(cpu_master());
     if (offset < 4) {
       const std::uint16_t v = vdp_.read_data();
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
@@ -694,11 +775,12 @@ std::uint16_t System::read(Target target, std::uint32_t offset, bool word) {
       // prefetched, as for $A11100 (measured on gpgx, TP-110.4: the bits
       // follow the instruction after the read).
       const std::uint16_t v = static_cast<std::uint16_t>(
-          (vdp_.read_status() & 0x03FFU) | (cpu_.getIRC() & 0xFC00U));
+          (vdp_.read_status(read_line_cycle()) & 0x03FFU) |
+          (cpu_.getIRC() & 0xFC00U));
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     if (offset < 0x10) {
-      const std::uint16_t v = vdp_.read_hv(line_cycle());
+      const std::uint16_t v = vdp_.read_hv(read_line_cycle());
       return word ? v : static_cast<std::uint8_t>((offset & 1U) ? v : v >> 8);
     }
     return word ? 0xFFFFU : 0xFFU;
@@ -762,7 +844,7 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
   case Target::vdp: {
     const std::uint16_t v =
         word ? value : dup(static_cast<std::uint8_t>(value));
-    vdp_.set_time(cpu_.getClock() * kDivider68k);
+    vdp_.set_time(cpu_master());
     if (offset >= 0x10 && offset < 0x18) {
       // The PSG sits on the odd (low) byte lane of $C00010-$C00017. gpgx
       // takes the write 9 cycles after the start of its instruction, one
@@ -772,7 +854,8 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
       // the access 1 cycle earlier rule).
       if (word || (offset & 1U) != 0)
         psg_write(static_cast<std::uint8_t>(value),
-                  static_cast<std::uint64_t>(instr_start_ + 9) * kDivider68k);
+                  static_cast<std::uint64_t>(instr_start_ + 9) * kDivider68k +
+                      psi_);
       break;
     }
     if (offset < 4)
@@ -785,8 +868,12 @@ void System::write(Target target, std::uint32_t offset, std::uint16_t value,
           !display_on_cycle_)
         display_on_cycle_ = line_cycle();
     }
-    if (const auto stall = vdp_.take_cpu_stall(); stall != 0)
-      cpu_.stall(static_cast<int>(stall / kDivider68k)); // DMA owns the bus
+    if (const auto stall = vdp_.take_cpu_stall(); stall != 0) {
+      // The DMA owns the bus; the 68000 keeps the part of a cycle (psi_).
+      const std::uint64_t total = psi_ + stall;
+      cpu_.stall(static_cast<int>(total / kDivider68k));
+      psi_ = total % kDivider68k;
+    }
     break;
   }
   case Target::tmss:
@@ -886,13 +973,14 @@ void System::log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
 // only from the start of the instruction (TP-209.2, scratchpad bus/grant.py
 // REQF/RELF).
 std::uint64_t System::bus_control_stamp() const noexcept {
-  return static_cast<std::uint64_t>(instr_start_ + 6) * kDivider68k;
+  return static_cast<std::uint64_t>(instr_start_ + 6) * kDivider68k + psi_;
 }
 
 std::uint64_t System::ym_stamp(bool write) const noexcept {
   return static_cast<std::uint64_t>(write ? instr_start_ + 10
                                           : read_start_ + 2) *
-         kDivider68k;
+             kDivider68k +
+         psi_;
 }
 
 void System::psg_write(std::uint8_t value, std::uint64_t now) {
@@ -946,9 +1034,10 @@ std::uint64_t System::z80_status_lag() const noexcept {
 // 68000 cycles, so each access takes the 68000 cycles whose boundaries fall in
 // [z80_master_, z80_master_ + kZ80BusSteal): 72/7 on average and no state.
 void System::z80_take_68k_bus() noexcept {
-  const std::uint64_t from = (z80_master_ + kDivider68k - 1) / kDivider68k;
+  const std::uint64_t from =
+      (z80_master_ - psi_ + kDivider68k - 1) / kDivider68k;
   const std::uint64_t to =
-      (z80_master_ + kZ80BusSteal + kDivider68k - 1) / kDivider68k;
+      (z80_master_ - psi_ + kZ80BusSteal + kDivider68k - 1) / kDivider68k;
   cpu_.stall(static_cast<int>(to - from));
 }
 
@@ -1024,6 +1113,14 @@ std::vector<std::uint8_t> System::save_state() const {
   w.u32(frame_start_line_);
   w.u64(line_start_master_);
   w.i64(refresh_due_);
+  w.u64(psi_);
+  w.i64(refresh_stall_end_);
+  w.u8(mask_before_);
+  w.u8(mask_now_);
+  w.i64(start_before_);
+  w.i64(start_now_);
+  w.u8(irq_level_);
+  w.i64(irq_raised_at_);
   w.boolean(z80_bus_requested_);
   w.boolean(z80_reset_released_);
   w.u64(z80_master_);
@@ -1089,6 +1186,18 @@ bool System::read_state(std::span<const std::uint8_t> state) {
   frame_start_line_ = r.u32();
   line_start_master_ = r.u64();
   refresh_due_ = r.i64();
+  psi_ = r.u64();
+  if (psi_ >= kDivider68k)
+    r.fail();
+  refresh_stall_end_ = r.i64();
+  mask_before_ = r.u8();
+  mask_now_ = r.u8();
+  start_before_ = r.i64();
+  start_now_ = r.i64();
+  irq_level_ = r.u8();
+  irq_raised_at_ = r.i64();
+  if (mask_before_ > 7 || mask_now_ > 7 || irq_level_ > 7)
+    r.fail();
   z80_bus_requested_ = r.boolean();
   z80_reset_released_ = r.boolean();
   z80_master_ = r.u64();

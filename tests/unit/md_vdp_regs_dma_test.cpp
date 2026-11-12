@@ -140,13 +140,13 @@ TEST_CASE("vblank flag and PAL bit in the status") {
 TEST_CASE("V counter follows the line, H counter the position in it") {
   Vdp v(Standard::ntsc);
   v.begin_line(100);
-  CHECK((v.read_hv(0) >> 8) == 100);
+  CHECK((v.read_hv(1000) >> 8) == 100);
   v.begin_line(234);
-  CHECK((v.read_hv(0) >> 8) == 0xEA);
+  CHECK((v.read_hv(1000) >> 8) == 0xEA);
   v.begin_line(235); // NTSC counter jumps back
-  CHECK((v.read_hv(0) >> 8) == 0xE5);
+  CHECK((v.read_hv(1000) >> 8) == 0xE5);
   v.begin_line(261);
-  CHECK((v.read_hv(0) >> 8) == 0xFF);
+  CHECK((v.read_hv(1000) >> 8) == 0xFF);
   // the line starts at H = $85 (gpgx hvc.h) and passes H = 0 on cycle 760
   CHECK((v.read_hv(0) & 0xFF) == 0x85);
   CHECK((v.read_hv(760) & 0xFF) == 0x00);
@@ -460,8 +460,9 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   dma_regs(v, 16, 0x400, 0x00);
   dma_command(v, 0x0000, 1);
   // A VRAM word takes two external slots (measured on gpgx, TP-104.4), 166
-  // per blanked H32 line (TP-209.2).
-  CHECK(v.take_cpu_stall() == (2ULL * 16 * 3420 + 165) / 166);
+  // per blanked H32 line (TP-209.2), and the end rounds down: the 68000
+  // keeps the rest of the cycle (Gunstar Heroes sub-cycle phase, TP-209.2).
+  CHECK(v.take_cpu_stall() == 2ULL * 16 * 3420 / 166);
   CHECK(v.take_cpu_stall() == 0);
 }
 
@@ -513,7 +514,7 @@ TEST_CASE("the V counter jump depends on the standard and on V28/V30") {
     Vdp v(s);
     reg(v, 1, 0x04 | (v30 ? 0x08 : 0x00));
     v.begin_line(line);
-    return static_cast<unsigned>(v.read_hv(0) >> 8);
+    return static_cast<unsigned>(v.read_hv(1000) >> 8);
   };
   CHECK(v_of(Standard::ntsc, 0, 0xEA) == 0xEA);
   CHECK(v_of(Standard::ntsc, 0, 0xEB) == 0xE5);

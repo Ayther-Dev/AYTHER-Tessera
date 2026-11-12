@@ -6,7 +6,7 @@ M68k::M68k(Bus &bus) : bus_(bus) { setModel(moira::Model::M68000); }
 
 void M68k::willInterrupt(moira::u8 level) {
   if (interrupt_hook_)
-    interrupt_hook_(level);
+    sync(interrupt_hook_(level, clock));
 }
 
 moira::u8 M68k::read8(moira::u32 addr) const { return bus_.read8(addr); }

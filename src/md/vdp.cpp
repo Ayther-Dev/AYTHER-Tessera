@@ -363,16 +363,19 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
     const std::uint64_t line_end = static_cast<std::uint64_t>(
         static_cast<std::int64_t>(line_start_) + (k + 1) * kCyclesPerLine);
     if (!enabled || (wrapped >= active && wrapped + 1 != total_lines)) {
-      // blanking: evenly spread slots
-      const std::uint64_t avail = (line_end - t) * per_line / kCyclesPerLine;
-      if (slots <= avail || avail == 0 || true) {
-        const std::uint64_t need =
-            (slots * kCyclesPerLine + per_line - 1) / per_line;
-        if (t + need <= line_end)
-          return t + need;
-      }
-      slots -= avail;
-      t = line_end;
+      // blanking: evenly spread slots, the whole blanking at one rate; the
+      // end rounds down, display on or off (dm/dmb probes; with the display
+      // off, Gunstar Heroes' 68000 sub-cycle phase stays on gpgx's)
+      const std::uint64_t need = (slots * kCyclesPerLine) / per_line;
+      if (!enabled)
+        return t + need;
+      const std::uint64_t blank_end =
+          line_end + (total_lines - 2U - static_cast<std::uint64_t>(wrapped)) *
+                         kCyclesPerLine;
+      if (t + need <= blank_end)
+        return t + need;
+      slots -= (blank_end - t) * per_line / kCyclesPerLine;
+      t = blank_end;
       continue;
     }
     // The last line of the frame takes the display rate too; the display
@@ -703,7 +706,15 @@ void Vdp::finish_dma(std::uint32_t length, bool advance_source) noexcept {
   }
 }
 
-std::uint16_t Vdp::read_status() {
+// HBlank flag window in master cycles from the line start (measured on gpgx
+// with dense status reads, 2026-11-12).
+constexpr std::uint32_t kVCounterStep = 6;
+constexpr std::uint32_t kHBlankOnH40 = 122;
+constexpr std::uint32_t kHBlankOffH40 = 766;
+constexpr std::uint32_t kHBlankOnH32 = 174;
+constexpr std::uint32_t kHBlankOffH32 = 754;
+
+std::uint16_t Vdp::read_status(std::uint32_t line_cycle) {
   pending_second_ = false;
   std::uint16_t status = 0x3400U; // fixed bits
   fifo_retire();
@@ -715,6 +726,13 @@ std::uint16_t Vdp::read_status() {
     status |= 0x0001U;
   if (display_blank())
     status |= 0x0008U; // blanking: vertical blank or display disabled
+  if (line_cycle != kNoLineCycle) {
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    const std::uint32_t on = h40 ? kHBlankOnH40 : kHBlankOnH32;
+    const std::uint32_t off = h40 ? kHBlankOffH40 : kHBlankOffH32;
+    if (line_cycle >= on && line_cycle < off)
+      status |= 0x0004U; // horizontal blank
+  }
   if (now_ < busy_until_)
     status |= 0x0002U; // DMA fill or copy in progress
   if (vint_flag_)
@@ -770,7 +788,16 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
   // $E5, PAL V28 from $102 to $CA, PAL V30 from $10A to $D2; NTSC V30 does not
   // jump. Verified against gpgx for NTSC and PAL (TP-106.1): the counter reads
   // $CA (V28) or $D2 (V30) right after $102 / $10A.
+  // A read of an instruction that ends past the line end belongs to the next
+  // line, and the V counter steps kVCounterStep master cycles after the line
+  // start (dense HV reads against gpgx, 2026-11-12: it changed about 64
+  // master cycles late on average before).
+  const std::uint32_t total = lines_per_frame(standard_);
   std::uint32_t v = line_;
+  if (line_cycle >= kCyclesPerLine + kVCounterStep)
+    v = (v + 1U) % total;
+  else if (line_cycle < kVCounterStep)
+    v = (v + total - 1U) % total;
   const bool v30 = (regs_[1] & 0x08U) != 0;
   if (standard_ == Standard::ntsc) {
     if (!v30 && v > 0xEA)

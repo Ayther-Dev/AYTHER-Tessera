@@ -22,7 +22,9 @@ public:
   void write_control(std::uint16_t value);
   void write_data(std::uint16_t value);
   std::uint16_t read_data();
-  std::uint16_t read_status();
+  // line_cycle: master cycles since the line start, for the HBlank flag.
+  std::uint16_t read_status(std::uint32_t line_cycle = kNoLineCycle);
+  static constexpr std::uint32_t kNoLineCycle = 0xFFFFFFFFU;
   /// HV counter word; `line_cycle` is the master cycle inside the current line.
   std::uint16_t read_hv(std::uint32_t line_cycle) const noexcept;
   /// Freezes the HV counter at `line_cycle` of the current line. Ignored
