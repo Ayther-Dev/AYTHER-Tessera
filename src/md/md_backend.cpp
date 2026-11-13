@@ -175,7 +175,8 @@ public:
     if (old == nullptr)
       return;
     subscriptions_ = old->subscriptions_;
-    stats_ = old->stats_; // the caches start empty
+    audio_mute_ = old->audio_mute_; // outside the state: a restore keeps it
+    stats_ = old->stats_;           // the caches start empty
     // The frame delta history and its generation are not machine state
     // either: gpgx keeps counting frames through retro_unserialize.
     delta_ring_ = old->delta_ring_;
@@ -219,6 +220,17 @@ public:
         return TESSERA_INVALID_ARGUMENT;
       if (!out.empty())
         out[0] = id == kLayerMaskRegion ? layer_mask_ : layer_dim_;
+      work_ += out.size();
+      return TESSERA_OK;
+    }
+    if (id == kAudioMuteRegion) {
+      // Read back as written, like the layer controls.
+      if (offset > sizeof(audio_mute_) ||
+          out.size() > sizeof(audio_mute_) - offset)
+        return TESSERA_INVALID_ARGUMENT;
+      std::memcpy(out.data(),
+                  reinterpret_cast<const std::uint8_t *>(&audio_mute_) + offset,
+                  out.size());
       work_ += out.size();
       return TESSERA_OK;
     }
@@ -327,8 +339,21 @@ public:
       return poke_memory_region(*system_, id, offset, data)
                  ? TESSERA_OK
                  : TESSERA_INVALID_ARGUMENT;
+    if (id == kAudioMuteRegion) {
+      // gpgx: a u32 at offset 0 with bits 0-17 (FM 0-5, PSG 6-9, PCM 10-17);
+      // another size or a higher bit is -1, another offset -4 (measured).
+      std::uint32_t mask = 0;
+      if (offset != 0 || data.size() != sizeof(mask))
+        return TESSERA_INVALID_ARGUMENT;
+      std::memcpy(&mask, data.data(), sizeof(mask));
+      if ((mask & ~System::kAudioMuteBits) != 0)
+        return TESSERA_INVALID_ARGUMENT;
+      audio_mute_ = mask;
+      apply_controls();
+      return TESSERA_OK;
+    }
     if (id != kLayerMaskRegion && id != kLayerDimRegion)
-      return TESSERA_UNSUPPORTED_CAPABILITY; // AUDIO_MUTE arrives with TP-209
+      return TESSERA_UNSUPPORTED_CAPABILITY;
     if (offset != 0 || data.size() != 1 || !valid_control(id, data[0]) ||
         data[0] == 0xFF)
       return TESSERA_INVALID_ARGUMENT;
@@ -369,6 +394,8 @@ private:
   static constexpr std::uint32_t kLayerMaskRegion =
       TESSERA_OBS_REGION_LAYER_MASK;
   static constexpr std::uint32_t kLayerDimRegion = TESSERA_OBS_REGION_LAYER_DIM;
+  static constexpr std::uint32_t kAudioMuteRegion =
+      TESSERA_OBS_REGION_AUDIO_MUTE;
   /// gpgx refuses a mask beyond the four layers and a dim other than 0 or 1;
   /// 0xFF, the mask before any write, is valid only as restored state.
   static bool valid_control(std::uint32_t id, std::uint8_t value) noexcept {
@@ -381,6 +408,9 @@ private:
         on ? static_cast<std::uint8_t>(layer_mask_ & Renderer::kLayerAll)
            : Renderer::kLayerAll,
         on && layer_dim_ != 0);
+    // AUDIO_MUTE too acts only while RENDER_CONTROLS is (measured on gpgx).
+    // It is an output control, not machine state (savestate-v1.md).
+    system_->set_audio_mute(on ? audio_mute_ : 0U);
   }
   /// gpgx's recomposition cache: one entry per kind, keyed on the frame, the
   /// flags and the controls (TP-205.3). Only accepted calls count.
@@ -545,6 +575,7 @@ private:
   observation::Subscriptions subscriptions_;
   std::uint8_t layer_mask_ = 0xFF; ///< LAYER_MASK as written (gpgx: 0xFF)
   std::uint8_t layer_dim_ = 0;     ///< LAYER_DIM as written
+  std::uint32_t audio_mute_ = 0;   ///< AUDIO_MUTE as written (not in the state)
   std::uint64_t work_ = 0; ///< bytes the observation delivered (TP-201.3)
   RecomposeStats stats_{};
   RecomposeCache single_cache_, multilayer_cache_;

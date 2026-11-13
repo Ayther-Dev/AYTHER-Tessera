@@ -20,6 +20,7 @@
 #include "support/md_testrom.hpp"
 #include <tessera/tessera.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -183,7 +184,7 @@ bool served(unsigned region) {
          region == 24 || region == 25 || region == 26 || region == 16 ||
          region == 19 || region == 20 || region == 21 || region == 22 ||
          region == 5 || region == 10 || region == 23 || region == 11 ||
-         region == 12;
+         region == 12 || region == 15;
 }
 } // namespace
 
@@ -425,6 +426,82 @@ TEST_CASE("recompose_frame draws the last frame again (TP-205.1)") {
   CHECK(s.checkpoint() == before);
 }
 
+TEST_CASE("AUDIO_MUTE through write_control (TP-302.3)") {
+  Observed s(rom_audio());
+  Observed plain(rom_audio()); // the same frames with nothing muted
+  const auto write = [&](Bytes data, std::uint32_t offset = 0) {
+    std::uint64_t g = 0;
+    return tessera_observation_write_control_v1(
+        s.handle, TESSERA_OBS_REGION_AUDIO_MUTE, offset, data.data(),
+        static_cast<std::uint32_t>(data.size()), UINT64_MAX, &g, &s.context);
+  };
+  const auto mute = [&] {
+    Bytes out;
+    REQUIRE(s.read(TESSERA_OBS_REGION_AUDIO_MUTE, &out) == TESSERA_OK);
+    REQUIRE(out.size() == 4);
+    return static_cast<std::uint32_t>(out[0] | out[1] << 8 | out[2] << 16 |
+                                      out[3] << 24);
+  };
+  const auto pcm = [](Native &n) {
+    auto frame = initial<tessera_original_frame_v1>();
+    REQUIRE(tessera_original_frame_query_v1(n.handle, &frame, &n.context) ==
+            TESSERA_OK);
+    return Bytes(frame.pcm.data, frame.pcm.data + frame.pcm.bytes);
+  };
+  // The first two stereo samples of a frame are the mix tail of the interval
+  // before it (md_audio_mute_test): after a change they are the old mix.
+  constexpr std::size_t kTail = 2 * 2 * sizeof(std::int16_t);
+  // Silent: the chips' rest level on each side, flat (md_audio_mute_test).
+  const auto silent = [](const Bytes &bytes) {
+    std::vector<std::int16_t> v(bytes.size() / 2);
+    std::memcpy(v.data(), bytes.data(), v.size() * 2);
+    for (std::size_t i = 6; i < v.size(); ++i)
+      if (v[i] != v[4 + i % 2])
+        return false;
+    return v.size() > 16;
+  };
+  const auto same_after_tail = [](const Bytes &a, const Bytes &b) {
+    return a.size() == b.size() && a.size() > kTail &&
+           std::equal(a.begin() + kTail, a.end(), b.begin() + kTail);
+  };
+  s.step(10);
+  plain.step(10);
+  CHECK(mute() == 0);
+  // Measured on gpgx: a u32 at offset 0 with bits 0-17. Another size or a
+  // higher bit is -1, another offset -4: INVALID_ARGUMENT, nothing kept.
+  CHECK(write({0x00, 0x00, 0x04, 0x00}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(write({0xFF, 0xFF, 0x03}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(write({0x00, 0x00, 0x00, 0x00, 0x00}) == TESSERA_INVALID_ARGUMENT);
+  CHECK(write({0x01, 0x00, 0x00, 0x00}, 1) == TESSERA_INVALID_ARGUMENT);
+  CHECK(mute() == 0);
+  REQUIRE(write({0xFF, 0xFF, 0x03, 0x00}) == TESSERA_OK);
+  CHECK(mute() == 0x3FFFFU);
+  // Without RENDER_CONTROLS the mask is kept but does nothing (gpgx).
+  s.step(5);
+  plain.step(5);
+  REQUIRE_FALSE(silent(pcm(plain)));
+  CHECK(pcm(s) == pcm(plain));
+  // With it, from the next frame on, every channel is silent.
+  REQUIRE(s.set(TESSERA_OBS_SUB_RENDER_CONTROLS) == TESSERA_OK);
+  s.step(2);
+  plain.step(2);
+  REQUIRE_FALSE(silent(pcm(plain)));
+  CHECK(silent(pcm(s)));
+  // The mix only: the machine goes on as without the mask.
+  CHECK(s.checkpoint() == plain.checkpoint());
+  // A restore keeps it: AUDIO_MUTE is not machine state (savestate-v1.md).
+  REQUIRE(s.restore(s.checkpoint()) == TESSERA_OK);
+  CHECK(mute() == 0x3FFFFU);
+  s.step();
+  plain.step();
+  CHECK(silent(pcm(s)));
+  // Cleared, the audio is the unmuted one again.
+  REQUIRE(write({0x00, 0x00, 0x00, 0x00}) == TESSERA_OK);
+  s.step();
+  plain.step();
+  CHECK(same_after_tail(pcm(s), pcm(plain)));
+}
+
 TEST_CASE("LAYER_MASK and LAYER_DIM through write_control (TP-205.2)") {
   Observed s(rom_idle());
   Observed plain(rom_idle()); // the same frames with no control written
@@ -460,8 +537,6 @@ TEST_CASE("LAYER_MASK and LAYER_DIM through write_control (TP-205.2)") {
   CHECK(write(TESSERA_OBS_REGION_LAYER_DIM, {2}) == TESSERA_INVALID_ARGUMENT);
   CHECK(write(TESSERA_OBS_REGION_LAYER_DIM, {1, 0}) ==
         TESSERA_INVALID_ARGUMENT);
-  CHECK(write(TESSERA_OBS_REGION_AUDIO_MUTE, {1}) ==
-        TESSERA_UNSUPPORTED_CAPABILITY); // TP-209
   REQUIRE(write(TESSERA_OBS_REGION_LAYER_DIM, {1}, &after) == TESSERA_OK);
   CHECK(after == before + 1);
   CHECK(value(TESSERA_OBS_REGION_LAYER_DIM) == 1);
