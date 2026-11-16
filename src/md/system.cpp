@@ -142,6 +142,17 @@ System::System(std::vector<std::uint8_t> rom, const MachineConfig &config)
       sram_(read_sram_header(rom)),
       bus_(std::move(rom), *this, config.mapper, &sram_), cpu_(bus_),
       vdp_(config.standard), tmss_(config.tmss), mixer_(config.standard) {
+  const auto sc = detect_special_cart(bus_.rom());
+  eeprom_ = Eeprom(sc.eeprom);
+  jcart_.set_present(sc.jcart);
+  if (sc.flash.present)
+    flash_.init(sc.flash, bus_.rom());
+  if (eeprom_.present())
+    bus_.attach_eeprom(&eeprom_);
+  if (jcart_.present())
+    bus_.attach_jcart(&jcart_);
+  if (flash_.present())
+    bus_.attach_flash(&flash_);
   vdp_.set_dma_reader([this](std::uint32_t address) -> std::uint16_t {
     return bus_.read16(address);
   });
@@ -1150,6 +1161,12 @@ std::vector<std::uint8_t> System::save_state() const {
   ym_.save(w);
   psg_.save(w);
   mixer_.save(w);
+  if (eeprom_.present())
+    eeprom_.save(w);
+  if (jcart_.present())
+    jcart_.save(w);
+  if (flash_.present())
+    flash_.save(w);
   w.u32(kStateEnd);
   return out;
 }
@@ -1230,6 +1247,12 @@ bool System::read_state(std::span<const std::uint8_t> state) {
   ym_.load(r);
   psg_.load(r);
   mixer_.load(r);
+  if (eeprom_.present())
+    eeprom_.load(r);
+  if (jcart_.present())
+    jcart_.load(r);
+  if (flash_.present())
+    flash_.load(r);
   if (r.u32() != kStateEnd || !r.finished())
     return false;
   // Per frame outputs are rebuilt by the next frame.

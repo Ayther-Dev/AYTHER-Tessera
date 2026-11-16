@@ -9,6 +9,7 @@
 #include "md/m68k.hpp"
 #include "md/mixer.hpp"
 #include "md/machine.hpp"
+#include "md/special_cart.hpp"
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
 #include "md/vdp_render.hpp"
@@ -131,6 +132,11 @@ public:
   const Z80 &z80() const noexcept { return z80_; }
   const Ym2612 &ym() const noexcept { return ym_; }
   const Psg &psg() const noexcept { return psg_; }
+  const Eeprom &eeprom() const noexcept { return eeprom_; }
+  Eeprom &eeprom() noexcept { return eeprom_; }
+  const JCart &jcart() const noexcept { return jcart_; }
+  JCart &jcart() noexcept { return jcart_; }
+  const FlashCart &flash() const noexcept { return flash_; }
   /// Audio of the last frame run: interleaved S16 stereo at 48 kHz (TP-107.4).
   std::span<const std::int16_t> audio() const noexcept {
     return mixer_.output();
@@ -361,6 +367,9 @@ private:
   std::array<std::uint8_t, 3> io_data_{0x00, 0x00, 0x00};
   std::array<std::uint8_t, 3> io_ctrl_{0x00, 0x00, 0x00};
   std::array<std::uint16_t, 2> pads_{0x00, 0x00};
+  Eeprom eeprom_;
+  JCart jcart_;
+  FlashCart flash_;
 };
 
 } // namespace tessera::md

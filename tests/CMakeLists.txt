@@ -66,6 +66,13 @@ tessera_copy_diagnostic_runtime(tessera_md_cart_test)
 add_test(NAME unit.md_cart COMMAND tessera_md_cart_test)
 set_tests_properties(unit.md_cart PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 
+add_executable(tessera_md_special_cart_test unit/md_special_cart_test.cpp)
+target_include_directories(tessera_md_special_cart_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(tessera_md_special_cart_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_special_cart_test)
+add_test(NAME unit.md_special_cart COMMAND tessera_md_special_cart_test)
+set_tests_properties(unit.md_special_cart PROPERTIES LABELS "unit;phase5;md" TIMEOUT 30)
+
 add_executable(tessera_md_bus_test unit/md_bus_test.cpp)
 target_include_directories(tessera_md_bus_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(tessera_md_bus_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
