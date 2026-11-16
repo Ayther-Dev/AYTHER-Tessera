@@ -237,7 +237,7 @@ tessera_session_create_v1(const tessera_session_create_info_v1 *in,
     c.input(in->config);
     c.input(in->initial_persistent_memory);
     c.start();
-    require(in->flags == 0 && in->system_override <= 1);
+    require(in->flags == 0 && in->system_override <= TESSERA_SYSTEM_SG1000);
     const auto requested =
         in->backend_id.bytes
             ? std::string(reinterpret_cast<const char *>(in->backend_id.data),

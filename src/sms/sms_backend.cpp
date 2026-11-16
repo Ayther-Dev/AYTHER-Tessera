@@ -18,13 +18,6 @@ namespace {
 constexpr std::uint64_t kCapabilities = 0x20F;
 constexpr std::uint64_t kMaxFrames = 1ULL << 40;
 
-std::uint16_t argb_to_rgb565(std::uint32_t c) noexcept {
-  const std::uint16_t r = static_cast<std::uint16_t>((c >> 19) & 0x1FU);
-  const std::uint16_t g = static_cast<std::uint16_t>((c >> 10) & 0x3FU);
-  const std::uint16_t b = static_cast<std::uint16_t>((c >> 3) & 0x1FU);
-  return static_cast<std::uint16_t>((r << 11) | (g << 5) | b);
-}
-
 std::uint16_t sms_pad_mask(const InputState &input, unsigned port) noexcept {
   const auto *c = input.data() + std::size_t{port} * kPadControls;
   std::uint16_t mask = 0;
@@ -51,10 +44,8 @@ public:
       : id_(id) {
     require(!content.empty() && content.size() <= 4U * 1024U * 1024U,
             TESSERA_INVALID_CONTENT, TESSERA_PHASE_CREATE);
-    require(memory.size() == 65536 &&
-                std::all_of(memory.begin(), memory.end(),
-                            [](std::uint8_t byte) { return byte == 0; }),
-            TESSERA_UNSUPPORTED_CAPABILITY, TESSERA_PHASE_CREATE);
+    require(memory.size() <= 65536, TESSERA_UNSUPPORTED_CAPABILITY,
+            TESSERA_PHASE_CREATE);
 
     if (id == "gamegear") {
       model_ = ConsoleModel::game_gear;
@@ -199,17 +190,56 @@ public:
       return TESSERA_OK;
     }
     std::span<const std::uint8_t> src;
-    if (id == TESSERA_OBS_REGION_VRAM)
+    std::size_t abi_size = 0;
+    std::array<std::uint8_t, 44> sys_buf{};
+    if (id == TESSERA_OBS_REGION_VRAM) {
       src = system_->vdp().vram();
-    else if (id == TESSERA_OBS_REGION_CRAM)
+      abi_size = 65536;
+    } else if (id == TESSERA_OBS_REGION_CRAM) {
       src = system_->vdp().cram();
-    else if (id == TESSERA_OBS_REGION_WORK_RAM)
+      abi_size = 128;
+    } else if (id == TESSERA_OBS_REGION_VDP_REGS) {
+      src = system_->vdp().regs();
+      abi_size = 32;
+    } else if (id == TESSERA_OBS_REGION_WORK_RAM) {
       src = system_->ram();
-    else
+      abi_size = 65536;
+    } else if (id == TESSERA_OBS_REGION_SYSTEM) {
+      auto w16 = [&](std::size_t at, std::uint16_t v) {
+        sys_buf[at] = static_cast<std::uint8_t>(v);
+        sys_buf[at + 1] = static_cast<std::uint8_t>(v >> 8);
+      };
+      auto w32 = [&](std::size_t at, std::uint32_t v) {
+        w16(at, static_cast<std::uint16_t>(v));
+        w16(at + 2, static_cast<std::uint16_t>(v >> 16));
+      };
+      w32(0, 44);
+      w32(4, 1);
+      sys_buf[8] = model_ == ConsoleModel::game_gear ? 0x40
+                   : model_ == ConsoleModel::sg1000  ? 0x10
+                                                     : 0x20;
+      sys_buf[9] = 0;
+      sys_buf[10] = model_ == ConsoleModel::sg1000 ? 0 : 4;
+      w16(14, 262);
+      w16(20, static_cast<std::uint16_t>(width_));
+      w16(22, static_cast<std::uint16_t>(height_));
+      w32(24, 3579545U);
+      w32(28, 53693175U);
+      sys_buf[33] = 1;
+      w32(36, system_->rom_crc32());
+      src = sys_buf;
+      abi_size = sys_buf.size();
+    } else {
       return TESSERA_UNSUPPORTED_CAPABILITY;
-    if (offset > src.size() || out.size() > src.size() - offset)
+    }
+    if (offset > abi_size || out.size() > abi_size - offset)
       return TESSERA_INVALID_ARGUMENT;
-    std::copy_n(src.begin() + offset, out.size(), out.begin());
+    const std::size_t avail =
+        offset < src.size() ? std::min(out.size(), src.size() - offset) : 0;
+    if (avail > 0)
+      std::copy_n(src.begin() + offset, avail, out.begin());
+    if (avail < out.size())
+      std::fill(out.begin() + avail, out.end(), std::uint8_t{0});
     work_ += out.size();
     return TESSERA_OK;
   }
@@ -249,6 +279,16 @@ public:
     std::memcpy(out.data(), &stats, sizeof(stats));
     return TESSERA_OK;
   }
+  [[nodiscard]] std::int32_t frame_delta(FrameDelta &out) const override {
+    out = {};
+    out.generation = frame_;
+    out.dirty.fill(0xFF);
+    return TESSERA_OK;
+  }
+  [[nodiscard]] std::int32_t frame_delta_since(std::uint64_t /*from*/,
+                                               FrameDelta &out) const override {
+    return frame_delta(out);
+  }
   [[nodiscard]] std::uint64_t observation_work() const noexcept override {
     return work_;
   }
@@ -256,15 +296,19 @@ public:
 private:
   void capture_output() {
     const auto fb = system_->vdp().framebuffer();
-    pixels_.resize(std::size_t{width_} * height_ * sizeof(std::uint16_t));
-    auto *dst = reinterpret_cast<std::uint16_t *>(pixels_.data());
+    pixels_.resize(std::size_t{width_} * height_ * 4U);
+    auto *dst = pixels_.data();
     const int x_off = model_ == ConsoleModel::game_gear ? 48 : 0;
     const int y_off = model_ == ConsoleModel::game_gear ? 24 : 0;
     for (std::uint32_t y = 0; y < height_; ++y) {
       for (std::uint32_t x = 0; x < width_; ++x) {
         const std::uint32_t c =
             fb[std::size_t{y + y_off} * VdpM4::kSmsWidth + (x + x_off)];
-        dst[std::size_t{y} * width_ + x] = argb_to_rgb565(c);
+        const std::size_t at = (std::size_t{y} * width_ + x) * 4U;
+        dst[at + 0] = static_cast<std::uint8_t>((c >> 16) & 0xFFU);
+        dst[at + 1] = static_cast<std::uint8_t>((c >> 8) & 0xFFU);
+        dst[at + 2] = static_cast<std::uint8_t>(c & 0xFFU);
+        dst[at + 3] = 0xFFU;
       }
     }
     const auto audio = system_->audio();

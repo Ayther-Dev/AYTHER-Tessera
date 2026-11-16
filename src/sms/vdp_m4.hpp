@@ -50,6 +50,7 @@ public:
   std::span<const std::uint32_t> framebuffer() const noexcept { return fb_; }
   std::span<const std::uint8_t> vram() const noexcept { return vram_; }
   std::span<const std::uint8_t> cram() const noexcept { return cram_; }
+  std::span<const std::uint8_t> regs() const noexcept { return regs_; }
 
   void save(md::StateWriter &w) const;
   void load(md::StateReader &r);

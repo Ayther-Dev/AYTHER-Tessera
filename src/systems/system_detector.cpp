@@ -111,7 +111,7 @@ Detection SystemDetector::detect(wire::View bytes,
   } else if (d.candidates.size() == 1) {
     d.status = TESSERA_OK;
     d.info.outcome = TESSERA_DETECTION_RECOGNIZED;
-    d.info.system = TESSERA_SYSTEM_MEGA_DRIVE;
+    d.info.system = d.candidates[0].system;
   } else {
     d.status = malformed ? TESSERA_INVALID_CONTENT : TESSERA_UNKNOWN_CONTENT;
     d.info.outcome =

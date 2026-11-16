@@ -117,12 +117,21 @@ inline Bytes inputs(const InputState &input,
 inline Bytes configuration(std::string_view id, View build, View memory) {
   Bytes b;
   const bool clown = id == "clownmdemu";
-  const bool native = id == "megadrive"; // the own core: two pads of twelve
-  const bool megadrive = clown || native;
-  scalar(b, 1, 1, megadrive ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE);
+  std::uint32_t sys = TESSERA_SYSTEM_NONE;
+  if (clown || id == "megadrive")
+    sys = TESSERA_SYSTEM_MEGA_DRIVE;
+  else if (id == "mastersystem")
+    sys = TESSERA_SYSTEM_MASTER_SYSTEM;
+  else if (id == "gamegear")
+    sys = TESSERA_SYSTEM_GAME_GEAR;
+  else if (id == "sg1000")
+    sys = TESSERA_SYSTEM_SG1000;
+  const bool native = sys != TESSERA_SYSTEM_NONE && !clown;
+  const bool console = sys != TESSERA_SYSTEM_NONE;
+  scalar(b, 1, 1, sys);
   field(b, 2, 6, text(id));
   field(b, 3, 5, build);
-  scalar(b, 4, 1, megadrive ? 1 : 0);
+  scalar(b, 4, 1, console ? 1 : 0);
   scalar(b, 5, 1, 48000);
   std::vector<Bytes> map;
   const std::uint32_t ports = native ? kPadPorts : 1;
