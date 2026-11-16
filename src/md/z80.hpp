@@ -19,6 +19,8 @@ public:
   virtual std::uint8_t read(std::uint16_t address, unsigned &wait) = 0;
   virtual void write(std::uint16_t address, std::uint8_t value,
                      unsigned &wait) = 0;
+  virtual std::uint8_t in(std::uint16_t /*port*/) { return 0xFF; }
+  virtual void out(std::uint16_t /*port*/, std::uint8_t /*value*/) {}
 };
 
 class Z80 {
@@ -40,6 +42,8 @@ public:
   void hold(unsigned t) noexcept { wait_ += t; }
   /// Level of the INT pin (kept until the 68000 side lowers it).
   void set_int(bool level) noexcept { int_ = level; }
+  /// Level of the NMI pin (active on falling/rising edge per Z80 core).
+  void set_nmi(bool level) noexcept { nmi_ = level; }
 
   std::uint64_t cycles() const noexcept { return cycles_; }
   std::uint16_t pc() const noexcept { return tessera_z80_pc(&cpu_); }
@@ -63,6 +67,7 @@ private:
   std::uint64_t cycles_ = 0;
   unsigned wait_ = 0;
   bool int_ = false;
+  bool nmi_ = false;
 };
 
 } // namespace tessera::md

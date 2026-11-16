@@ -38,6 +38,10 @@ void Z80::tick() {
     pins_ |= TZ80_INT;
   else
     pins_ &= ~TZ80_INT;
+  if (nmi_)
+    pins_ |= TZ80_NMI;
+  else
+    pins_ &= ~TZ80_NMI;
   pins_ = tessera_z80_tick(&cpu_, pins_);
   const auto address = static_cast<std::uint16_t>(pins_ & 0xFFFFU);
   if ((pins_ & TZ80_MREQ) != 0) {
@@ -50,10 +54,14 @@ void Z80::tick() {
     }
     wait_ = wait;
   } else if ((pins_ & TZ80_IORQ) != 0) {
-    // Interrupt acknowledge and port accesses: the Mega Drive has no I/O space
-    // on the Z80 side; the data bus floats high (RST 38h for IM 1 / IM 0).
-    if ((pins_ & TZ80_RD) != 0 || (pins_ & (1ULL << 24)) != 0)
+    if ((pins_ & (1ULL << 24)) != 0) {
       pins_ |= kDataMask;
+    } else if ((pins_ & TZ80_RD) != 0) {
+      const std::uint8_t value = bus_.in(address);
+      pins_ = (pins_ & ~kDataMask) | (std::uint64_t{value} << kDataShift);
+    } else if ((pins_ & TZ80_WR) != 0) {
+      bus_.out(address, static_cast<std::uint8_t>(pins_ >> kDataShift));
+    }
   }
 }
 
