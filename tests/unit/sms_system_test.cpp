@@ -77,16 +77,21 @@ TEST_CASE("SG-1000 TMS9918A renders Graphics I and savestate round-trips") {
 TEST_CASE("YM2413 AUDIO_MUTE (PQ-15) silences selected FM channels") {
   Ym2413 ym;
   ym.reset();
+  ym.write_addr(0x30);
+  ym.write_data(0x30); // instrument 3 (Piano, fast attack), max volume
   ym.write_addr(0x10);
   ym.write_data(0x80); // F-num low
   ym.write_addr(0x20);
   ym.write_data(0x18); // key on + block
-  ym.write_addr(0x30);
-  ym.write_data(0x00); // max volume
 
-  std::int32_t l1 = 0, r1 = 0;
-  ym.step_sample(l1, r1);
-  CHECK(l1 != 0);
+  bool any_nonzero = false;
+  for (int i = 0; i < 256; ++i) {
+    std::int32_t l1 = 0, r1 = 0;
+    ym.step_sample(l1, r1);
+    if (l1 != 0)
+      any_nonzero = true;
+  }
+  CHECK(any_nonzero);
 
   ym.set_mute(0x0001U); // mute channel 0
   std::int32_t l2 = 0, r2 = 0;

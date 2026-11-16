@@ -39,7 +39,7 @@ int main() {
           TESSERA_BUFFER_TOO_SMALL ||
       (required != 2 && required != 3))
     return 3;
-  std::array<tessera_backend_info_v1, 3> backends{};
+  std::array<tessera_backend_info_v1, 8> backends{};
   for (auto &backend : backends)
     backend = initialized<tessera_backend_info_v1>();
   const std::uint32_t first = required - 2;

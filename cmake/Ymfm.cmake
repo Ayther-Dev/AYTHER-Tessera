@@ -38,6 +38,7 @@ function(tessera_add_ymfm)
 
     set(root "${PROJECT_SOURCE_DIR}/${include_dir}")
     add_library(tessera_ymfm OBJECT "${root}/ymfm_adpcm.cpp" "${root}/ymfm_ssg.cpp"
+        "${root}/ymfm_opl.cpp" "${root}/ymfm_pcm.cpp"
         "${PROJECT_SOURCE_DIR}/src/md/ymfm_instantiate.cpp")
     target_include_directories(tessera_ymfm SYSTEM PUBLIC "${root}")
     if(MSVC)

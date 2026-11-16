@@ -49,7 +49,7 @@ struct Native {
   std::uint64_t epoch = 0;
 
   explicit Native(Bytes content) : rom(std::move(content)) {
-    std::array<tessera_backend_info_v1, 4> backends{
+    std::array<tessera_backend_info_v1, 8> backends{
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
     std::uint32_t required{};
@@ -1150,7 +1150,7 @@ TEST_CASE("the published limits are the ones applied (TP-208.3)") {
   const auto create = [](const Bytes &rom) {
     tessera_context_v1 context = initial<tessera_context_v1>();
     const Bytes memory(65536, 0);
-    std::array<tessera_backend_info_v1, 4> backends{
+    std::array<tessera_backend_info_v1, 8> backends{
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
     std::uint32_t required{};

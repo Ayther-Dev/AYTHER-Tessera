@@ -5,6 +5,7 @@
 #endif
 #if TESSERA_MEGADRIVE
 #include "md/md_backend.hpp"
+#include "sms/sms_backend.hpp"
 #endif
 #include "systems/system_detector.hpp"
 namespace tessera {
@@ -13,6 +14,12 @@ std::span<const SystemRegistration> SystemRegistry::registrations() {
 #if TESSERA_MEGADRIVE
       {"megadrive", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
        md::make_backend},
+      {"mastersystem", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MASTER_SYSTEM,
+       0x1FFF, sms::make_backend},
+      {"gamegear", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_GAME_GEAR, 0x1FFF,
+       sms::make_backend},
+      {"sg1000", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_SG1000, 0x1FFF,
+       sms::make_backend},
 #endif
 #if TESSERA_CLOWN_REFERENCE
       {"clownmdemu", TESSERA_BACKEND_PRODUCT, TESSERA_SYSTEM_MEGA_DRIVE, 0x1FFF,
@@ -42,7 +49,7 @@ bool SystemRegistry::initial_reset_fault(std::string_view id,
 std::string SystemRegistry::resolve(std::string_view requested,
                                     wire::View content,
                                     std::uint32_t system_override) {
-  require(system_override <= TESSERA_SYSTEM_MEGA_DRIVE);
+  require(system_override <= TESSERA_SYSTEM_SG1000);
   for (const auto &entry : registrations())
     if (entry.id == requested) {
       require(system_override == entry.system, TESSERA_INVALID_CONTENT);

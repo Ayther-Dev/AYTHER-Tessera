@@ -223,7 +223,7 @@ TEST_CASE("Without a backend id Mega Drive content opens the native core") {
   // TP-112.1 (DA-1): megadrive is the default Mega Drive backend; ClownMDEmu,
   // when the reference build has it, is chosen only by its id.
   auto context = fx01::init<tessera_context_v1>();
-  std::array<tessera_backend_info_v1, 4> backends{};
+  std::array<tessera_backend_info_v1, 8> backends{};
   for (auto &backend : backends)
     backend = fx01::init<tessera_backend_info_v1>();
   std::uint32_t count = 0;

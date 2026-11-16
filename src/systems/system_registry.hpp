@@ -15,7 +15,7 @@ namespace tessera {
 // local reference build (TESSERA_BUILD_CLOWN_REFERENCE), after megadrive, and
 // is selected only by its id.
 inline constexpr std::size_t kRegistrationCount =
-    2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 1 : 0);
+    2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 4 : 0);
 struct SystemRegistration {
   std::string_view id;
   std::uint32_t kind, system;

@@ -41,7 +41,7 @@ TEST_CASE(
   REQUIRE(required == 1);
 
   const auto id = tessera_test::backend_under_test();
-  std::array<tessera_backend_info_v1, 4> backends{
+  std::array<tessera_backend_info_v1, 8> backends{
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
   REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),

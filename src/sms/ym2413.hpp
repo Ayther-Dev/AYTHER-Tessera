@@ -1,4 +1,4 @@
-// YM2413 (OPLL) FM sound chip for Sega Master System (spec 008, Phase 6).
+// YM2413 (OPLL) FM sound chip for Sega Master System powered by ymfm (BSD-3).
 // Supports register writes ($F0 addr, $F1 data), $F2 detection latch,
 // AUDIO_MUTE per-channel masking (PQ-15: bits 0..8 FM, bits 9..13 rhythm),
 // and deterministic savestate.
@@ -7,14 +7,22 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 
 namespace tessera::sms {
 
 class Ym2413 {
 public:
+  Ym2413();
+  ~Ym2413();
+  Ym2413(const Ym2413 &) = delete;
+  Ym2413 &operator=(const Ym2413 &) = delete;
+  Ym2413(Ym2413 &&) noexcept;
+  Ym2413 &operator=(Ym2413 &&) noexcept;
+
   void reset() noexcept;
 
-  void write_addr(std::uint8_t addr) noexcept { addr_ = addr; }
+  void write_addr(std::uint8_t addr) noexcept;
   void write_data(std::uint8_t value) noexcept;
 
   /// $F2 detection port on Master System (tracks bits 0..2 written by
@@ -36,8 +44,9 @@ public:
   void load(md::StateReader &r);
 
 private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
   std::array<std::uint8_t, 0x40> regs_{};
-  std::array<std::uint64_t, 9> phase_{};
   std::uint8_t addr_ = 0;
   std::uint8_t detect_ = 0;
   std::uint16_t mute_ = 0;

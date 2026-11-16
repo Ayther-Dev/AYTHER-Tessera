@@ -33,7 +33,7 @@ struct Native {
   std::uint64_t epoch = 0;
 
   explicit Native(Bytes content) : rom(std::move(content)) {
-    std::array<tessera_backend_info_v1, 4> backends{
+    std::array<tessera_backend_info_v1, 8> backends{
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
         initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
     std::uint32_t required{};
@@ -241,7 +241,7 @@ TEST_CASE("malformed traces are refused by the native session") {
   const Bytes cfg_memory(65536, 0);
   // The session's own config sha is needed in the trace header; take it from
   // a checkpoint-free path: build the same configuration the session used.
-  std::array<tessera_backend_info_v1, 4> backends{
+  std::array<tessera_backend_info_v1, 8> backends{
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
       initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
   std::uint32_t required{};
