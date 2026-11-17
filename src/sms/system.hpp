@@ -1,6 +1,7 @@
 // Native Sega Master System / Game Gear / SG-1000 machine
 // (spec 008, Phase 6 / TP-601.1..TP-601.5).
 #pragma once
+#include "md/audio_events.hpp"
 #include "md/psg.hpp"
 #include "md/state_io.hpp"
 #include "md/z80.hpp"
@@ -9,6 +10,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -50,6 +52,17 @@ public:
 
   const VdpM4 &vdp() const noexcept { return vdp_; }
   const Ym2413 &ym2413() const noexcept { return ym2413_; }
+  struct AudioWrite {
+    std::uint32_t cycle;
+    std::uint16_t addr;
+    std::uint8_t data;
+    std::uint8_t chip;
+  };
+  std::span<const AudioWrite> audio_writes() const noexcept {
+    return audio_writes_;
+  }
+  md::AudioEventQueue &audio_events() noexcept { return *audio_events_; }
+  void set_observe_audio(bool on) noexcept { observe_audio_ = on; }
   std::span<const std::int16_t> audio() const noexcept { return audio_out_; }
   std::span<const std::uint8_t> ram() const noexcept { return ram_; }
   std::span<const std::uint8_t> sram() const noexcept { return sram_; }
@@ -98,7 +111,11 @@ private:
 
   std::uint64_t frame_ = 0;
   std::uint64_t master_ = 0;
+  std::uint64_t frame_start_master_ = 0;
   std::uint32_t audio_mute_ = 0;
+  bool observe_audio_ = false;
+  std::unique_ptr<md::AudioEventQueue> audio_events_;
+  std::vector<AudioWrite> audio_writes_;
   std::vector<std::int16_t> audio_out_;
 };
 

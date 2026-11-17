@@ -119,6 +119,9 @@ public:
     system_->set_pad(1, sms_pad_mask(inputs, 1));
     input_ = inputs;
     subscriptions_.begin_frame();
+    system_->set_observe_audio(
+        subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS) ||
+        subscriptions_.active(TESSERA_OBS_SUB_AUDIO_WRITES));
     system_->set_audio_mute(audio_mute_);
     system_->run_frame();
     ++frame_;
@@ -192,11 +195,20 @@ public:
     std::span<const std::uint8_t> src;
     std::size_t abi_size = 0;
     std::array<std::uint8_t, 44> sys_buf{};
+    std::array<std::uint8_t, 64> cram_buf{};
+    std::vector<std::uint8_t> audio_buf;
     if (id == TESSERA_OBS_REGION_VRAM) {
       src = system_->vdp().vram();
       abi_size = 65536;
     } else if (id == TESSERA_OBS_REGION_CRAM) {
-      src = system_->vdp().cram();
+      const auto raw = system_->vdp().cram();
+      if (model_ == ConsoleModel::game_gear) {
+        src = raw;
+      } else {
+        for (std::size_t i = 0; i < 32 && i < raw.size(); ++i)
+          cram_buf[i * 2] = raw[i];
+        src = cram_buf;
+      }
       abi_size = 128;
     } else if (id == TESSERA_OBS_REGION_VDP_REGS) {
       src = system_->vdp().regs();
@@ -204,6 +216,33 @@ public:
     } else if (id == TESSERA_OBS_REGION_WORK_RAM) {
       src = system_->ram();
       abi_size = 65536;
+    } else if (id == TESSERA_OBS_REGION_AUDIO_WRITES) {
+      const auto writes = system_->audio_writes();
+      audio_buf.resize(writes.size() * 8U);
+      for (std::size_t i = 0; i < writes.size(); ++i) {
+        const auto &w = writes[i];
+        const std::size_t at = i * 8U;
+        audio_buf[at + 0] = static_cast<std::uint8_t>(w.cycle);
+        audio_buf[at + 1] = static_cast<std::uint8_t>(w.cycle >> 8);
+        audio_buf[at + 2] = static_cast<std::uint8_t>(w.cycle >> 16);
+        audio_buf[at + 3] = static_cast<std::uint8_t>(w.cycle >> 24);
+        audio_buf[at + 4] = static_cast<std::uint8_t>(w.addr);
+        audio_buf[at + 5] = static_cast<std::uint8_t>(w.addr >> 8);
+        audio_buf[at + 6] = w.data;
+        audio_buf[at + 7] = w.chip;
+      }
+      src = audio_buf;
+      abi_size = 65536;
+    } else if (id == TESSERA_OBS_REGION_AUDIO_WRITE_COUNT) {
+      const std::uint32_t count =
+          static_cast<std::uint32_t>(system_->audio_writes().size());
+      audio_buf.resize(4);
+      audio_buf[0] = static_cast<std::uint8_t>(count);
+      audio_buf[1] = static_cast<std::uint8_t>(count >> 8);
+      audio_buf[2] = static_cast<std::uint8_t>(count >> 16);
+      audio_buf[3] = static_cast<std::uint8_t>(count >> 24);
+      src = audio_buf;
+      abi_size = 4;
     } else if (id == TESSERA_OBS_REGION_SYSTEM) {
       auto w16 = [&](std::size_t at, std::uint16_t v) {
         sys_buf[at] = static_cast<std::uint8_t>(v);
@@ -257,8 +296,8 @@ public:
     return TESSERA_UNSUPPORTED_CAPABILITY;
   }
 
-  [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> /*out*/,
-                                               std::uint32_t /*capacity*/,
+  [[nodiscard]] std::int32_t poll_audio_events(std::span<std::uint8_t> out,
+                                               std::uint32_t capacity,
                                                std::uint32_t event_size,
                                                std::uint32_t &count) override {
     count = 0;
@@ -266,11 +305,17 @@ public:
       return TESSERA_INVALID_ARGUMENT;
     if (!subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS))
       return TESSERA_NOT_SUBSCRIBED;
+    const std::size_t n = std::min<std::size_t>(
+        capacity, out.size() / sizeof(md::AudioEvent));
+    if (n == 0)
+      return TESSERA_OK;
+    count = static_cast<std::uint32_t>(system_->audio_events().poll(
+        {reinterpret_cast<md::AudioEvent *>(out.data()), n}));
     return TESSERA_OK;
   }
   [[nodiscard]] std::int32_t
   audio_transport_stats(std::span<std::uint8_t> out) const override {
-    const auto stats = md::AudioEventQueue::idle_stats(
+    const auto stats = system_->audio_events().stats(
         subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS)
             ? md::kAudioTransportObservationActive
             : 0U);
@@ -282,6 +327,8 @@ public:
   [[nodiscard]] std::int32_t frame_delta(FrameDelta &out) const override {
     out = {};
     out.generation = frame_;
+    out.audio_writes =
+        static_cast<std::uint32_t>(system_->audio_writes().size());
     out.dirty.fill(0xFF);
     return TESSERA_OK;
   }

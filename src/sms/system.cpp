@@ -30,7 +30,8 @@ System::System(std::vector<std::uint8_t> rom, ConsoleModel model, bool pal,
       mapper_(model == ConsoleModel::sg1000 && rom_.size() <= 0xC000U
                   ? SmsMapper::plain
                   : mapper),
-      rom_crc32_(crc32(rom_)), vdp_(model), z80_(*this) {
+      rom_crc32_(crc32(rom_)), vdp_(model), z80_(*this),
+      audio_events_(std::make_unique<md::AudioEventQueue>()) {
   reset();
 }
 
@@ -220,6 +221,16 @@ void System::out(std::uint16_t port, std::uint8_t value) {
     io_ctrl_ = value;
   } else if (p == 0x7EU || p == 0x7FU) {
     psg_.write(value, master_);
+    if (observe_audio_) {
+      const auto cyc = static_cast<std::uint32_t>(master_ - frame_start_master_);
+      if (audio_writes_.size() < 8192)
+        audio_writes_.push_back({cyc, 0x7FU, value, 2});
+      audio_events_->push({master_, static_cast<std::uint32_t>(frame_), cyc,
+                          static_cast<std::uint8_t>(md::AudioSource::psg),
+                          static_cast<std::uint8_t>(md::AudioEventType::raw_write),
+                          md::kAudioNoChannel, md::kAudioEventSchema, 0, 0x7FU,
+                          value, {}});
+    }
   } else if (p == 0xBEU) {
     vdp_.write_data(value);
   } else if (p == 0xBFU) {
@@ -228,6 +239,16 @@ void System::out(std::uint16_t port, std::uint8_t value) {
     ym2413_.write_addr(value);
   } else if (p == 0xF1U && model_ == ConsoleModel::sms) {
     ym2413_.write_data(value);
+    if (observe_audio_) {
+      const auto cyc = static_cast<std::uint32_t>(master_ - frame_start_master_);
+      if (audio_writes_.size() < 8192)
+        audio_writes_.push_back({cyc, 0xF1U, value, 0});
+      audio_events_->push({master_, static_cast<std::uint32_t>(frame_), cyc,
+                          static_cast<std::uint8_t>(md::AudioSource::fm),
+                          static_cast<std::uint8_t>(md::AudioEventType::raw_write),
+                          md::kAudioNoChannel, md::kAudioEventSchema, 0, 0xF1U,
+                          value, {}});
+    }
   } else if (p == 0xF2U && model_ == ConsoleModel::sms) {
     ym2413_.write_detect(value);
   }
@@ -237,6 +258,8 @@ void System::run_frame() {
   const int total_lines = pal_ ? 313 : 262;
   const int z80_cycles_per_line = 228;
   const int samples_per_frame = pal_ ? (48000 / 50) : (48000 / 60);
+  frame_start_master_ = master_;
+  audio_writes_.clear();
 
   for (int line = 0; line < total_lines; ++line) {
     const std::uint8_t vc = line <= 0xDA ? static_cast<std::uint8_t>(line)
@@ -254,11 +277,20 @@ void System::run_frame() {
   }
 
   psg_.run_to(master_);
+  const auto psg_pcm = psg_.samples();
+  const std::size_t psg_frames = psg_pcm.size() / 2U;
   audio_out_.clear();
   audio_out_.reserve(static_cast<std::size_t>(samples_per_frame) * 2U);
   for (int i = 0; i < samples_per_frame; ++i) {
     std::int32_t l = 0;
     std::int32_t r = 0;
+    if (psg_frames > 0) {
+      const std::size_t pi =
+          (static_cast<std::size_t>(i) * psg_frames) /
+          static_cast<std::size_t>(samples_per_frame);
+      l += psg_pcm[pi * 2U];
+      r += psg_pcm[pi * 2U + 1U];
+    }
     if (model_ == ConsoleModel::sms)
       ym2413_.step_sample(l, r);
     auto clamp16 = [](std::int32_t v) -> std::int16_t {
@@ -269,6 +301,13 @@ void System::run_frame() {
   }
   psg_.clear_samples();
   ++frame_;
+  if (observe_audio_) {
+    audio_events_->push({master_, static_cast<std::uint32_t>(frame_),
+                        static_cast<std::uint32_t>(master_ - frame_start_master_),
+                        static_cast<std::uint8_t>(md::AudioSource::psg),
+                        static_cast<std::uint8_t>(md::AudioEventType::frame),
+                        md::kAudioNoChannel, md::kAudioEventSchema, 0, 0, 0, {}});
+  }
 }
 
 bool System::load_srm(std::span<const std::uint8_t> file) {
