@@ -36,9 +36,8 @@ struct Driver {
   std::uint64_t epoch{};
   Driver() {
     const auto id = tessera_test::backend_under_test();
-    std::array<tessera_backend_info_v1, 8> backends{
-        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>(),
-        initial<tessera_backend_info_v1>(), initial<tessera_backend_info_v1>()};
+    std::array<tessera_backend_info_v1, 8> backends{};
+    backends.fill(initial<tessera_backend_info_v1>());
     std::uint32_t count{};
     REQUIRE(tessera_backends_enumerate_v1(backends.data(), backends.size(),
                                           &count, &context) == TESSERA_OK);

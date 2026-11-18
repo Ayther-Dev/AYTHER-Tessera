@@ -138,10 +138,12 @@ TEST_CASE("CLI lists implemented test backends and detects bytes independently "
   const auto list = run({L"backend", L"list"});
   REQUIRE(list.exit_code == 0);
   // The ClownMDEmu reference backend (product kind) exists only in the local
-  // reference build; the distributable core lists the two synthetic backends.
+  // reference build; the distributable core lists the two synthetic backends
+  // after the four native product cores (megadrive, mastersystem, gamegear,
+  // sg1000) when it carries them.
   REQUIRE(
       list.report.at("backends").size() ==
-      (2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 1 : 0)));
+      (2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 4 : 0)));
   CHECK(list.report.at("code") == 0);
   CHECK(list.report.at("backends")[0].at("kind") ==
         ((TESSERA_CLOWN_REFERENCE || TESSERA_MEGADRIVE) ? 1 : 2));
