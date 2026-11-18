@@ -73,12 +73,31 @@ std::uint8_t Bus::read8(std::uint32_t address) {
   const std::uint32_t a = address & kMask;
   switch (const Target t = classify(a)) {
   case Target::rom: {
+    if (jcart_ && jcart_->present() && JCart::is_jcart_addr(a)) {
+      const std::uint16_t w = jcart_->read16();
+      return static_cast<std::uint8_t>((a & 1U) ? w : (w >> 8));
+    }
+    if (eeprom_ && eeprom_->contains_addr(a))
+      return eeprom_->read8(a);
     if (sram_hit(a))
       return sram_->read8(a);
     for (const auto &patch : rom_patches_)
       if ((a & ~1U) == patch.address)
         return static_cast<std::uint8_t>((a & 1U) ? patch.data
                                                   : patch.data >> 8);
+    if (flash_ && flash_->present())
+      return flash_->read8(rom_offset(a));
+    if ((mapper_ == Mapper::lock_on_s2 || mapper_ == Mapper::lock_on_s3) &&
+        a >= 0x200000U) {
+      if (mapper_ == Mapper::lock_on_s2 && a >= 0x300000U && sram_mapped_) {
+        const std::uint32_t patch_off = 0x200000U + (a - 0x300000U);
+        return patch_off < rom_.size() ? rom_[patch_off] : kUnmappedByte;
+      }
+      if (!locked_rom_.empty()) {
+        const std::uint32_t lo = (a - 0x200000U) % locked_rom_.size();
+        return locked_rom_[lo];
+      }
+    }
     const std::uint32_t o = rom_offset(a);
     return o < rom_.size() ? rom_[o] : kUnmappedByte;
   }
@@ -97,12 +116,38 @@ std::uint16_t Bus::read16(std::uint32_t address) {
   const std::uint32_t a = address & kMask & ~1U;
   switch (const Target t = classify(a)) {
   case Target::rom: {
+    if (jcart_ && jcart_->present() && JCart::is_jcart_addr(a))
+      return jcart_->read16();
+    if (eeprom_ &&
+        (eeprom_->contains_addr(a) || eeprom_->contains_addr(a + 1U)))
+      return static_cast<std::uint16_t>((eeprom_->read8(a) << 8) |
+                                        eeprom_->read8(a + 1U));
     if (sram_hit(a))
       return static_cast<std::uint16_t>((sram_->read8(a) << 8) |
                                         sram_->read8(a + 1));
     for (const auto &patch : rom_patches_)
       if (a == patch.address)
         return patch.data;
+    if (flash_ && flash_->present()) {
+      const std::uint32_t o = rom_offset(a);
+      return static_cast<std::uint16_t>((flash_->read8(o) << 8) |
+                                        flash_->read8(o + 1U));
+    }
+    if ((mapper_ == Mapper::lock_on_s2 || mapper_ == Mapper::lock_on_s3) &&
+        a >= 0x200000U) {
+      if (mapper_ == Mapper::lock_on_s2 && a >= 0x300000U && sram_mapped_) {
+        const std::uint32_t patch_off = 0x200000U + (a - 0x300000U);
+        return patch_off + 1U < rom_.size()
+                   ? static_cast<std::uint16_t>((rom_[patch_off] << 8) |
+                                                rom_[patch_off + 1U])
+                   : kUnmappedWord;
+      }
+      if (!locked_rom_.empty() && a - 0x200000U + 1U < locked_rom_.size()) {
+        const std::uint32_t lo = a - 0x200000U;
+        return static_cast<std::uint16_t>((locked_rom_[lo] << 8) |
+                                          locked_rom_[lo + 1U]);
+      }
+    }
     const std::uint32_t o = rom_offset(a);
     return o + 1 < rom_.size()
                ? static_cast<std::uint16_t>((rom_[o] << 8) | rom_[o + 1])
@@ -128,6 +173,18 @@ void Bus::write8(std::uint32_t address, std::uint8_t value) {
   const std::uint32_t a = address & kMask;
   switch (const Target t = classify(a)) {
   case Target::rom:
+    if (jcart_ && jcart_->present() && JCart::is_jcart_addr(a)) {
+      jcart_->write16(value);
+      return;
+    }
+    if (eeprom_ && eeprom_->contains_addr(a)) {
+      eeprom_->write8(a, value);
+      return;
+    }
+    if (flash_ && flash_->present()) {
+      flash_->write8(rom_offset(a), value);
+      return;
+    }
     if (sram_hit(a) && !sram_protected_)
       sram_->write8(a, value);
     return;
@@ -149,6 +206,24 @@ void Bus::write16(std::uint32_t address, std::uint16_t value) {
   const std::uint32_t a = address & kMask & ~1U;
   switch (const Target t = classify(a)) {
   case Target::rom:
+    if (jcart_ && jcart_->present() && JCart::is_jcart_addr(a)) {
+      jcart_->write16(value);
+      return;
+    }
+    if (eeprom_ &&
+        (eeprom_->contains_addr(a) || eeprom_->contains_addr(a + 1U))) {
+      if (eeprom_->contains_addr(a))
+        eeprom_->write8(a, static_cast<std::uint8_t>(value >> 8));
+      if (eeprom_->contains_addr(a + 1U))
+        eeprom_->write8(a + 1U, static_cast<std::uint8_t>(value));
+      return;
+    }
+    if (flash_ && flash_->present()) {
+      const std::uint32_t o = rom_offset(a);
+      flash_->write8(o, static_cast<std::uint8_t>(value >> 8));
+      flash_->write8(o + 1U, static_cast<std::uint8_t>(value));
+      return;
+    }
     if (sram_hit(a) && !sram_protected_) {
       sram_->write8(a, static_cast<std::uint8_t>(value >> 8));
       sram_->write8(a + 1, static_cast<std::uint8_t>(value));

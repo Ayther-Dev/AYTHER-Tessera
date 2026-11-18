@@ -4,6 +4,7 @@
 // endian; a long access is two word accesses, high word first.
 #pragma once
 #include "md/machine.hpp"
+#include "md/special_cart.hpp"
 #include "md/sram.hpp"
 #include "md/state_io.hpp"
 
@@ -67,6 +68,14 @@ public:
     rom_patches_ = std::move(patches);
   }
 
+  void attach_eeprom(Eeprom *eeprom) noexcept { eeprom_ = eeprom; }
+  void attach_jcart(JCart *jcart) noexcept { jcart_ = jcart; }
+  void attach_flash(FlashCart *flash) noexcept { flash_ = flash; }
+  void set_locked_rom(std::vector<std::uint8_t> locked_rom) {
+    locked_rom_ = std::move(locked_rom);
+  }
+
+  std::span<const std::uint8_t> rom() const noexcept { return rom_; }
   std::span<const std::uint8_t> work_ram() const noexcept { return ram_; }
   std::span<std::uint8_t> work_ram() noexcept { return ram_; }
 
@@ -76,6 +85,7 @@ public:
 
 private:
   std::vector<std::uint8_t> rom_;
+  std::vector<std::uint8_t> locked_rom_;
   std::vector<RomPatch> rom_patches_;
   std::array<std::uint8_t, 0x10000> ram_{};
   std::uint32_t rom_offset(std::uint32_t address) const noexcept;
@@ -86,6 +96,9 @@ private:
   /// SSF2: 512 KiB bank mapped in each of the 8 slots of the 4 MiB window.
   std::array<std::uint8_t, 8> banks_{0, 1, 2, 3, 4, 5, 6, 7};
   Sram *sram_;
+  Eeprom *eeprom_ = nullptr;
+  JCart *jcart_ = nullptr;
+  FlashCart *flash_ = nullptr;
   bool sram_mapped_ = false;
   bool sram_protected_ = false;
 

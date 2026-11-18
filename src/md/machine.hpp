@@ -9,7 +9,7 @@ namespace tessera::md {
 enum class Region : std::uint8_t { japan, usa, europe };
 enum class Standard : std::uint8_t { ntsc, pal };
 enum class PadType : std::uint8_t { three_button, six_button };
-enum class Mapper : std::uint8_t { none, ssf2 };
+enum class Mapper : std::uint8_t { none, ssf2, lock_on_s2, lock_on_s3 };
 enum class DisplayWidth : std::uint8_t { h32, h40 };
 
 // A line is 3420 master cycles in H32 and H40 alike.
