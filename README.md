@@ -40,7 +40,8 @@ y FX-03. La demo propia de fase 0 es una semilla de FX-02.
 ## Compilación y validación local
 
 Se requiere Windows x64 con Visual Studio/MSVC v145 14.51 o posterior, SDK Windows,
-LLVM `clang-cl`, CMake y Ninja. Los presets y el wrapper usan `clang-cl` con ABI
+LLVM `clang-cl` 22 o posterior (la STL de MSVC 14.52 rechaza Clang anterior a 22;
+CI instala LLVM 22.1.8 con `tools/install_pinned_llvm.ps1`), CMake y Ninja. Los presets y el wrapper usan `clang-cl` con ABI
 MSVC y CRT `/MD`; el wrapper configura el entorno x64 y comprueba
 una caché de dependencias fijadas por hash. Desde la raíz, con la caché disponible:
 

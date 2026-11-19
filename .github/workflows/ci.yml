@@ -31,6 +31,8 @@ jobs:
             third_party/cache/picosha2-1.0.1
             third_party/cache/doctest-2.5.3
           key: ${{ runner.os }}-headers-${{ hashFiles('cmake/dependencies.lock.json') }}
+      - name: Install the pinned LLVM for clang-cl
+        run: ./tools/install_pinned_llvm.ps1
       - name: Prepare and verify pinned headers
         run: ./tools/bootstrap-dependencies.ps1 -Download
       - name: Configure, build and test the distributable core (no ClownMDEmu)
@@ -60,6 +62,8 @@ jobs:
             third_party/cache/picosha2-1.0.1
             third_party/cache/doctest-2.5.3
           key: ${{ runner.os }}-headers-${{ hashFiles('cmake/dependencies.lock.json') }}
+      - name: Install the pinned LLVM for clang-cl
+        run: ./tools/install_pinned_llvm.ps1
       - name: Prepare and verify pinned headers
         run: ./tools/bootstrap-dependencies.ps1 -Download
       - name: Prepare the pinned Mega Drive reference backend
@@ -90,6 +94,8 @@ jobs:
             third_party/cache/picosha2-1.0.1
             third_party/cache/doctest-2.5.3
           key: ${{ runner.os }}-headers-${{ hashFiles('cmake/dependencies.lock.json') }}
+      - name: Install the pinned LLVM for clang-cl
+        run: ./tools/install_pinned_llvm.ps1
       - name: Prepare and verify pinned headers
         run: ./tools/bootstrap-dependencies.ps1 -Download
       - name: Build the differential bench and run its self-tests

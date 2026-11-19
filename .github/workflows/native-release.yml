@@ -46,6 +46,8 @@ jobs:
           if ($response.StatusCode -eq 200) { throw 'A release already exists for this immutable tag.' }
           if ($response.StatusCode -ne 404) { throw "Release lookup failed: HTTP $($response.StatusCode)." }
 
+      - name: Install the pinned LLVM for clang-cl
+        run: ./tools/install_pinned_llvm.ps1
       - name: Prepare exact pinned source inputs
         run: |
           ./tools/bootstrap-dependencies.ps1 -Download
