@@ -305,8 +305,8 @@ public:
       return TESSERA_INVALID_ARGUMENT;
     if (!subscriptions_.active(TESSERA_OBS_SUB_AUDIO_EVENTS))
       return TESSERA_NOT_SUBSCRIBED;
-    const std::size_t n = std::min<std::size_t>(
-        capacity, out.size() / sizeof(md::AudioEvent));
+    const std::size_t n =
+        std::min<std::size_t>(capacity, out.size() / sizeof(md::AudioEvent));
     if (n == 0)
       return TESSERA_OK;
     count = static_cast<std::uint32_t>(system_->audio_events().poll(
