@@ -1,13 +1,15 @@
 // Runs a ROM on the native Mega Drive machine and writes its work RAM
 // (spec 008, TP-101.9). The differential bench compares that file with the one
 // gpgx produces (`tessera_diffbench --libretro ... --work-ram-out`).
-//   tessera_md_run --rom <file> [--frames N] [--region a|j|u|e|p] --work-ram-out
-//   <file>
+//   tessera_md_run --rom <file> [--frames N] [--region a|j|u|e|p]
+//   --work-ram-out <file>
 #include "md/cart.hpp"
 #include "md/region.hpp"
+#include "md/regions.hpp"
 #include "md/system.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -17,11 +19,17 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  std::string pad_script, rom_path, out_path, srm_path, frame_path, palette_path, vram_path,
-      regs_path, z80_path, poke_spec, audio_path;
+  std::string pad_script, rom_path, out_path, srm_path, frame_path,
+      palette_path, vram_path, regs_path, z80_path, poke_spec, audio_path;
   unsigned long pad_mask[2] = {0, 0};
   int pad_type = 3;
   unsigned frames = 600;
+  unsigned soft_reset_at = 0, hard_reset_at = 0;
+  std::string events_path;
+  std::vector<std::pair<std::uint32_t, std::string>> region_outs;
+  std::string recompose_path, multilayer_path;
+  bool isolate_layers = false, replay_journal = false;
+  std::string controls_spec;
   bool print_region = false;
   // a = from the ROM header (default), j, u, e, p = Japan PAL
   tessera::md::RegionChoice region = tessera::md::RegionChoice::automatic;
@@ -60,6 +68,41 @@ int main(int argc, char **argv) {
       frame_path = argv[++i];
     } else if (arg == "--frames" && has_value) {
       frames = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
+    } else if (arg == "--region-out" && has_value) {
+      // <id>:<file>: a memory region as the observation contract lays it out
+      const std::string spec = argv[++i];
+      const auto colon = spec.find(':');
+      if (colon == std::string::npos) {
+        std::fputs("--region-out <id>:<file>\n", stderr);
+        return 2;
+      }
+      region_outs.emplace_back(
+          static_cast<std::uint32_t>(std::strtoul(spec.c_str(), nullptr, 10)),
+          spec.substr(colon + 1));
+    } else if (arg == "--multilayer-out" && has_value) {
+      // status, width, height, then plane A, plane B, window, sprites and
+      // composite (RGB565), as tessera_diffbench writes them for gpgx
+      multilayer_path = argv[++i];
+    } else if (arg == "--isolate-layers") {
+      isolate_layers = true; // RENDER_CONTROLS subscribed
+    } else if (arg == "--replay-journal") {
+      replay_journal = true; // RASTER_TRACKING subscribed
+    } else if (arg == "--controls" && has_value) {
+      // <LAYER_MASK hex>:<LAYER_DIM>:<frame>: the render controls in force
+      // from frame N on (0 = the first), RENDER_CONTROLS subscribed
+      controls_spec = argv[++i];
+    } else if (arg == "--recompose-out" && has_value) {
+      // status, width, height (int32, uint32, uint32), then the RGB565 pixels
+      // of recompose_frame, as tessera_diffbench writes them for gpgx
+      recompose_path = argv[++i];
+    } else if (arg == "--audio-events-out" && has_value) {
+      events_path = argv[++i]; // 80 byte ayther_audio_event_v1 records
+    } else if (arg == "--soft-reset-at" && has_value) {
+      soft_reset_at =
+          static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
+    } else if (arg == "--hard-reset-at" && has_value) {
+      hard_reset_at =
+          static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
     } else if (arg == "--region" && has_value) {
       const char r = argv[++i][0];
       region = r == 'j'   ? tessera::md::RegionChoice::japan
@@ -118,7 +161,8 @@ int main(int argc, char **argv) {
     for (auto i = c1 + 1; i < c2; i += 2)
       poke_bytes.push_back(static_cast<std::uint8_t>(
           std::strtoul(poke_spec.substr(i, 2).c_str(), nullptr, 16)));
-    poke_frame = static_cast<unsigned>(std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
+    poke_frame = static_cast<unsigned>(
+        std::strtoul(poke_spec.c_str() + c2 + 1, nullptr, 10));
   }
   // Pad script: from frame N (1 = the first) the pads hold the masks. gpgx
   // reads the pads just before the V-int, which is the first line of its
@@ -133,23 +177,68 @@ int main(int argc, char **argv) {
     PadStep step{};
     if (std::sscanf(pad_script.substr(at, end - at).c_str(), "%u:%lx:%lx",
                     &step.frame, &step.mask[0], &step.mask[1]) != 3) {
-      std::fputs("--pad-script: <frame>:<mask1>:<mask2>[,...]' + chr(92) + 'n", stderr);
+      std::fputs("--pad-script: <frame>:<mask1>:<mask2>[,...]' + chr(92) + 'n",
+                 stderr);
       return 2;
     }
     steps.push_back(step);
     at = end + 1;
   }
+  std::vector<tessera::md::AudioEvent> events;
+  system.set_audio_events(!events_path.empty());
+  for (const auto &out : region_outs) {
+    if (out.first == 13 || out.first == 14 || out.first == 25)
+      system.set_sprite_capture(true); // SPRITE_CAPTURE: what the bench reads
+    if (out.first == 17)
+      system.set_attribution(true); // ATTRIBUTION
+  }
   for (unsigned frame = 0; frame < frames; ++frame) {
+    // The RESET button before frame N (1 = the first one), as --reset-at does
+    // on the libretro side (TP-110.4).
+    if (soft_reset_at != 0 && frame == soft_reset_at - 1)
+      system.soft_reset();
+    if (hard_reset_at != 0 && frame == hard_reset_at - 1)
+      system.reset();
     for (const auto &step : steps)
       if (step.frame == frame + 1)
         for (unsigned port = 0; port < 2; ++port)
           system.set_pad(port, static_cast<std::uint16_t>(step.mask[port]));
+    if (!controls_spec.empty() &&
+        frame == std::strtoul(
+                     controls_spec.substr(controls_spec.rfind(':') + 1).c_str(),
+                     nullptr, 10))
+      system.set_render_controls(
+          static_cast<std::uint8_t>(
+              std::strtoul(controls_spec.c_str(), nullptr, 16) & 15U),
+          std::strtoul(
+              controls_spec.substr(controls_spec.find(':') + 1).c_str(),
+              nullptr, 10) != 0);
     if (!poke_spec.empty() && frame == poke_frame &&
         !system.poke_z80_ram(poke_offset, poke_bytes)) {
       std::fputs("poke out of range\n", stderr);
       return 2;
     }
     system.run_frame();
+    if (!events_path.empty()) {
+      std::vector<tessera::md::AudioEvent> batch(1024);
+      for (;;) {
+        const auto n = system.poll_audio_events(batch);
+        if (n == 0)
+          break;
+        events.insert(events.end(), batch.begin(), batch.begin() + n);
+      }
+    }
+  }
+  if (!events_path.empty()) {
+    std::ofstream eo(events_path, std::ios::binary | std::ios::trunc);
+    eo.write(reinterpret_cast<const char *>(events.data()),
+             static_cast<std::streamsize>(events.size() * sizeof(events[0])));
+    const auto stats = system.audio_transport_stats();
+    std::ofstream so(events_path + ".stats",
+                     std::ios::binary | std::ios::trunc);
+    const std::int32_t status = 0;
+    so.write(reinterpret_cast<const char *>(&status), sizeof status);
+    so.write(reinterpret_cast<const char *>(&stats), sizeof stats);
   }
   std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
   const auto ram = system.work_ram();
@@ -171,16 +260,61 @@ int main(int argc, char **argv) {
   if (!audio_path.empty()) {
     std::ofstream ao(audio_path, std::ios::binary | std::ios::trunc);
     for (const auto &w : system.audio_writes()) {
-      const unsigned char rec[8] = {
-          static_cast<unsigned char>(w.cycle),
-          static_cast<unsigned char>(w.cycle >> 8),
-          static_cast<unsigned char>(w.cycle >> 16),
-          static_cast<unsigned char>(w.cycle >> 24),
-          static_cast<unsigned char>(w.addr),
-          static_cast<unsigned char>(w.addr >> 8),
-          w.data, w.chip};
+      const unsigned char rec[8] = {static_cast<unsigned char>(w.cycle),
+                                    static_cast<unsigned char>(w.cycle >> 8),
+                                    static_cast<unsigned char>(w.cycle >> 16),
+                                    static_cast<unsigned char>(w.cycle >> 24),
+                                    static_cast<unsigned char>(w.addr),
+                                    static_cast<unsigned char>(w.addr >> 8),
+                                    w.data,
+                                    w.chip};
       ao.write(reinterpret_cast<const char *>(rec), 8);
     }
+  }
+  for (const auto &[id, path] : region_outs) {
+    const auto bytes = tessera::md::memory_region(system, id);
+    if (bytes.empty() && !tessera::md::variable_region(system, id)) {
+      std::fprintf(stderr, "region %u is not a memory region\n", id);
+      return 2;
+    }
+    std::ofstream ro(path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(bytes.data()),
+             static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!multilayer_path.empty()) {
+    tessera::md::FrameSize size;
+    std::array<std::vector<std::uint32_t>, 5> layers;
+    const bool ok = system.renderer().recompose_layers(
+        system.vdp(), isolate_layers, replay_journal, layers, size);
+    const std::int32_t status = ok ? 0 : -5; // TESSERA_WRONG_STATE
+    if (!ok)
+      size = {0, 0};
+    std::ofstream ro(multilayer_path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(&status), 4);
+    ro.write(reinterpret_cast<const char *>(&size.width), 4);
+    ro.write(reinterpret_cast<const char *>(&size.height), 4);
+    for (const auto &layer : layers) {
+      std::vector<std::uint16_t> pixels(layer.size());
+      std::transform(layer.begin(), layer.end(), pixels.begin(),
+                     tessera::md::rgba_to_565);
+      ro.write(reinterpret_cast<const char *>(pixels.data()),
+               static_cast<std::streamsize>(pixels.size() * 2));
+    }
+  }
+  if (!recompose_path.empty()) {
+    tessera::md::FrameSize size;
+    const auto frame = system.renderer().recompose(system.vdp(), size);
+    std::vector<std::uint16_t> pixels(frame.size());
+    std::transform(frame.begin(), frame.end(), pixels.begin(),
+                   tessera::md::rgba_to_565);
+    // Tessera statuses: 0 or TESSERA_WRONG_STATE (interlace mode 2)
+    const std::int32_t status = frame.empty() ? -5 : 0;
+    std::ofstream ro(recompose_path, std::ios::binary | std::ios::trunc);
+    ro.write(reinterpret_cast<const char *>(&status), 4);
+    ro.write(reinterpret_cast<const char *>(&size.width), 4);
+    ro.write(reinterpret_cast<const char *>(&size.height), 4);
+    ro.write(reinterpret_cast<const char *>(pixels.data()),
+             static_cast<std::streamsize>(pixels.size() * 2));
   }
   if (!regs_path.empty()) {
     std::ofstream ro(regs_path, std::ios::binary | std::ios::trunc);

@@ -124,6 +124,33 @@ TEST_CASE("a bus request is granted only with the Z80 out of reset") {
   CHECK(((ram[0] << 8) | ram[1]) == 0xFFFF);
 }
 
+// TP-209.2: a Z80 access to the 68000 bus through the bank window holds the
+// 68000. z80_steal counts 68000 loop passes over the 224 active lines of four
+// frames; the expected counts are gpgx's (black box, 2026-11-10): 3611 with
+// the Z80 in reset, 3212 with a ROM read every 44 T-states, 3420 every 92.
+// One pass of tolerance: the count is cut by the start of the blanking.
+TEST_CASE("a Z80 access to the 68000 bus takes 68000 time as on gpgx") {
+  const struct {
+    unsigned nops;
+    unsigned gpgx;
+  } cases[] = {{99, 3611}, {4, 3212}, {16, 3420}};
+  for (const auto &c : cases) {
+    CAPTURE(c.nops);
+    System system(tessera::testrom::z80_steal_rom(c.nops),
+                  MachineConfig::for_region(Region::usa));
+    system.reset();
+    for (int i = 0; i < 10; ++i)
+      system.run_frame();
+    const auto ram = system.work_ram();
+    for (unsigned n = 0; n < 4; ++n) {
+      CAPTURE(n);
+      const unsigned count = (ram[2 + 2 * n] << 8) | ram[3 + 2 * n];
+      CHECK(count + 1 >= c.gpgx);
+      CHECK(count <= c.gpgx + 1);
+    }
+  }
+}
+
 // TP-106.3 (RF-2.1): the vertical interrupt reaches the Z80 as a pulse of one
 // scanline, about two handler entries per frame, with or without IE0.
 TEST_CASE("the Z80 INT pulse is one scanline per frame") {

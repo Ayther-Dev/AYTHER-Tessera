@@ -1,5 +1,7 @@
 // Writes the synthetic Mega Drive test ROMs (spec 008, TP-101.10).
 //   tessera_md_testrom bus-sweep|ssf2-sweep|vint-counter <out.bin>
+#include "support/md_delta_testrom.hpp"
+#include "support/md_limits_testrom.hpp"
 #include "support/md_testrom.hpp"
 #include "support/md_z80_testrom.hpp"
 
@@ -59,20 +61,48 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::hv_h_probe_rom(0x00);
   else if (std::strcmp(argv[1], "hv-h40-h") == 0)
     rom = tessera::testrom::hv_h_probe_rom(0x81);
+  else if (std::strcmp(argv[1], "audio-flood") == 0)
+    rom = tessera::testrom::audio_flood_rom();
+  else if (std::strcmp(argv[1], "mode4-vram-0") == 0)
+    rom = tessera::testrom::mode4_vram_rom(false);
+  else if (std::strcmp(argv[1], "mode4-vram-1") == 0)
+    rom = tessera::testrom::mode4_vram_rom(true);
   else if (std::strcmp(argv[1], "mode4-pbc") == 0)
     rom = tessera::testrom::mode4_pbc_rom();
   else if (std::strncmp(argv[1], "palette-sweep-", 14) == 0)
     rom = tessera::testrom::palette_sweep_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10)));
+  else if (std::strncmp(argv[1], "modes-hv-", 9) == 0) {
+    // modes-hv-<variant>-<words between HV reads> (TP-209.1 timing probe)
+    char *end = nullptr;
+    const auto id = std::strtoul(argv[1] + 9, &end, 10);
+    // [-<nops before the display write>]
+    const auto every = *end == '-' ? std::strtoul(end + 1, &end, 10) : 256UL;
+    // [-<nops before the CRAM data>]
+    const auto nops = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
+    // [-d: display on before the CRAM data | -m: Mode 4 before the display]
+    const auto cram = *end == '-' ? std::strtoul(end + 1, &end, 10) : 0UL;
+    rom = tessera::testrom::modes_sweep_rom(
+        tessera::testrom::modes_variant(static_cast<unsigned>(id)),
+        static_cast<unsigned>(every), static_cast<unsigned>(nops),
+        static_cast<unsigned>(cram), std::strcmp(end, "-d") == 0,
+        std::strcmp(end, "-m") == 0);
+  }
   else if (std::strncmp(argv[1], "modes-sweep-", 12) == 0)
     rom = tessera::testrom::modes_sweep_rom(tessera::testrom::modes_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
   else if (std::strncmp(argv[1], "sprite-limits-", 14) == 0)
     rom = tessera::testrom::sprite_limits_rom(tessera::testrom::sprite_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10))));
+  else if (std::strncmp(argv[1], "raster-bands-", 13) == 0)
+    rom = tessera::testrom::raster_bands_rom(tessera::testrom::raster_variant(
+        static_cast<unsigned>(std::strtoul(argv[1] + 13, nullptr, 10))));
   else if (std::strncmp(argv[1], "mode4-scene-", 12) == 0) {
     rom = tessera::testrom::mode4_scene_rom(tessera::testrom::mode4_variant(
         static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10))));
+  } else if (std::strncmp(argv[1], "delta-probe-", 12) == 0) {
+    rom = tessera::testrom::delta_probe_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 12, nullptr, 10)));
   } else if (std::strcmp(argv[1], "dma-fifo") == 0)
     rom = tessera::testrom::dma_fifo_rom();
   else if (std::strncmp(argv[1], "dma-timing-", 11) == 0) {
@@ -91,6 +121,22 @@ int main(int argc, char **argv) {
     rom = tessera::testrom::cpu_timing_rom(tessera::testrom::cpu_muldiv_groups());
   else if (std::strcmp(argv[1], "cpu-timing") == 0)
     rom = tessera::testrom::cpu_timing_rom();
+  else if (std::strncmp(argv[1], "z80-steal-", 10) == 0) {
+    // z80-steal-<n>[-w|-r|-p|-t|-f]: read (default), write, own-RAM read, PSG,
+    // read with n T-states of filler, phase n of a 35 T-state loop
+    char *end = nullptr;
+    const auto nops =
+        static_cast<unsigned>(std::strtoul(argv[1] + 10, &end, 10));
+    const unsigned access = std::strcmp(end, "-w") == 0   ? 1U
+                            : std::strcmp(end, "-r") == 0 ? 2U
+                            : std::strcmp(end, "-p") == 0 ? 3U
+                            : std::strcmp(end, "-t") == 0 ? 4U
+                            : std::strcmp(end, "-f") == 0 ? 5U
+                                                          : 0U;
+    rom = tessera::testrom::z80_steal_rom(nops, access);
+  } else if (std::strncmp(argv[1], "z80-bank-rate-", 14) == 0)
+    rom = tessera::testrom::z80_bank_rate_rom(
+        static_cast<unsigned>(std::strtoul(argv[1] + 14, nullptr, 10)));
   else if (std::strncmp(argv[1], "z80-bank-", 9) == 0)
     rom = tessera::testrom::z80_bank_rom(
         static_cast<unsigned>(std::strtoul(argv[1] + 9, nullptr, 10)));
@@ -140,6 +186,13 @@ int main(int argc, char **argv) {
         static_cast<unsigned>(v[0] - '0'), v[2] == 'd', v[5] == '4',
         v[8] == 'v', v[9] == 'r',
         (v[9] == 'n' || v[10] == 'n') ? 240U : 64U, v[9] == 'l');
+  } else if (std::strncmp(argv[1], "fifo-status-", 12) == 0 &&
+             std::strlen(argv[1]) == 21) {
+    // fifo-status-<target 0|1>-<d|b>-<h32|h40>-<a|v>
+    const char *v = argv[1] + 12;
+    rom = tessera::testrom::fifo_status_rom(static_cast<unsigned>(v[0] - '0'),
+                                            v[2] == 'd', v[5] == '4',
+                                            v[8] == 'v');
   } else
     return 2;
   std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);

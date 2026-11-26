@@ -50,6 +50,11 @@ typedef uint64_t tessera_snapshot;
 #define TESSERA_IO_OTHER (-INT32_C(25))
 #define TESSERA_OUT_OF_MEMORY (-INT32_C(26))
 #define TESSERA_BACKEND_FAILURE (-INT32_C(27))
+/* API 1.1 (observación): la región o la operación existe, pero su suscripción
+   no está activa (el NOT_SUBSCRIBED de gpgx), y la llamada llega con el núcleo
+   ejecutando un frame (el BUSY de gpgx). */
+#define TESSERA_NOT_SUBSCRIBED (-INT32_C(28))
+#define TESSERA_BUSY (-INT32_C(29))
 #define TESSERA_PHASE_NONE UINT32_C(0)
 #define TESSERA_PHASE_VALIDATE UINT32_C(1)
 #define TESSERA_PHASE_DETECT UINT32_C(2)
@@ -75,6 +80,9 @@ typedef uint64_t tessera_snapshot;
 #define TESSERA_SESSION_CLOSED UINT32_C(3)
 #define TESSERA_SYSTEM_NONE UINT32_C(0)
 #define TESSERA_SYSTEM_MEGA_DRIVE UINT32_C(1)
+#define TESSERA_SYSTEM_MASTER_SYSTEM UINT32_C(2)
+#define TESSERA_SYSTEM_GAME_GEAR UINT32_C(3)
+#define TESSERA_SYSTEM_SG1000 UINT32_C(4)
 #define TESSERA_BACKEND_PRODUCT UINT32_C(1)
 #define TESSERA_BACKEND_TEST UINT32_C(2)
 #define TESSERA_DETECTION_RECOGNIZED UINT32_C(1)
@@ -432,6 +440,15 @@ tessera_status_format_v1(const tessera_context_v1 *context,
 /* --- API 1.1: superficie de observación (spec 008, RF-3.0). Las firmas son las
    de ayther_interface_v1 con el session delante y el contexto al final. Los
    ids, flags y layouts están en tessera_observation.h. --- */
+
+/* Extensión de Tessera fuera de la numeración de la ABI 1.10 (1 a 26): los
+   64 KiB de work RAM del 68000, que la ABI deja a la memoria legacy
+   (RETRO_MEMORY_SYSTEM_RAM, legacy_memory_id 2). Mismo layout que esa memoria:
+   word-swapped (el byte del 68000 en $FF0000 + n es el byte n ^ 1), servida
+   siempre (sin suscripción) y escribible con write_control: el poke entra en la
+   máquina al momento, forma parte del estado (savestates y checkpoints) y
+   avanza la generación. */
+#define TESSERA_OBS_REGION_WORK_RAM UINT32_C(0x1000)
 tessera_status TESSERA_CALL
 tessera_observation_region_query_v1(tessera_session session, uint32_t region_id,
                                     tessera_obs_region_info_v1 *out,

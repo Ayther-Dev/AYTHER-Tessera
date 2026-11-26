@@ -287,6 +287,72 @@ inline std::vector<std::uint8_t> fifo_timing_rom(unsigned target, bool display,
   return rom;
 }
 
+// `fifo_status` (TP-104.3): the FIFO bits of the status register (bit 8 full,
+// bit 9 empty). Synced like fifo_timing, then for n = 0..6 it writes n words
+// back to back and stores status & $0300 right after them and again after a
+// wait long enough to drain the FIFO; then six pairs of one write and one
+// status read show it filling. 20 words at $FF0000.
+inline std::vector<std::uint8_t> fifo_status_rom(unsigned target, bool display,
+                                                 bool h40, bool in_vblank) {
+  std::vector<std::uint8_t> rom(0x600, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER FIFO STAT", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0,
+      0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0,
+      0x0004, // lea $C00004,a1
+      0x45F9, 0x00FF,
+      0x0000,         // lea $FF0000,a2
+      0x32BC, 0x8144, // mode 5, display on
+      0x32BC, 0x8F02, // autoincrement 2
+      0x32BC, static_cast<std::uint16_t>(h40 ? 0x8C81 : 0x8C00),
+  };
+  const auto wait_status = [&](bool until_set) { // status bit 3 (vblank)
+    c.insert(c.end(),
+             {0x3011, 0x0240, 0x0008,
+              static_cast<std::uint16_t>(until_set ? 0x67F8 : 0x66F8)});
+  };
+  wait_status(true);
+  wait_status(false);
+  if (in_vblank)
+    wait_status(true);
+  c.insert(c.end(),
+           {0x32BC, static_cast<std::uint16_t>(display ? 0x8144 : 0x8104)});
+  c.insert(c.end(),
+           {0x22BC, static_cast<std::uint16_t>(target == 0 ? 0x4000 : 0xC000),
+            0x0000});
+  c.insert(c.end(), {0x303C, 0x0EEE}); // d0 = data
+  const auto store_status = [&] {
+    // move.w (a1),d1; andi.w #$0300,d1; move.w d1,(a2)+
+    c.insert(c.end(), {0x3211, 0x0241, 0x0300, 0x34C1});
+  };
+  for (unsigned n = 0; n <= 6; ++n) {
+    for (unsigned i = 0; i < n; ++i)
+      c.push_back(0x3080); // move.w d0,(a0)
+    store_status();
+    c.insert(c.end(),
+             {0x343C, 0x00C8, 0x51CA, 0xFFFE}); // dbf wait, 2010 cycles
+    store_status();
+  }
+  for (unsigned i = 0; i < 6; ++i) {
+    c.push_back(0x3080);
+    store_status();
+  }
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `cpu_drift` (TP-104.3): after syncing to the end of the vertical blanking
 // the 68000 runs a dbf loop of 250 * k iterations (10 cycles each, no VDP
 // access) and reads the HV counter into $FF0000 + 2 * (k - 1), k = 1..32.
@@ -868,6 +934,43 @@ inline std::vector<std::uint8_t> hv_h_probe_rom(std::uint8_t reg12) {
 
 namespace tessera::testrom {
 
+// `mode4_vram` (TP-209.1 (d)): fills the 32768 VRAM words with their own index
+// in Mode 5, then goes to Mode 4 (`back` false) or to Mode 4 and back to Mode
+// 5 (`back` true), display off. The VRAM region shows the permutation through
+// which Mode 4 sees the VRAM, and that a round trip loses nothing.
+inline std::vector<std::uint8_t> mode4_vram_rom(bool back) {
+  std::vector<std::uint8_t> rom(0x400, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER MODE4VRAM", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1
+      0x32BC, 0x8104,         // Mode 5, display off
+      0x32BC, 0x8F02,         // autoincrement 2
+      0x22BC, 0x4000, 0x0000, // VRAM write at $0000
+      0x323C, 0x7FFF,         // move.w #$7FFF,d1
+      0x7000,                 // moveq #0,d0
+      0x3080,                 // .loop move.w d0,(a0)
+      0x5240,                 // addq.w #1,d0
+      0x51C9, 0xFFFA,         // dbf d1,.loop
+      0x32BC, 0x8100,         // Mode 4, display off
+  };
+  if (back)
+    c.insert(c.end(), {0x32BC, 0x8104}); // Mode 5 again
+  c.push_back(0x60FE);
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
 // `mode4_pbc` (TP-104.6): the VDP stays in Mode 4 (register 1 bit 2 clear), as
 // a Power Base Converter game leaves it. It writes VRAM with the byte and word
 // accesses of the 68000 through the control and data ports and reads it back
@@ -968,6 +1071,14 @@ struct Scene {
   std::vector<std::uint16_t> vsram; // from index 0
   std::uint8_t reg1 = 0x44;         // final value of register 1
   bool poll_status = false;         // accumulate status bits 5-6 in work RAM
+  // Timing probe (TP-209.1): when not 0, the HV counter is stored at
+  // $FF0000 + 2 * n at the start, after the registers, after every
+  // `hv_every` data words and after the final register 1 write.
+  unsigned hv_every = 0;
+  unsigned nops_before_display = 0;  // delay before the final register 1
+  unsigned nops_before_cram = 0;     // delay before the CRAM data
+  bool display_before_cram = false;  // final register 1 before the CRAM
+  bool mode4_before_display = false; // Mode 4 (display off) before it
 };
 
 inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
@@ -979,33 +1090,60 @@ inline std::vector<std::uint8_t> scene_rom(const Scene &scene,
   const auto reg = [&](std::uint8_t r, std::uint8_t v) {
     c.insert(c.end(),
              {0x32BC, static_cast<std::uint16_t>(0x8000 | (r << 8) | v)});
+    if (scene.hv_every == 2000000) // probe: HV after every register write
+      c.push_back(0x34D3);
   };
   const auto command = [&](std::uint32_t cmd) {
     c.insert(c.end(), {0x22BC, static_cast<std::uint16_t>(cmd >> 16),
                        static_cast<std::uint16_t>(cmd)});
   };
-  const auto data = [&](std::uint16_t w) { c.insert(c.end(), {0x30BC, w}); };
+  unsigned written = 0;
+  const auto hv = [&] {
+    if (scene.hv_every != 0)
+      c.push_back(0x34D3); // move.w (a3),(a2)+
+  };
+  const auto data = [&](std::uint16_t w) {
+    c.insert(c.end(), {0x30BC, w});
+    if (scene.hv_every != 0 && ++written % scene.hv_every == 0)
+      hv();
+  };
+  if (scene.hv_every != 0) {
+    c.insert(c.end(), {0x45F9, 0x00FF, 0x0000,   // lea $FF0000,a2
+                       0x47F9, 0x00C0, 0x0008}); // lea $C00008,a3 (HV)
+    hv();
+  }
   reg(0, 0x04); // full palette
   reg(1, 0x04); // display off, Mode 5
   reg(15, 2);
   for (const auto &[r, v] : scene.regs)
     reg(r, v);
+  hv();
   for (const auto &[addr, words] : scene.vram) {
     command((0x40000000U | ((addr & 0x3FFFU) << 16)) | ((addr >> 14) & 3U));
     for (const auto w : words)
       data(w);
   }
   if (!scene.cram.empty()) {
+    if (scene.display_before_cram)
+      reg(1, scene.reg1);
     command(0xC0000000U);
-    for (const auto w : scene.cram)
+    c.insert(c.end(), scene.nops_before_cram, 0x4E71); // nop
+    for (const auto w : scene.cram) {
       data(w);
+      if (scene.hv_every == 1000000) // probe: HV after every CRAM word only
+        hv();
+    }
   }
   if (!scene.vsram.empty()) {
     command(0x40000010U);
     for (const auto w : scene.vsram)
       data(w);
   }
+  if (scene.mode4_before_display)
+    reg(1, 0x00); // Mode 4, display off: the final write leaves Mode 4
+  c.insert(c.end(), scene.nops_before_display, 0x4E71); // nop
   reg(1, scene.reg1);
+  hv();
   if (scene.poll_status) {
     // d1 |= status & $60, stored at $FF0000, forever (overflow and collision
     // flags are cleared by every read, so the loop accumulates them).
@@ -1096,8 +1234,16 @@ struct ModesVariant {
   int hscroll_a = -1;           // first horizontal scroll entry of plane A
 };
 
-inline std::vector<std::uint8_t> modes_sweep_rom(const ModesVariant &v) {
+inline std::vector<std::uint8_t>
+modes_sweep_rom(const ModesVariant &v, unsigned hv_every = 0, unsigned nops = 0,
+                unsigned cram_nops = 0, bool display_first = false,
+                bool mode4_first = false) {
   Scene scene;
+  scene.display_before_cram = display_first;
+  scene.mode4_before_display = mode4_first;
+  scene.hv_every = hv_every;
+  scene.nops_before_display = nops;
+  scene.nops_before_cram = cram_nops;
   scene.regs = {{2, 0x10},   // plane A at $4000
                 {4, 0x06},   // plane B at $C000
                 {3, v.reg3}, // window
@@ -1291,6 +1437,17 @@ inline ModesVariant modes_variant(unsigned id) {
     v.reg1_extra = 0x08;
     v.reg18 = 0x8C;
     break;
+  case 32: // window right and below, shadow (27 without interlace)
+    v.reg12 = 0x08;
+    v.reg17 = 0x85;
+    v.reg18 = 0x84;
+    break;
+  case 33: // window above and left, shadow, line scroll
+    v.reg12 = 0x08;
+    v.reg11 = 0x03;
+    v.reg17 = 0x05;
+    v.reg18 = 0x03;
+    break;
   default:
     break;
   }
@@ -1329,6 +1486,7 @@ struct SpriteVariant {
   unsigned fixed_h = 0;     // cells tall (0 = random)
   bool poll_status = false; // read the sprite flags into work RAM
   std::uint8_t reg1_extra = 0x00;
+  std::uint8_t reg0_extra = 0x00; // 0x20: left column blank
 };
 
 inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
@@ -1337,6 +1495,8 @@ inline std::vector<std::uint8_t> sprite_limits_rom(const SpriteVariant &v) {
                 {5, 0x70},  {11, 0x00}, {16, 0x00}, {12, v.reg12},
                 {17, 0x00}, {18, 0x00}, {7, 0x05}};
   scene.reg1 = static_cast<std::uint8_t>(0x44 | v.reg1_extra);
+  if (v.reg0_extra != 0)
+    scene.regs.push_back({0, static_cast<std::uint8_t>(0x04 | v.reg0_extra)});
   scene.poll_status = v.poll_status;
   Lcg rng{0x5EED1000U + v.seed};
   std::vector<std::uint16_t> tiles;
@@ -1924,6 +2084,22 @@ inline SpriteVariant sprite_variant(unsigned id) {
     v.planes = false;
     v.poll_status = true;
     break;
+  case 189: // unused bits of the Y word: bit 9, and bits 10 to 15
+    v.sprites = {{20, 40, 2, 2, 0x0F},
+                 {60, 0x200 + 40, 2, 2, 0x1F},
+                 {100, 0xFC00 + 80, 2, 2, 0x2F}};
+    v.planes = false;
+    v.poll_status = true;
+    break;
+  case 190: // the same in interlace mode 2: bit 9 counts, bit 10 does not?
+    v.sprites = {{20, 208, 2, 2, 0x0F},
+                 {60, 0x200 + 208, 2, 2, 0x1F},
+                 {100, 0x400 + 248, 2, 2, 0x2F},
+                 {140, 0xF800 + 288, 2, 2, 0x3F}};
+    v.reg12 = 0x06;
+    v.planes = false;
+    v.poll_status = true;
+    break;
   case 200: // shadow/highlight with random sprites over random planes
   case 201:
   case 202:
@@ -1992,6 +2168,17 @@ inline SpriteVariant sprite_variant(unsigned id) {
     v.reg12 = 0x02;
     v.seed = id;
     v.poll_status = true;
+    break;
+  case 224: // left column blank over sprites (LAYER_DIM, TP-205.2)
+    v.count = 30;
+    v.max_cells = 3;
+    v.reg0_extra = 0x20;
+    break;
+  case 225: // the same with shadow/highlight, H40
+    v.count = 30;
+    v.max_cells = 3;
+    v.reg12 = 0x89;
+    v.reg0_extra = 0x20;
     break;
   default:
     break;
@@ -2652,6 +2839,351 @@ inline std::vector<std::uint8_t> pad_latch_rom(unsigned variant,
   rom[0x1F0] = 'U';
   std::size_t at = 0x200;
   for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  return rom;
+}
+
+} // namespace tessera::testrom
+
+namespace tessera::testrom {
+
+// `raster_bands` (spec 008, TP-106.4, TP-203, TP-204, TP-205): a fixed scene of
+// two planes and, every `reg10 + 1` lines, a horizontal interrupt whose
+// handler writes the next entry of a table in ROM to the VDP. What it writes
+// is the variant: a CRAM colour, the full screen vertical or horizontal
+// scroll, or a register (backdrop, display enable, plane A base, H32/H40,
+// shadow/highlight, the line counter itself). The vertical interrupt points
+// the table back to its start and writes entry 0, so every frame shows the
+// same bands; the bench compares the last frame and the VDP regions.
+struct RasterVariant {
+  std::uint8_t reg10 = 7;    // horizontal interrupt every reg10 + 1 lines
+  std::uint32_t command = 0; // control longword before the data; 0: the
+                             // entries are register writes to the control port
+  unsigned words = 1;        // data words per entry
+  std::uint8_t reg11 = 0x00; // full screen scroll
+  std::uint8_t reg12 = 0x81; // H40
+  std::vector<std::uint16_t> table; // 256 entries of `words` words
+  // 68000 words run once after the scene is loaded, before the interrupts
+  // (a0 = data port, a1 = control port).
+  std::vector<std::uint16_t> post;
+};
+
+inline RasterVariant raster_variant(unsigned id) {
+  RasterVariant v;
+  const auto fill = [&](auto entry) {
+    for (unsigned i = 0; i < 256; ++i)
+      for (unsigned w = 0; w < v.words; ++w)
+        v.table.push_back(static_cast<std::uint16_t>(entry(i, w)));
+  };
+  constexpr std::uint32_t kCram0 = 0xC0000000U;
+  constexpr std::uint32_t kVsram0 = 0x40000010U;
+  constexpr std::uint32_t kHscroll = 0x7C000003U; // VRAM $FC00
+  const auto colour = [](unsigned i) {
+    return (i * 0x0246U + 0x0420U) & 0x0EEEU;
+  };
+  switch (id) {
+  case 0: // backdrop colour (CRAM 0) every 8 lines
+    v.command = kCram0;
+    fill([&](unsigned i, unsigned) { return colour(i); });
+    break;
+  case 1: // backdrop colour every line
+    v.reg10 = 0;
+    v.command = kCram0;
+    fill([&](unsigned i, unsigned) { return colour(i); });
+    break;
+  case 2: // full screen vertical scroll of both planes, split screen
+    v.command = kVsram0;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (i * (w == 0 ? 5U : 13U)) & 0x3FFU;
+    });
+    break;
+  case 3: // full screen horizontal scroll of both planes
+    v.command = kHscroll;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (w == 0 ? i * 7U : 0x400U - i * 4U) & 0x3FFU;
+    });
+    break;
+  case 4: // backdrop index (register 7)
+    fill([](unsigned i, unsigned) { return 0x8700U | ((i * 5U) & 0x3FU); });
+    break;
+  case 5: // display enable (register 1) on and off
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8124U : 0x8164U; });
+    break;
+  case 6: // plane A name table (register 2): $C000 and $8000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8220U : 0x8230U; });
+    break;
+  case 7: // H40 and H32 (register 12)
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8C00U : 0x8C81U; });
+    break;
+  case 8: // shadow/highlight (register 12) off and on, H40
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8C89U : 0x8C81U; });
+    break;
+  case 9: // vertical scroll every line
+    v.reg10 = 0;
+    v.command = kVsram0;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (i * (w == 0 ? 3U : 1U)) & 0x3FFU;
+    });
+    break;
+  case 10: // horizontal scroll every line
+    v.reg10 = 0;
+    v.command = kHscroll;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (i * (w == 0 ? 2U : 5U)) & 0x3FFU;
+    });
+    break;
+  case 11: // the line counter (register 10) rewritten by its own interrupt
+    v.reg10 = 3;
+    fill([](unsigned i, unsigned) { return 0x8A00U | ((i % 4U) * 3U + 1U); });
+    break;
+  case 12: // PALETTE: shadow/highlight on and off after the CRAM is loaded,
+           // then new colours in entries 16, 32 and 48
+  case 13: // PALETTE: register 12 rewritten with the same value
+  case 14: // PALETTE: limited palette (register 0) on and off
+    fill([](unsigned, unsigned) { return 0x8700U; });
+    if (id == 12)
+      v.post = {0x32BC, 0x8C89, 0x32BC, 0x8C81};
+    else if (id == 13)
+      v.post = {0x32BC, 0x8C81};
+    else
+      v.post = {0x32BC, 0x8000, 0x32BC, 0x8004};
+    for (const std::uint32_t entry : {16U, 32U, 48U})
+      v.post.insert(v.post.end(),
+                    {0x22BC, static_cast<std::uint16_t>(0xC000U | (entry * 2U)),
+                     0x0000, 0x30BC,
+                     static_cast<std::uint16_t>(0x0A0CU + entry)});
+    break;
+  // SYSTEM flags (GEOMETRY_PENDING): when does a size change leave it set?
+  case 15: // control: register 12 rewritten with H40 at every band
+    fill([](unsigned, unsigned) { return 0x8C81U; });
+    break;
+  case 16: // H32 in the vertical interrupt, H40 again at line 7
+    fill([](unsigned i, unsigned) { return i == 0 ? 0x8C00U : 0x8C81U; });
+    break;
+  case 17: // H32 once at boot, nothing after
+    fill([](unsigned, unsigned) { return 0x8700U; });
+    v.post = {0x32BC, 0x8C00};
+    break;
+  case 18: // V30 in the vertical interrupt, V28 again at line 7
+    fill([](unsigned i, unsigned) { return i == 0 ? 0x816CU : 0x8164U; });
+    break;
+  // RASTER_JOURNAL: which writes are events?
+  case 19: // auto-increment (register 15)
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8F04U : 0x8F02U; });
+    break;
+  case 20: // DMA length (register 19)
+    fill([](unsigned i, unsigned) { return 0x9300U | (i & 0xFFU); });
+    break;
+  case 21: // sprite table base (register 5): $F800 and $F000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8578U : 0x857CU; });
+    break;
+  case 22: // VRAM outside every table ($A000)
+    v.command = 0x60000002U;
+    fill([](unsigned i, unsigned) { return i * 3U; });
+    break;
+  case 23: // VRAM in the plane A name table ($C000, first entry)
+    v.command = 0x40000003U;
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x0005U : 0x0003U; });
+    break;
+  case 24: // CRAM entry 0 rewritten with the same colour
+    v.command = kCram0;
+    fill([](unsigned, unsigned) { return 0x0222U; });
+    v.post = {0x22BC, 0xC000, 0x0000, 0x30BC, 0x0222};
+    break;
+  case 25: // VSRAM entries 2 and 3 (2-cell columns, unused in full mode)
+    v.command = 0x40040010U;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) { return (i * (w + 2U)) & 0x3FFU; });
+    break;
+  // LINE_REGS: when is each derived field taken?
+  case 26: // plane B name table (register 4): $E000 and $8000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8404U : 0x8407U; });
+    break;
+  case 27: // horizontal scroll table (register 13): $FC00 and $F400
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x8D3DU : 0x8D3FU; });
+    break;
+  case 28: // window name table (register 3): $F000 and $B000
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x832CU : 0x833CU; });
+    break;
+  case 29: // plane size (register 16): 64x32 and 32x32
+    fill([](unsigned i, unsigned) { return (i & 1U) ? 0x9000U : 0x9001U; });
+    break;
+  case 30: // window columns (register 17): none, 10 cells left, 6 right
+    fill([](unsigned i, unsigned) {
+      return i % 3U == 0 ? 0x9100U : i % 3U == 1 ? 0x9105U : 0x9183U;
+    });
+    break;
+  case 31: // window rows (register 18): none, top 12 rows, bottom from row 20
+    fill([](unsigned i, unsigned) {
+      return i % 3U == 0 ? 0x9200U : i % 3U == 1 ? 0x920CU : 0x9294U;
+    });
+    break;
+  case 33: // CRAM entry 5: the journal address of a CRAM write
+    v.command = 0xC00A0000U;
+    fill(
+        [](unsigned i, unsigned) { return (i * 0x0246U + 0x0420U) & 0x0EEEU; });
+    break;
+  case 32: // pattern data: row 7 of tiles 1 to 4 (VRAM $003C, $005C, ...)
+    v.command = 0x403C0000U;
+    v.words = 2;
+    fill([](unsigned i, unsigned w) {
+      return (i & 1U) ? (w ? 0x2345U : 0x6789U) : (w ? 0xABCDU : 0xEF12U);
+    });
+    break;
+  default:
+    fill([&](unsigned i, unsigned) { return colour(i); });
+    v.command = kCram0;
+    break;
+  }
+  return v;
+}
+
+/// Number of `raster_bands` variants; mirrored in
+/// tools/diffbench/CMakeLists.txt.
+inline unsigned raster_variant_count() { return 34; }
+
+inline std::vector<std::uint8_t> raster_bands_rom(const RasterVariant &v) {
+  std::vector<std::uint16_t> c = {
+      0x41F9, 0x00C0, 0x0000, // lea $C00000,a0 (data port)
+      0x43F9, 0x00C0, 0x0004, // lea $C00004,a1 (control port)
+  };
+  const auto reg = [&](std::uint8_t r, std::uint8_t value) {
+    c.insert(c.end(),
+             {0x32BC, static_cast<std::uint16_t>(0x8000 | (r << 8) | value)});
+  };
+  const auto command = [&](std::uint32_t cmd) {
+    c.insert(c.end(), {0x22BC, static_cast<std::uint16_t>(cmd >> 16),
+                       static_cast<std::uint16_t>(cmd)});
+  };
+  const auto vram = [&](std::uint16_t addr,
+                        const std::vector<std::uint16_t> &words) {
+    command((0x40000000U | ((addr & 0x3FFFU) << 16)) | ((addr >> 14) & 3U));
+    for (const auto w : words)
+      c.insert(c.end(), {0x30BC, w});
+  };
+  reg(0, 0x04); // full palette, no HINT while loading
+  reg(1, 0x04); // display off, Mode 5
+  reg(15, 2);
+  reg(2, 0x30);  // plane A at $C000 (the second one at $8000)
+  reg(4, 0x07);  // plane B at $E000
+  reg(3, 0x3C);  // window at $F000, unused
+  reg(5, 0x7C);  // sprites at $F800, empty
+  reg(13, 0x3F); // horizontal scroll at $FC00
+  reg(16, 0x01); // 64x32 cells
+  reg(11, v.reg11);
+  reg(12, v.reg12);
+  reg(17, 0);
+  reg(18, 0);
+  reg(7, 0x00);
+  reg(10, v.reg10);
+  Lcg rng{0x5EED0B4DU};
+  std::vector<std::uint16_t> tiles;
+  for (unsigned t = 0; t < 32; ++t)
+    for (unsigned row = 0; row < 8; ++row) {
+      std::uint32_t word = 0;
+      for (unsigned col = 0; col < 8; ++col) {
+        const unsigned shade =
+            (t == 0) ? 0U : (((t * 7U + row * 3U + col * 5U) % 15U) + 1U);
+        word = (word << 4) | ((rng.next() % 4U == 0U) ? 0U : shade);
+      }
+      tiles.push_back(static_cast<std::uint16_t>(word >> 16));
+      tiles.push_back(static_cast<std::uint16_t>(word));
+    }
+  vram(0x0000, tiles);
+  const auto table = [&] {
+    std::vector<std::uint16_t> t(64 * 32);
+    for (auto &e : t) {
+      const std::uint32_t r = rng.next();
+      e = static_cast<std::uint16_t>(
+          ((r & 0x100U) ? 0x8000U : 0U) | (((r >> 9) & 3U) << 13) |
+          ((r & 0x800U) ? 0x1000U : 0U) | ((r & 0x400U) ? 0x0800U : 0U) |
+          ((r >> 12) % 32U));
+    }
+    return t;
+  };
+  vram(0xC000, table());
+  vram(0xE000, table());
+  vram(0x8000, table());
+  vram(0xF800, {0, 0, 0, 0}); // one sprite, off screen, end of the list
+  vram(0xFC00, {0, 0});       // full screen horizontal scroll
+  command(0xC0000000U);
+  for (unsigned i = 0; i < 64; ++i)
+    c.insert(c.end(),
+             {0x30BC, static_cast<std::uint16_t>(rng.next() & 0x0EEEU)});
+  command(0x40000010U);
+  for (unsigned i = 0; i < 40; ++i)
+    c.insert(c.end(), {0x30BC, std::uint16_t{0}});
+  c.insert(c.end(), v.post.begin(), v.post.end());
+  // lea table,a2 before the interrupts: the address is patched below.
+  const std::size_t lea_at = c.size();
+  c.insert(c.end(), {0x45F9, 0x0000, 0x0000});
+  reg(0, 0x14);                      // HINT enabled
+  reg(1, 0x64);                      // display, VINT, Mode 5
+  c.insert(c.end(), {0x46FC, 0x2000, // move #$2000,sr
+                     0x60FE});       // bra.s .
+  // Handlers after the main code: HINT writes the next entry through a2,
+  // VINT points a2 at the table and falls into it for entry 0.
+  std::vector<std::uint16_t> hint;
+  if (v.command != 0) {
+    hint.insert(hint.end(),
+                {0x23FC, static_cast<std::uint16_t>(v.command >> 16),
+                 static_cast<std::uint16_t>(v.command), 0x00C0,
+                 0x0004}); // move.l #cmd,$C00004
+    for (unsigned w = 0; w < v.words; ++w)
+      hint.insert(hint.end(), {0x33DA, 0x00C0, 0x0000}); // move.w (a2)+,$C00000
+  } else {
+    hint.insert(hint.end(), {0x33DA, 0x00C0, 0x0004}); // move.w (a2)+,$C00004
+  }
+  hint.push_back(0x4E73); // rte
+  const std::uint32_t hint_at =
+      0x200U + static_cast<std::uint32_t>(c.size()) * 2U;
+  const std::uint32_t vint_at =
+      hint_at + static_cast<std::uint32_t>(hint.size()) * 2U;
+  // lea (6 bytes) and bra.w (4 bytes); the table follows. The bra.w sits at
+  // vint_at + 6 and its displacement counts from vint_at + 8.
+  const std::uint32_t table_at = vint_at + 10U;
+  c[lea_at + 1] = static_cast<std::uint16_t>(table_at >> 16);
+  c[lea_at + 2] = static_cast<std::uint16_t>(table_at);
+  const auto back =
+      static_cast<std::uint16_t>(static_cast<std::int32_t>(hint_at) -
+                                 static_cast<std::int32_t>(vint_at + 8U));
+  const std::uint16_t vint[] = {
+      0x45F9,
+      static_cast<std::uint16_t>(table_at >> 16),
+      static_cast<std::uint16_t>(table_at), // lea table,a2
+      0x6000,
+      back, // bra.w hint
+  };
+  std::vector<std::uint8_t> rom(table_at + v.table.size() * 2 + 2, 0);
+  put32(rom, 0, 0xFFFE00);
+  put32(rom, 4, 0x200);
+  put32(rom, 0x70, hint_at); // level 4 autovector
+  put32(rom, 0x78, vint_at); // level 6 autovector
+  std::memcpy(&rom[0x100], "SEGA MEGA DRIVE ", 16);
+  std::memcpy(&rom[0x120], "AYTHER RASTER   ", 16);
+  put32(rom, 0x1A4, static_cast<std::uint32_t>(rom.size() - 1));
+  std::memset(&rom[0x1F0], ' ', 16);
+  rom[0x1F0] = 'U';
+  std::size_t at = 0x200;
+  for (const auto word : c) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  for (const auto word : hint) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  for (const auto word : vint) {
+    put16(rom, at, word);
+    at += 2;
+  }
+  for (const auto word : v.table) {
     put16(rom, at, word);
     at += 2;
   }

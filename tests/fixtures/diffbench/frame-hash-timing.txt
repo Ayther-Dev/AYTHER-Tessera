@@ -1,0 +1,50 @@
+# FRAME_HASH on the first frames after power-on (spec 008, TP-206.1), where the
+# test ROMs set the VDP up while it draws; see md_subscriptions_test.cpp.
+# raster-bands-7 also draws H32 lines in an H40 frame (known limitation).
+# The other 28 cases moved to frame-hash.txt when the line draw point and the
+# mid-line display enable were fixed (TP-209.1, 2026-11-10).
+
+
+case modes-sweep-3 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=9afc658419cff2b vram=e14afcacac47adee cram=31698d6bc6e6351d vsram=306c537b2ff38983
+end
+
+case modes-sweep-4 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=9afc658419cff2b vram=e14afcacac47adee cram=31698d6bc6e6351d vsram=306c537b2ff38983
+end
+
+case modes-sweep-14 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=9afc658419cff2b vram=e14afcacac47adee cram=31698d6bc6e6351d vsram=306c537b2ff38983
+end
+
+case modes-sweep-15 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=27fa2786f06dfbeb audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-16 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=a91adb890f40b52b audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-25 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=2e317b418345ae8a audio=9afc658419cff2b vram=6d104cd4917b25e3 cram=c4b9dcbab3e80c02 vsram=ca662bbe0e86ccaa
+end
+
+case modes-sweep-30 800 1:h 2
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=c6ba2821652f0383 audio=9afc658419cff2b vram=e14afcacac47adee cram=31698d6bc6e6351d vsram=306c537b2ff38983
+end
+
+case raster-bands-7 800 0:h;1:h;2:h;3:h 4
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=3130d28f27c4d38f cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=8e11026f2f70c72f audio=9afc658419cff2b vram=a62d9c040e78e465 cram=83bb46d130c5ce37 vsram=306c537b2ff38983
+frame=2 hash status=0 version=1 size=56 frame_index=2 video=2fe8427e219459aa audio=d4edd7fe26e7ecf3 vram=a62d9c040e78e465 cram=83bb46d130c5ce37 vsram=306c537b2ff38983
+frame=3 hash status=0 version=1 size=56 frame_index=3 video=2fe8427e219459aa audio=e693fa3b4b76355b vram=a62d9c040e78e465 cram=83bb46d130c5ce37 vsram=306c537b2ff38983
+end
+
+case sprite-limits-0 800 0:h;1:h 2
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=4616022f36349142 cram=306c537b2ff38983 vsram=306c537b2ff38983
+frame=1 hash status=0 version=1 size=56 frame_index=1 video=d14a2a9001ae74b2 audio=9afc658419cff2b vram=6851b7d8badc1752 cram=c64636b5a8878a34 vsram=306c537b2ff38983
+end
+
+case mode4-scene-0 800 0:h 1
+frame=0 hash status=0 version=1 size=56 frame_index=0 video=c6ba2821652f0383 audio=db0253c04dfdd9ab vram=443a7f21367cf398 cram=306c537b2ff38983 vsram=306c537b2ff38983
+end

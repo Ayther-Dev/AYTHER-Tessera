@@ -4,7 +4,7 @@ Uso: gen_observation_header.py <ayther_api.h>"""
 import pathlib, re, sys
 
 PREFIXES = ("CAP_", "SUB_", "LAYOUT_", "SPR_OUT_", "REGION_ACCESS_", "REGION_WORD_SWAPPED_LE",
-            "AUDIO_TRANSPORT_", "ABI_VERSION_1_", "ABI_VERSION_LATEST", "JOURNAL_MAX_EVENTS", "PALETTE_ENTRIES", "LINE_CELL_COLUMNS", "LINE_MAX", "MAX_")
+            "AUDIO_TRANSPORT_", "ABI_VERSION_1_", "ABI_VERSION_LATEST", "JOURNAL_MAX_EVENTS", "PALETTE_ENTRIES", "LINE_CELL_COLUMNS", "LINE_MAX", "MAX_", "SNAPSHOT_", "OVERFLOW_")
 
 def main(ref):
     root = pathlib.Path(__file__).resolve().parent.parent

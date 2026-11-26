@@ -50,7 +50,9 @@ std::array<tessera_backend_info_v1, kRegistrationCount> backends() {
     v.system = registrations[i].system;
     v.capabilities = registrations[i].capabilities;
     std::memcpy(v.id, registrations[i].id.data(), registrations[i].id.size());
-    std::memcpy(v.version, "0.1.0", 5);
+    static_assert(sizeof(TESSERA_PACKAGE_VERSION) <= sizeof(v.version));
+    std::memcpy(v.version, TESSERA_PACKAGE_VERSION,
+                sizeof(TESSERA_PACKAGE_VERSION) - 1);
     std::copy(hash.begin(), hash.end(), v.build_id);
   }
   return values;
@@ -115,6 +117,10 @@ std::string status_text(tessera_status code) {
     return "Memoria insuficiente";
   case TESSERA_BACKEND_FAILURE:
     return "Fallo del backend";
+  case TESSERA_NOT_SUBSCRIBED:
+    return "Suscripción inactiva";
+  case TESSERA_BUSY:
+    return "Núcleo ocupado ejecutando un frame";
   default:
     return "Código de estado desconocido";
   }
@@ -231,7 +237,7 @@ tessera_session_create_v1(const tessera_session_create_info_v1 *in,
     c.input(in->config);
     c.input(in->initial_persistent_memory);
     c.start();
-    require(in->flags == 0 && in->system_override <= 1);
+    require(in->flags == 0 && in->system_override <= TESSERA_SYSTEM_SG1000);
     const auto requested =
         in->backend_id.bytes
             ? std::string(reinterpret_cast<const char *>(in->backend_id.data),
@@ -581,16 +587,35 @@ tessera_status_format_v1(const tessera_context_v1 *in, tessera_buffer_v1 out,
 }
 }
 namespace {
-// Solo synthetic.complete sirve observación por ahora (TP-006.5); los demás
-// backends la anuncian cuando la implementen.
+// Sirven observación el backend sintético completo (TP-006.5, contenido nulo) y
+// los que ofrecen IObservable (el Mega Drive nativo, TP-201). Una llamada que
+// llega con un frame en marcha responde BUSY, como gpgx.
 std::shared_ptr<Session> observed_session(tessera_session handle) {
   auto s = sessions.get(handle);
-  require(s->backend == "synthetic.complete", TESSERA_UNSUPPORTED_CAPABILITY);
+  require(s->backend == "synthetic.complete" ||
+              s->machine->observation() != nullptr,
+          TESSERA_UNSUPPORTED_CAPABILITY);
+  require(!s->running.load(), TESSERA_BUSY);
   return s;
 }
+// Solo los backends con IObservable llevan suscripciones.
+IObservable &observable(Session &s) {
+  auto *o = s.machine->observation();
+  require(o != nullptr, TESSERA_UNSUPPORTED_CAPABILITY);
+  return *o;
+}
 const observation::RegionRow &region_row(std::uint32_t id) {
+  if (id == TESSERA_OBS_REGION_WORK_RAM)
+    return observation::kWorkRamRow;
   require(id >= 1 && id <= observation::kRegionCount);
   return observation::kRegions[id - 1];
+}
+/// Byte size of the region now: the system's when it varies, else the table's.
+std::uint32_t region_bytes(Session &s, const observation::RegionRow &r) {
+  if (const auto *o = s.machine->observation())
+    if (const auto live = o->region_byte_size(r.id); live != UINT32_MAX)
+      return live;
+  return r.byte_size;
 }
 } // namespace
 extern "C" {
@@ -609,7 +634,9 @@ tessera_status TESSERA_CALL tessera_observation_region_query_v1(
     info.data_version = r.data_version;
     info.element_size = r.element_size;
     info.capacity = r.capacity;
-    info.byte_size = r.byte_size;
+    info.byte_size = region_bytes(*s, r);
+    if (r.element_size == 1)
+      info.capacity = info.byte_size;
     info.access_flags = r.access_flags;
     info.legacy_memory_id = r.legacy_id;
     *out = info;
@@ -623,13 +650,23 @@ tessera_status TESSERA_CALL tessera_observation_region_read_v1(
   return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
     auto s = observed_session(session);
     const auto &r = region_row(region_id);
-    require(out && (byte_count == 0 || offset < r.byte_size) &&
-            std::uint64_t{offset} + byte_count <= r.byte_size);
+    const std::uint32_t size = region_bytes(*s, r);
+    // A read of 0 bytes may pass no buffer: gpgx answers it with the state of
+    // the subscription (measured, ATTRIBUTION of 0 bytes before any frame).
+    require((out || byte_count == 0) && (byte_count == 0 || offset < size) &&
+            std::uint64_t{offset} + byte_count <= size);
     require(expected_generation == UINT64_MAX ||
                 expected_generation == s->generation,
             TESSERA_STALE_EPOCH);
+    c.range(out, byte_count);
     c.start();
-    std::memset(out, 0, byte_count); // regiones fijas: contenido nulo
+    if (auto *o = s->machine->observation()) {
+      const auto status = o->read_region(
+          region_id, offset, {static_cast<std::uint8_t *>(out), byte_count});
+      require(status == TESSERA_OK, status);
+    } else if (byte_count != 0) {
+      std::memset(out, 0, byte_count); // regiones fijas: contenido nulo
+    }
     if (actual_generation)
       *actual_generation = s->generation;
     return TESSERA_OK;
@@ -652,8 +689,254 @@ tessera_status TESSERA_CALL tessera_observation_write_control_v1(
                 expected_generation == s->generation,
             TESSERA_STALE_EPOCH);
     c.start();
+    // TP-205.2: LAYER_MASK y LAYER_DIM; una escritura aceptada avanza la
+    // generación (medido en gpgx), una rechazada no.
+    if (auto *o = s->machine->observation()) {
+      const auto status = o->write_control(
+          region_id, offset,
+          {static_cast<const std::uint8_t *>(data), byte_count});
+      require(status == TESSERA_OK, status);
+      ++s->generation;
+    }
     if (new_generation)
       *new_generation = s->generation;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_subscriptions_get_v1(
+    tessera_session session, tessera_obs_subscription_state_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out && out_size >= sizeof(*out));
+    c.range(out, sizeof(*out), alignof(tessera_obs_subscription_state_v1));
+    c.start();
+    const auto state = o.subscriptions();
+    tessera_obs_subscription_state_v1 v{};
+    v.struct_size = sizeof(v);
+    v.state_version = 1;
+    v.supported_mask = state.supported;
+    v.active_mask = state.active;
+    v.requested_mask = state.requested;
+    v.activation_frame = state.activation_frame;
+    *out = v;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_subscriptions_set_v1(
+    tessera_session session, std::uint32_t requested_mask,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_WRITE, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    c.start();
+    // Los bits desconocidos se rechazan, no se ignoran.
+    require(o.set_subscriptions(requested_mask), TESSERA_INVALID_ARGUMENT);
+    // An accepted request moves the generation, even with the same mask; a
+    // refused one does not (measured on gpgx r4).
+    ++s->generation;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_audio_events_poll_v1(
+    tessera_session session, void *out, std::uint32_t event_capacity,
+    std::uint32_t event_size, std::uint32_t *out_event_count,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out && out_event_count && event_capacity != 0 && event_size != 0 &&
+            event_size <= 4096 &&
+            std::uint64_t{event_capacity} * event_size <= byte_limit);
+    c.range(out, std::uint64_t{event_capacity} * event_size);
+    c.range(out_event_count, sizeof(*out_event_count), alignof(std::uint32_t));
+    c.start();
+    std::uint32_t count = 0;
+    const auto status =
+        o.poll_audio_events({static_cast<std::uint8_t *>(out),
+                             std::size_t{event_capacity} * event_size},
+                            event_capacity, event_size, count);
+    *out_event_count = count;
+    require(status == TESSERA_OK, status);
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_recompose_v1(
+    tessera_session session, std::uint16_t *out_pixels,
+    std::uint32_t pixel_capacity, std::uint32_t flags, std::uint32_t *out_width,
+    std::uint32_t *out_height, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out_pixels && out_width && out_height && pixel_capacity != 0 &&
+            std::uint64_t{pixel_capacity} * 2 <= byte_limit);
+    c.range(out_pixels, std::uint64_t{pixel_capacity} * 2,
+            alignof(std::uint16_t));
+    c.range(out_width, sizeof(*out_width), alignof(std::uint32_t));
+    c.range(out_height, sizeof(*out_height), alignof(std::uint32_t));
+    c.start();
+    std::uint32_t width = 0, height = 0;
+    const auto status =
+        o.recompose({out_pixels, pixel_capacity}, flags, width, height);
+    *out_width = width;
+    *out_height = height;
+    require(status == TESSERA_OK, status);
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_recompose_multilayer_v1(
+    tessera_session session, std::uint16_t *out_bg_a, std::uint16_t *out_bg_b,
+    std::uint16_t *out_window, std::uint16_t *out_sprites,
+    std::uint16_t *out_composite, std::uint32_t pixel_capacity,
+    std::uint32_t flags, std::uint32_t *out_width, std::uint32_t *out_height,
+    tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    const std::array<std::uint16_t *, 5> layers{out_bg_a, out_bg_b, out_window,
+                                                out_sprites, out_composite};
+    require(out_width && out_height && pixel_capacity != 0 &&
+            std::uint64_t{pixel_capacity} * 2 <= byte_limit);
+    for (auto *layer : layers) {
+      require(layer != nullptr);
+      c.range(layer, std::uint64_t{pixel_capacity} * 2, alignof(std::uint16_t));
+    }
+    c.range(out_width, sizeof(*out_width), alignof(std::uint32_t));
+    c.range(out_height, sizeof(*out_height), alignof(std::uint32_t));
+    c.start();
+    std::array<std::span<std::uint16_t>, 5> out;
+    for (unsigned i = 0; i < 5; ++i)
+      out[i] = {layers[i], pixel_capacity};
+    std::uint32_t width = 0, height = 0;
+    const auto status = o.recompose_layers(out, flags, width, height);
+    *out_width = width;
+    *out_height = height;
+    require(status == TESSERA_OK, status);
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_recompose_stats_v1(
+    tessera_session session, tessera_obs_recompose_stats_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    // gpgx answers BUFFER_TOO_SMALL below the 48 bytes, with or without
+    // subscriptions, and ok for a larger size (TP-205.3).
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_recompose_stats_v1));
+    c.start();
+    IObservable::RecomposeStats stats{};
+    const auto status = o.recompose_stats(stats);
+    require(status == TESSERA_OK, status);
+    *out = {sizeof(*out),
+            0,
+            stats.single_calls,
+            stats.single_hits,
+            stats.multilayer_calls,
+            stats.multilayer_hits,
+            stats.controls_fingerprint};
+    return TESSERA_OK;
+  });
+}
+} // extern "C"
+namespace {
+/// poll_frame_delta and frame_delta_since (TP-205.4): no subscription needed;
+/// below the 2080 bytes gpgx answers BUFFER_TOO_SMALL and leaves `out` as it
+/// was. A generation out of the history is STALE_EPOCH (gpgx
+/// DELTA_HISTORY_LOST), with `out` filled: everything dirty.
+template <typename Ask>
+tessera_status
+frame_delta_call(tessera_session session, tessera_obs_frame_delta_v1 *out,
+                 std::uint32_t out_size, tessera_context_v1 *ctx, Ask ask) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_frame_delta_v1));
+    c.start();
+    IObservable::FrameDelta delta{};
+    const std::int32_t status = ask(o, delta);
+    require(status == TESSERA_OK || status == TESSERA_STALE_EPOCH, status);
+    out->struct_size = sizeof(*out);
+    out->delta_version = 1;
+    out->frame_generation = delta.generation;
+    out->raster_event_count = delta.raster_events;
+    out->parsed_sprite_count = delta.parsed_sprites;
+    out->audio_write_count = delta.audio_writes;
+    out->raster_events_dropped = delta.raster_dropped;
+    std::memcpy(out->dirty_patterns, delta.dirty.data(), delta.dirty.size());
+    return static_cast<tessera_status>(status);
+  });
+}
+} // namespace
+extern "C" {
+tessera_status TESSERA_CALL tessera_observation_frame_delta_poll_v1(
+    tessera_session session, tessera_obs_frame_delta_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return frame_delta_call(session, out, out_size, ctx,
+                          [](IObservable &o, IObservable::FrameDelta &delta) {
+                            return o.frame_delta(delta);
+                          });
+}
+tessera_status TESSERA_CALL tessera_observation_frame_delta_since_v1(
+    tessera_session session, std::uint64_t generation_from,
+    tessera_obs_frame_delta_v1 *out, std::uint32_t out_size,
+    tessera_context_v1 *ctx) {
+  return frame_delta_call(
+      session, out, out_size, ctx,
+      [generation_from](IObservable &o, IObservable::FrameDelta &delta) {
+        return o.frame_delta_since(generation_from, delta);
+      });
+}
+/// capture_snapshot (TP-302): the counters of the last frame run, frozen when
+/// it ended, with the session generation that region reads check. Below the
+/// 48 bytes gpgx answers BUFFER_TOO_SMALL and leaves `out` as it was. No
+/// subscription is needed; each counter is 0 while its own is idle.
+tessera_status TESSERA_CALL tessera_observation_snapshot_capture_v1(
+    tessera_session session, tessera_obs_frame_snapshot_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out != nullptr);
+    require(out_size >= sizeof(*out), TESSERA_BUFFER_TOO_SMALL);
+    c.range(out, sizeof(*out), alignof(tessera_obs_frame_snapshot_v1));
+    c.start();
+    IObservable::FrameDelta frame{};
+    const std::int32_t status = o.frame_delta(frame);
+    require(status == TESSERA_OK, status);
+    tessera_obs_frame_snapshot_v1 v{};
+    v.struct_size = sizeof(v);
+    v.snapshot_version = 1;
+    v.snapshot_generation = s->generation;
+    v.frame_generation = frame.generation;
+    // A session always holds its content; a capture never lands inside a
+    // frame (the call would be BUSY), so FRAME_ACTIVE never shows.
+    v.flags = TESSERA_OBS_SNAPSHOT_CONTENT_LOADED;
+    v.overflow_flags = frame.overflow;
+    v.fallback_reasons = frame.fallback;
+    v.parsed_sprite_count = frame.parsed_sprites;
+    v.audio_write_count = frame.audio_writes;
+    *out = v;
+    return TESSERA_OK;
+  });
+}
+tessera_status TESSERA_CALL tessera_observation_audio_transport_stats_v1(
+    tessera_session session, tessera_obs_audio_transport_stats_v1 *out,
+    std::uint32_t out_size, tessera_context_v1 *ctx) {
+  return invoke(ctx, TESSERA_PHASE_READ, [&](Call &c) {
+    auto s = observed_session(session);
+    auto &o = observable(*s);
+    require(out && out_size >= sizeof(*out));
+    c.range(out, sizeof(*out), alignof(tessera_obs_audio_transport_stats_v1));
+    c.start();
+    const auto status = o.audio_transport_stats(
+        {reinterpret_cast<std::uint8_t *>(out), sizeof(*out)});
+    require(status == TESSERA_OK, status);
     return TESSERA_OK;
   });
 }

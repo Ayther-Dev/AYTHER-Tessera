@@ -1,3 +1,23 @@
+# TP-112.2: registers <name> with the native core (when built) and
+# <name>_clown with the ClownMDEmu reference backend, through the
+# TESSERA_TEST_BACKEND variable that tests/support/backend_under_test.hpp reads.
+function(tessera_md_backend_variants name)
+    cmake_parse_arguments(PARSE_ARGV 1 variant "" "" "COMMAND;PROPERTIES")
+    set(variants)
+    if(TESSERA_BUILD_MEGADRIVE)
+        list(APPEND variants "${name}=megadrive")
+    endif()
+    list(APPEND variants "${name}_clown=clownmdemu")
+    foreach(entry IN LISTS variants)
+        string(REPLACE "=" ";" pair "${entry}")
+        list(GET pair 0 test_name)
+        list(GET pair 1 backend)
+        add_test(NAME ${test_name} COMMAND ${variant_COMMAND})
+        set_tests_properties(${test_name} PROPERTIES ${variant_PROPERTIES}
+            ENVIRONMENT "TESSERA_TEST_BACKEND=${backend}")
+    endforeach()
+endfunction()
+
 add_executable(tessera_native_api_test contract/native_api_test.cpp contract/abi_c_test.c)
 target_include_directories(tessera_native_api_test PRIVATE "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(tessera_native_api_test PRIVATE Tessera::build_options doctest::doctest)
@@ -23,7 +43,7 @@ add_test(NAME unit.session COMMAND tessera_session_test)
 set_tests_properties(unit.session PROPERTIES LABELS "unit;phase1" TIMEOUT 30)
 
 add_executable(tessera_detector_test unit/system_detector_test.cpp)
-target_include_directories(tessera_detector_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(tessera_detector_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(tessera_detector_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
 target_compile_definitions(tessera_detector_test PRIVATE TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>)
 tessera_copy_diagnostic_runtime(tessera_detector_test)
@@ -45,6 +65,20 @@ target_compile_definitions(tessera_md_cart_test PRIVATE SRM_FIXTURE="${CMAKE_CUR
 tessera_copy_diagnostic_runtime(tessera_md_cart_test)
 add_test(NAME unit.md_cart COMMAND tessera_md_cart_test)
 set_tests_properties(unit.md_cart PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+
+add_executable(tessera_sms_system_test unit/sms_system_test.cpp)
+target_include_directories(tessera_sms_system_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(tessera_sms_system_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_sms_system_test)
+add_test(NAME unit.sms_system COMMAND tessera_sms_system_test)
+set_tests_properties(unit.sms_system PROPERTIES LABELS "unit;phase6;sms" TIMEOUT 30)
+
+add_executable(tessera_md_special_cart_test unit/md_special_cart_test.cpp)
+target_include_directories(tessera_md_special_cart_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(tessera_md_special_cart_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_special_cart_test)
+add_test(NAME unit.md_special_cart COMMAND tessera_md_special_cart_test)
+set_tests_properties(unit.md_special_cart PROPERTIES LABELS "unit;phase5;md" TIMEOUT 30)
 
 add_executable(tessera_md_bus_test unit/md_bus_test.cpp)
 target_include_directories(tessera_md_bus_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
@@ -120,6 +154,13 @@ target_link_libraries(tessera_md_state_restore_test PRIVATE Tessera::core Tesser
 tessera_copy_diagnostic_runtime(tessera_md_state_restore_test)
 add_test(NAME integration.md_state_restore COMMAND tessera_md_state_restore_test)
 set_tests_properties(integration.md_state_restore PROPERTIES LABELS "integration;phase1;md" TIMEOUT 120)
+add_executable(tessera_md_subscriptions_test integration/md_subscriptions_test.cpp)
+target_include_directories(tessera_md_subscriptions_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_compile_definitions(tessera_md_subscriptions_test PRIVATE TESSERA_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+target_link_libraries(tessera_md_subscriptions_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_subscriptions_test)
+add_test(NAME integration.md_subscriptions COMMAND tessera_md_subscriptions_test)
+set_tests_properties(integration.md_subscriptions PROPERTIES LABELS "integration;phase1;md" TIMEOUT 120)
 
 add_executable(tessera_md_input_test unit/md_input_test.cpp)
 target_include_directories(tessera_md_input_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
@@ -147,6 +188,13 @@ target_link_libraries(tessera_md_vdp_regs_dma_test PRIVATE Tessera::core Tessera
 tessera_copy_diagnostic_runtime(tessera_md_vdp_regs_dma_test)
 add_test(NAME unit.md_vdp_regs_dma COMMAND tessera_md_vdp_regs_dma_test)
 set_tests_properties(unit.md_vdp_regs_dma PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+
+add_executable(tessera_md_cheats_test unit/md_cheats_test.cpp)
+target_include_directories(tessera_md_cheats_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(tessera_md_cheats_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_cheats_test)
+add_test(NAME unit.md_cheats COMMAND tessera_md_cheats_test)
+set_tests_properties(unit.md_cheats PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
 add_executable(tessera_md_system_test unit/md_system_test.cpp)
 target_include_directories(tessera_md_system_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -178,6 +226,12 @@ target_link_libraries(tessera_md_vdp_render_test PRIVATE Tessera::core Tessera::
 tessera_copy_diagnostic_runtime(tessera_md_vdp_render_test)
 add_test(NAME unit.md_vdp_render COMMAND tessera_md_vdp_render_test)
 set_tests_properties(unit.md_vdp_render PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
+add_executable(tessera_md_vdp_registers_test unit/md_vdp_registers_test.cpp)
+target_include_directories(tessera_md_vdp_registers_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(tessera_md_vdp_registers_test PRIVATE Tessera::core Tessera::build_options doctest::doctest)
+tessera_copy_diagnostic_runtime(tessera_md_vdp_registers_test)
+add_test(NAME unit.md_vdp_registers COMMAND tessera_md_vdp_registers_test)
+set_tests_properties(unit.md_vdp_registers PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
 
 add_test(NAME unit.md_bus COMMAND tessera_md_bus_test)
 set_tests_properties(unit.md_bus PROPERTIES LABELS "unit;phase1;md" TIMEOUT 30)
@@ -215,9 +269,9 @@ add_test(NAME integration.replay COMMAND tessera_replay_test "${PROJECT_BINARY_D
 set_tests_properties(integration.replay PROPERTIES LABELS "integration;replay;phase1;FX-01" TIMEOUT 240 RUN_SERIAL TRUE)
 endif()
 
-# El paquete distribuible solo lista los backends sintéticos; con los núcleos
-# de referencia o el núcleo Mega Drive en construcción se verifica en windows-dev.
-if(WIN32 AND NOT TESSERA_BUILD_CLOWN_REFERENCE AND NOT TESSERA_BUILD_MEGADRIVE)
+# El paquete distribuible lista megadrive (TP-112.1) y los backends sintéticos;
+# el árbol de referencia ClownMDEmu nunca se instala.
+if(WIN32 AND NOT TESSERA_BUILD_CLOWN_REFERENCE)
 add_test(NAME package.installed_consumer COMMAND "${CMAKE_COMMAND}"
     "-DPRODUCER_BUILD=${PROJECT_BINARY_DIR}"
     "-DPROJECT_SOURCE=${PROJECT_SOURCE_DIR}"
@@ -251,24 +305,28 @@ add_custom_target(tessera_generate_fixture_roms ALL DEPENDS
     "${TESSERA_GENERATED_FIXTURES}/fx03_rom.md")
 
 add_executable(tessera_megadrive_session_test integration/megadrive_session_test.cpp)
-target_include_directories(tessera_megadrive_session_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_include_directories(tessera_megadrive_session_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(tessera_megadrive_session_test PRIVATE
     TESSERA_ORIGINAL_ROM="${TESSERA_GENERATED_FIXTURES}/ayther_synthetic.md")
 target_link_libraries(tessera_megadrive_session_test PRIVATE Tessera::core Tessera::build_options
     doctest::doctest PicoSHA2::PicoSHA2)
 tessera_copy_diagnostic_runtime(tessera_megadrive_session_test)
-add_test(NAME integration.megadrive_session COMMAND tessera_megadrive_session_test)
-set_tests_properties(integration.megadrive_session PROPERTIES LABELS "integration;phase3;MegaDrive" TIMEOUT 45)
+# TP-112.2 (DA-1): each Mega Drive integration test runs with the native core
+# (default name) and, in this reference tree, with ClownMDEmu (_clown).
+tessera_md_backend_variants(integration.megadrive_session
+    COMMAND tessera_megadrive_session_test
+    PROPERTIES LABELS "integration;phase3;MegaDrive" TIMEOUT 45)
 
 add_executable(tessera_megadrive_observation_test integration/megadrive_observation_test.cpp)
-target_include_directories(tessera_megadrive_observation_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_include_directories(tessera_megadrive_observation_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(tessera_megadrive_observation_test PRIVATE
     TESSERA_ORIGINAL_ROM="${TESSERA_GENERATED_FIXTURES}/ayther_synthetic.md")
 target_link_libraries(tessera_megadrive_observation_test PRIVATE Tessera::core Tessera::build_options
     doctest::doctest PicoSHA2::PicoSHA2)
 tessera_copy_diagnostic_runtime(tessera_megadrive_observation_test)
-add_test(NAME integration.megadrive_observation COMMAND tessera_megadrive_observation_test)
-set_tests_properties(integration.megadrive_observation PROPERTIES LABELS "integration;phase4;MegaDrive" TIMEOUT 45)
+tessera_md_backend_variants(integration.megadrive_observation
+    COMMAND tessera_megadrive_observation_test
+    PROPERTIES LABELS "integration;phase4;MegaDrive" TIMEOUT 45)
 endif()
 
 add_executable(tessera_robustness_test integration/robustness_test.cpp)
@@ -326,7 +384,7 @@ set_tests_properties(integration.checkpoint PROPERTIES
 
 if(TESSERA_BUILD_CLOWN_REFERENCE)
 add_executable(tessera_megadrive_replay_test integration/megadrive_replay_test.cpp)
-target_include_directories(tessera_megadrive_replay_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_include_directories(tessera_megadrive_replay_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(tessera_megadrive_replay_test PRIVATE
     TESSERA_ORIGINAL_ROM="${TESSERA_GENERATED_FIXTURES}/ayther_synthetic.md"
     TESSERA_FX02_MANIFEST="${PROJECT_SOURCE_DIR}/tests/fixtures/audio-active/manifest.json"
@@ -334,10 +392,10 @@ target_compile_definitions(tessera_megadrive_replay_test PRIVATE
 target_link_libraries(tessera_megadrive_replay_test PRIVATE Tessera::core Tessera::build_options
     nlohmann_json::nlohmann_json PicoSHA2::PicoSHA2)
 tessera_copy_diagnostic_runtime(tessera_megadrive_replay_test)
-add_test(NAME integration.megadrive_replay COMMAND tessera_megadrive_replay_test
-    "$<TARGET_FILE:tessera_audio_fixture_generator>" "${PROJECT_BINARY_DIR}/../evidence/phase3-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}")
-set_tests_properties(integration.megadrive_replay PROPERTIES
-    LABELS "integration;phase3;replay;FX-02;checkpoint" TIMEOUT 900 RUN_SERIAL TRUE)
+tessera_md_backend_variants(integration.megadrive_replay
+    COMMAND tessera_megadrive_replay_test
+    "$<TARGET_FILE:tessera_audio_fixture_generator>" "${PROJECT_BINARY_DIR}/../evidence/phase3-${CMAKE_BUILD_TYPE}-${TESSERA_ENABLE_DIAGNOSTICS}"
+    PROPERTIES LABELS "integration;phase3;replay;FX-02;checkpoint" TIMEOUT 900 RUN_SERIAL TRUE)
 endif()
 
 add_executable(tessera_observation_abi_test contract/observation_abi_test.cpp)
@@ -373,6 +431,20 @@ add_test(NAME unit.md_mixer COMMAND tessera_md_mixer_test)
 set_tests_properties(unit.md_mixer PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
 
 if(TESSERA_BUILD_MEGADRIVE)
+add_executable(tessera_md_regions_test unit/md_regions_test.cpp)
+target_include_directories(tessera_md_regions_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_regions_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_regions_test)
+add_test(NAME unit.md_regions COMMAND tessera_md_regions_test)
+set_tests_properties(unit.md_regions PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
+
+add_executable(tessera_md_audio_events_test unit/md_audio_events_test.cpp)
+target_include_directories(tessera_md_audio_events_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
+target_link_libraries(tessera_md_audio_events_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)
+tessera_copy_diagnostic_runtime(tessera_md_audio_events_test)
+add_test(NAME unit.md_audio_events COMMAND tessera_md_audio_events_test)
+set_tests_properties(unit.md_audio_events PROPERTIES LABELS "unit;phase1;md" TIMEOUT 60)
+
 add_executable(tessera_md_audio_mute_test unit/md_audio_mute_test.cpp)
 target_include_directories(tessera_md_audio_mute_test PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/tests")
 target_link_libraries(tessera_md_audio_mute_test PRIVATE Tessera::core Tessera::build_options doctest::doctest PicoSHA2::PicoSHA2)

@@ -1,0 +1,140 @@
+# recompose_stats measured on gpgx (spec 008, TP-205.3). Written by
+# tools/diffbench/compare_recompose_stats.py --update; the native side runs the
+# same cases in tests/integration/md_subscriptions_test.cpp.
+# case <test rom> <subscriptions hex> <stats script>; then what gpgx answered.
+
+case modes-sweep-0 24 1:p5=0f.s.s.p5=03.s.p5=0f.s.g
+frame=1 p5=0f status=0
+frame=1 s status=0
+frame=1 s status=0
+frame=1 p5=03 status=0
+frame=1 s status=0
+frame=1 p5=0f status=0
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=4/1 multi=0/0 fingerprint=7d376f323da88ba1
+end
+
+case modes-sweep-0 20 1:s.p5=03.s.p10=01.s.g
+frame=1 s status=0
+frame=1 p5=03 status=0
+frame=1 s status=0
+frame=1 p10=01 status=0
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=3/0 multi=0/0 fingerprint=624c0694afddd25d
+end
+
+case modes-sweep-0 20 1:s.p5=0f.p5=ff.s.g
+frame=1 s status=0
+frame=1 p5=0f status=0
+frame=1 p5=ff status=-1
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=2/0 multi=0/0 fingerprint=49ac568ddb2b23f0
+end
+
+case modes-sweep-0 24 1:s.m.s.m.g
+frame=1 s status=0
+frame=1 m status=0
+frame=1 s status=0
+frame=1 m status=0
+frame=1 stats status=0 size=48 single=2/1 multi=2/1 fingerprint=92b24ce1ac3a0531
+end
+
+case mode4-scene-1 20 1:m.m.s.s.g
+frame=1 m status=-20
+frame=1 m status=-20
+frame=1 s status=0
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=2/1 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-23 20 1:s.s.m.g
+frame=1 s status=-21
+frame=1 s status=-21
+frame=1 m status=-21
+frame=1 stats status=0 size=48 single=0/0 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 24 1:s.g;2:g.s.g
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=92b24ce1ac3a0531
+frame=2 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=92b24ce1ac3a0531
+frame=2 s status=0
+frame=2 stats status=0 size=48 single=2/0 multi=0/0 fingerprint=92b24ce1ac3a0531
+end
+
+case raster-bands-9 28 1:m.m.g
+frame=1 m status=0
+frame=1 m status=0
+frame=1 stats status=0 size=48 single=0/0 multi=2/1 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 20 1:s@100.s.s@100.m@100.g
+frame=1 s@100 status=-23
+frame=1 s status=0
+frame=1 s@100 status=-23
+frame=1 m@100 status=-23
+frame=1 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 28 1:m.m1.m1.m.g
+frame=1 m status=0
+frame=1 m1 status=0
+frame=1 m1 status=0
+frame=1 m status=0
+frame=1 stats status=0 size=48 single=0/0 multi=4/1 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 20 1:s.s1.s.g
+frame=1 s status=0
+frame=1 s1 status=0
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=3/0 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 20 1:s.u24.s.u20.s.g
+frame=1 s status=0
+frame=1 u24 status=0
+frame=1 s status=0
+frame=1 u20 status=0
+frame=1 s status=0
+frame=1 stats status=0 size=48 single=3/2 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 20 1:s.x.s.m.g;2:s.x.s.g
+frame=1 s status=0
+frame=1 x status=0
+frame=1 s status=0
+frame=1 m status=0
+frame=1 stats status=0 size=48 single=2/0 multi=1/0 fingerprint=343178de6c99aa60
+frame=2 s status=0
+frame=2 x status=0
+frame=2 s status=0
+frame=2 stats status=0 size=48 single=4/0 multi=1/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 20 1:s.g40.g47.g48.g64.g0
+frame=1 s status=0
+frame=1 stats status=-3 size=0 single=0/0 multi=0/0 fingerprint=0
+frame=1 stats status=-3 size=0 single=0/0 multi=0/0 fingerprint=0
+frame=1 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=343178de6c99aa60
+frame=1 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=343178de6c99aa60
+frame=1 stats status=-3 size=0 single=0/0 multi=0/0 fingerprint=0
+end
+
+case modes-sweep-0 0 1:s.m.g;2:u20;3:s.g
+frame=1 s status=-9
+frame=1 m status=-9
+frame=1 stats status=0 size=48 single=0/0 multi=0/0 fingerprint=343178de6c99aa60
+frame=2 u20 status=0
+frame=3 s status=0
+frame=3 stats status=0 size=48 single=1/0 multi=0/0 fingerprint=343178de6c99aa60
+end
+
+case modes-sweep-0 24 1:p5=03.p10=01.g;2:s.s.g
+frame=1 p5=03 status=0
+frame=1 p10=01 status=0
+frame=1 stats status=0 size=48 single=0/0 multi=0/0 fingerprint=21b42337b2383f3c
+frame=2 s status=0
+frame=2 s status=0
+frame=2 stats status=0 size=48 single=2/1 multi=0/0 fingerprint=21b42337b2383f3c
+end

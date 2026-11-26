@@ -3,10 +3,13 @@
 // sound chips and rendering are not here yet; their ports accept writes and
 // answer reads so that a ROM can run.
 #pragma once
+#include "md/audio_events.hpp"
 #include "md/bus.hpp"
+#include "md/cheats.hpp"
 #include "md/m68k.hpp"
 #include "md/mixer.hpp"
 #include "md/machine.hpp"
+#include "md/special_cart.hpp"
 #include "md/tmss.hpp"
 #include "md/vdp.hpp"
 #include "md/vdp_render.hpp"
@@ -17,7 +20,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace tessera::md {
@@ -75,10 +81,24 @@ public:
     std::copy(bytes.begin(), bytes.end(), z80_ram_.begin() + offset);
     return true;
   }
+  /// Control write on the work RAM (TP-201.1, RF-3.1): the bytes go straight
+  /// to the 64 KiB at logical (68000) offsets; the work RAM is part of the
+  /// state, so a poke changes the savestate. False if out of range.
+  bool poke_work_ram(std::size_t offset,
+                     std::span<const std::uint8_t> bytes) noexcept {
+    auto ram = bus_.work_ram();
+    if (bytes.empty() || offset >= ram.size() ||
+        bytes.size() > ram.size() - offset)
+      return false;
+    std::copy(bytes.begin(), bytes.end(), ram.begin() + offset);
+    return true;
+  }
   std::span<const std::uint8_t> work_ram() const noexcept {
     return bus_.work_ram();
   }
   const Vdp &vdp() const noexcept { return vdp_; }
+  /// The VRAM dirty patterns gathered since the last call (TP-205.4).
+  Vdp::DirtyPatterns take_vram_dirty() noexcept { return vdp_.take_dirty(); }
   /// Frame drawn by the last run_frame (RGBA8, `renderer().size()`).
   const Renderer &renderer() const noexcept { return renderer_; }
   const Sram &sram() const noexcept { return sram_; }
@@ -102,6 +122,9 @@ private:
 public:
   /// Value of the I/O version register ($A10001).
   std::uint8_t io_version() const noexcept;
+  const MachineConfig &config() const noexcept { return config_; }
+  std::uint32_t rom_crc32() const noexcept { return rom_crc32_; }
+  std::uint32_t rom_bytes() const noexcept { return rom_bytes_; }
   /// The 68000 owns the Z80 bus: requested, and the Z80 out of reset.
   bool z80_bus_granted() const noexcept {
     return z80_bus_requested_ && z80_reset_released_;
@@ -109,6 +132,11 @@ public:
   const Z80 &z80() const noexcept { return z80_; }
   const Ym2612 &ym() const noexcept { return ym_; }
   const Psg &psg() const noexcept { return psg_; }
+  const Eeprom &eeprom() const noexcept { return eeprom_; }
+  Eeprom &eeprom() noexcept { return eeprom_; }
+  const JCart &jcart() const noexcept { return jcart_; }
+  JCart &jcart() noexcept { return jcart_; }
+  const FlashCart &flash() const noexcept { return flash_; }
   /// Audio of the last frame run: interleaved S16 stereo at 48 kHz (TP-107.4).
   std::span<const std::int16_t> audio() const noexcept {
     return mixer_.output();
@@ -123,6 +151,46 @@ public:
     psg_.set_mute(static_cast<std::uint8_t>(audio_mute_ >> 6 & 0xFU));
   }
   std::uint32_t audio_mute() const noexcept { return audio_mute_; }
+  /// Cheats (TP-111, RF-4.3): session controls like AUDIO_MUTE, so they are not
+  /// in the savestate and survive reset and restore. `add_cheat` takes a Game
+  /// Genie or Pro Action Replay code and returns its id (0 if the code is
+  /// refused). A cartridge cheat acts at once and `remove_cheat` gives the
+  /// cartridge back at once; a work RAM cheat rewrites its word at the end of
+  /// every frame run, so removing it just stops the rewriting.
+  std::uint32_t add_cheat(std::string_view code);
+  bool remove_cheat(std::uint32_t id);
+  void clear_cheats();
+  std::size_t cheat_count() const noexcept { return cheats_.size(); }
+
+  /// Audio event transport (TP-107.6): while on, every sound chip write is
+  /// published as a RAW_WRITE and every frame closes with a FRAME event. The
+  /// observer drains them with `poll_audio_events`. Not in the savestate.
+  void set_audio_events(bool on) {
+    if (on && !audio_events_)
+      audio_events_ = std::make_unique<AudioEventQueue>(); // 640 KiB: on demand
+    audio_events_on_ = on;
+  }
+  bool audio_events() const noexcept { return audio_events_on_; }
+  /// The renderer parses the sprites for the PARSED_SPRITES and
+  /// SPRITE_OUTCOME regions only while this is on (SPRITE_CAPTURE).
+  void set_attribution(bool on) noexcept { renderer_.set_attribution(on); }
+  /// LAYER_MASK and LAYER_DIM in force from the next line drawn.
+  void set_render_controls(std::uint8_t mask, bool dim) noexcept {
+    renderer_.set_controls(mask, dim);
+  }
+  void set_sprite_capture(bool on) noexcept {
+    renderer_.set_sprite_capture(on);
+  }
+  std::size_t poll_audio_events(std::span<AudioEvent> out) noexcept {
+    return audio_events_ ? audio_events_->poll(out) : 0;
+  }
+  AudioTransportStats audio_transport_stats() const noexcept {
+    const std::uint32_t flags =
+        audio_events_on_ ? kAudioTransportObservationActive : 0;
+    return audio_events_ ? audio_events_->stats(flags)
+                         : AudioEventQueue::idle_stats(flags);
+  }
+
   /// Sound chip writes of the last frame run (up to kAudioWriteCapacity) and
   /// the ones that did not fit.
   std::span<const AudioWrite> audio_writes() const noexcept {
@@ -145,12 +213,34 @@ private:
   }
   /// Runs the Z80 up to `master` (it only advances while it owns its bus).
   void z80_sync(std::uint64_t master);
-  void z80_sync_now() { z80_sync(cpu_.getClock() * kDivider68k); }
+  void z80_sync_now() { z80_sync(cpu_master()); }
+  bool z80_run_whole(std::uint64_t master);
   std::uint8_t z80_read(std::uint16_t address, unsigned &wait);
   void z80_write(std::uint16_t address, std::uint8_t value, unsigned &wait);
   void z80_bank_write(std::uint8_t value) noexcept;
+  /// The Z80 takes the 68000 bus for one access: the 68000 loses that time.
+  void z80_take_68k_bus() noexcept;
   std::uint16_t open_bus(std::uint32_t offset, bool word) const noexcept;
   moira::i64 refresh_due_ = 0;
+  /// Master cycles the 68000 clock is ahead of its CPU-cycle count (0 to 6).
+  /// gpgx counts the 68000 in master cycles and a DMA holds it for a master
+  /// count that is not a whole number of CPU cycles: the remainder stays
+  /// (measured, black box: the cycle stamps after each 68000-to-VDP DMA move
+  /// off the 7-cycle grid by the DMA's own remainder, and the next frame
+  /// starts from there; scratchpad dac/dmarom.py, TP-209.2).
+  std::uint64_t psi_ = 0;
+  std::uint64_t cpu_master() const noexcept {
+    return static_cast<std::uint64_t>(cpu_.getClock()) * kDivider68k + psi_;
+  }
+  /// Runs the 68000 while its master clock is short of `master` by a whole
+  /// CPU cycle or more.
+  void run_cpu_until_master(std::uint64_t master) {
+    run_cpu_until(static_cast<moira::i64>((master - psi_) / kDivider68k));
+  }
+  /// 68000 clock at the start of the instruction being executed: gpgx stamps
+  /// the 68000 YM2612 accesses by instruction, not by bus cycle (TP-209.2).
+  moira::i64 instr_start_ = 0;
+  moira::i64 read_start_ = 0; ///< instr_start_ for the reads (refresh rule)
   void z80_wait();
   std::uint16_t read(Target target, std::uint32_t offset, bool word) override;
   void write(Target target, std::uint32_t offset, std::uint16_t value,
@@ -172,10 +262,14 @@ private:
   std::array<PadPort, 2> pad_port_{};
   bool th2() const noexcept;
   std::uint32_t line_cycle() const noexcept;
+  std::uint32_t read_line_cycle() const noexcept;
   void update_irq() noexcept;
+  void raise_sprite_flags() noexcept;
 
   MachineConfig config_;
-  std::uint64_t rom_hash_ = 0; ///< FNV-1a of the ROM image, for the savestate
+  std::uint64_t rom_hash_ = 0;  ///< FNV-1a of the ROM image, for the savestate
+  std::uint32_t rom_crc32_ = 0; ///< CRC-32 of the ROM image (SYSTEM region)
+  std::uint32_t rom_bytes_ = 0; ///< size of the ROM image
   Sram sram_; ///< declared before the bus: built from the ROM header first
   Bus bus_;
   M68k cpu_;
@@ -203,6 +297,15 @@ private:
   Psg psg_;
   Mixer mixer_;
   std::uint32_t audio_mute_ = 0;
+  std::unique_ptr<AudioEventQueue> audio_events_;
+  bool audio_events_on_ = false;
+  struct ActiveCheat {
+    std::uint32_t id;
+    Cheat cheat;
+  };
+  std::vector<ActiveCheat> cheats_;
+  std::uint32_t next_cheat_id_ = 1;
+  void refresh_cheats();
   std::vector<AudioWrite> audio_log_;
   std::uint32_t audio_dropped_ = 0;
   std::uint64_t log_origin_ = 0; ///< master cycle the log counts from
@@ -210,6 +313,37 @@ private:
       0; ///< latch: (part << 8) | register of the last address write
   void log_audio(std::uint16_t addr, std::uint8_t data, std::uint8_t chip,
                  std::uint64_t now);
+  std::uint64_t bus_control_stamp() const noexcept;
+  /// CPU cycles the acknowledge of an interrupt of `level` adds at 68000
+  /// clock `clock`.
+  int interrupt_ack_cycles(std::uint8_t level, moira::i64 clock) const noexcept;
+  /// Interrupt mask at the start of the previous instruction and of the one
+  /// about to run (an interrupt taken now was unmasked by the previous one
+  /// when its level is not above `mask_before_`).
+  std::uint8_t mask_before_ = 7;
+  std::uint8_t mask_now_ = 7;
+  /// 68000 clock at the start of those two instructions.
+  moira::i64 start_before_ = 0;
+  moira::i64 start_now_ = 0;
+  /// Interrupt level the VDP drives and the 68000 clock it last rose at.
+  std::uint8_t irq_level_ = 0;
+  moira::i64 irq_raised_at_ = 0;
+  void note_irq_level() noexcept {
+    const auto level = vdp_.irq_level();
+    if (level > irq_level_)
+      irq_raised_at_ = cpu_.getClock();
+    irq_level_ = level;
+  }
+  void note_mask() noexcept {
+    mask_before_ = mask_now_;
+    mask_now_ = static_cast<std::uint8_t>((cpu_.getSR() >> 8) & 7U);
+    start_before_ = start_now_;
+    start_now_ = cpu_.getClock();
+  }
+  /// 68000 clock at which the last refresh stall ended (-1: none).
+  moira::i64 refresh_stall_end_ = -1;
+  std::uint64_t z80_status_lag() const noexcept;
+  std::uint64_t ym_stamp(bool write) const noexcept;
   void psg_write(std::uint8_t value, std::uint64_t now);
   std::uint64_t ym_busy_until_ = 0; ///< master cycle the YM busy flag drops
   std::uint8_t ym_status(std::uint64_t now);
@@ -221,6 +355,10 @@ private:
   std::uint32_t current_line_ = 0;
   std::uint32_t frame_start_line_ = 192; // gpgx starts in Mode 4
   std::uint64_t line_start_master_ = 0;
+  // Within a line only (savestates fall on frame boundaries): whether the
+  // line was drawn, and the line cycle at which the display turned on after.
+  bool line_drawn_ = false;
+  std::optional<std::uint32_t> display_on_cycle_;
 
   bool z80_bus_requested_ = false;
   bool z80_reset_released_ = false;
@@ -229,6 +367,9 @@ private:
   std::array<std::uint8_t, 3> io_data_{0x00, 0x00, 0x00};
   std::array<std::uint8_t, 3> io_ctrl_{0x00, 0x00, 0x00};
   std::array<std::uint16_t, 2> pads_{0x00, 0x00};
+  Eeprom eeprom_;
+  JCart jcart_;
+  FlashCart flash_;
 };
 
 } // namespace tessera::md

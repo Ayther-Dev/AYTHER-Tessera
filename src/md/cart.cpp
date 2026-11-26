@@ -5,7 +5,6 @@
 namespace tessera::md {
 namespace {
 
-constexpr std::size_t kCopierHeader = 512;
 constexpr std::size_t kSmdBlock = 0x4000;
 
 std::uint32_t big32(std::span<const std::uint8_t> b, std::size_t at) {

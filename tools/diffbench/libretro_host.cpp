@@ -4,10 +4,16 @@
 
 #include "tessera/tessera_observation.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace diffbench {
 namespace {
@@ -42,14 +48,49 @@ struct AytherInterface {
   int32_t(__cdecl *write_control)(uint32_t, uint32_t, const void *, uint32_t,
                                   uint64_t, uint64_t *);
   void *capture_snapshot;
-  void *recompose_frame;
+  int32_t(__cdecl *recompose_frame)(uint16_t *, uint32_t, uint32_t, uint32_t *,
+                                    uint32_t *);
   uint32_t audio_event_size, audio_transport_stats_size;
   void *poll_audio_events;
   void *get_audio_transport_stats;
   uint32_t subscription_state_size, reserved1;
   void *get_subscriptions;
   int32_t(__cdecl *set_subscriptions)(uint32_t);
+  // ABI 1.0 tail, 1.1 and 1.2 (read only when struct_size reaches them)
+  uint32_t frame_delta_size;
+  void *poll_frame_delta;
+  uint32_t recompose_stats_size, reserved2;
+  void *get_recompose_stats;
+  int32_t(__cdecl *recompose_multilayer)(uint16_t *, uint16_t *, uint16_t *,
+                                         uint16_t *, uint16_t *, uint32_t,
+                                         uint32_t, uint32_t *, uint32_t *);
+  // ABI 1.4
+  int32_t(__cdecl *frame_delta_since)(uint64_t, void *, uint32_t);
 };
+
+/// The dirty bytes of a frame delta as runs "first-last:value" (one index
+/// alone as "index:value"), comma separated; "none" when nothing is dirty.
+std::string dirty_runs(const uint8_t *dirty, size_t count) {
+  std::string out;
+  char buffer[32];
+  for (size_t i = 0; i < count;) {
+    if (dirty[i] == 0) {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j + 1 < count && dirty[j + 1] == dirty[i])
+      ++j;
+    if (j == i)
+      std::snprintf(buffer, sizeof(buffer), "%zu:%02x", i, dirty[i]);
+    else
+      std::snprintf(buffer, sizeof(buffer), "%zu-%zu:%02x", i, j, dirty[i]);
+    out += out.empty() ? "" : ",";
+    out += buffer;
+    i = j + 1;
+  }
+  return out.empty() ? "none" : out;
+}
 
 RunResult *g_result = nullptr;
 const std::vector<TraceFrame> *g_trace = nullptr;
@@ -84,7 +125,33 @@ bool __cdecl environment(unsigned cmd, void *data) {
   }
 }
 
+// TP-206.1: FNV-1a 64 over what the core emitted in the last frame, computed
+// by the host: the 16-bit pixels row by row (w pixels, skipping the pitch)
+// and the audio samples as delivered.
+// Only with a --stats-script (the h/H operations need them): the bench
+// timings of retro_run (TP-014, TP-208) leave them out, as the baseline did.
+bool g_host_hash = false;
+uint64_t g_video_fnv = 0, g_audio_fnv = 0, g_video_prev_fnv = 0;
+unsigned g_prev_w = 0, g_prev_h = 0; // geometry of the frame before
+uint64_t fnv_bytes(uint64_t h, const uint8_t *p, size_t n) {
+  for (size_t i = 0; i < n; ++i)
+    h = (h ^ p[i]) * 1099511628211ull;
+  return h;
+}
 void __cdecl video(const void *data, unsigned w, unsigned h, size_t pitch) {
+  if (data && g_host_hash) {
+    g_video_fnv = g_video_prev_fnv = fnv_seed;
+    for (unsigned y = 0; y < h; ++y)
+      g_video_fnv = fnv_bytes(g_video_fnv,
+                              static_cast<const uint8_t *>(data) + y * pitch,
+                              size_t{w} * 2);
+    for (unsigned y = 0; y < g_prev_h; ++y)
+      g_video_prev_fnv = fnv_bytes(
+          g_video_prev_fnv, static_cast<const uint8_t *>(data) + y * pitch,
+          size_t{g_prev_w} * 2);
+    g_prev_w = w;
+    g_prev_h = h;
+  }
   if (!g_result)
     return;
   uint64_t hash = fnv_seed;
@@ -119,6 +186,9 @@ void __cdecl audio(int16_t l, int16_t r) {
   note_peak(r);
 }
 size_t __cdecl audio_batch(const int16_t *data, size_t frames) {
+  if (g_host_hash)
+    g_audio_fnv = fnv_bytes(g_audio_fnv,
+                            reinterpret_cast<const uint8_t *>(data), frames * 4);
   for (size_t i = 0; i < frames * 2; ++i)
     note_peak(data[i]);
   return frames;
@@ -175,11 +245,52 @@ template <class F> bool sym(HMODULE m, const char *name, F &out) {
 
 unsigned g_pad_device = 0;
 void set_pad_device(unsigned device) { g_pad_device = device; }
+static std::string g_audio_events_out;
+void set_audio_events_out(const std::string &path) { g_audio_events_out = path; }
+static std::string g_recompose_out;
+static uint32_t g_recompose_flags = 0;
+static uint32_t g_recompose_capacity = 320u * 240u;
+static std::string g_multilayer_out;
+void set_multilayer_out(const std::string &path) { g_multilayer_out = path; }
+static std::map<unsigned, std::vector<std::string>> g_stats_script;
+static std::string g_stats_out;
+void set_stats_script(const std::string &script, const std::string &out) {
+  // <frame>:<op>.<op>...;<frame>:... with s = recompose_frame, m =
+  // recompose_multilayer, g = get_recompose_stats, p<region>=<hex byte> =
+  // write_control, c = capture_snapshot, G<id> = generation of a region
+  // read, run after that frame (0 = the first).
+  std::stringstream entries(script);
+  for (std::string entry; std::getline(entries, entry, ';');) {
+    const auto colon = entry.find(':');
+    if (colon == std::string::npos)
+      continue;
+    auto &ops = g_stats_script[static_cast<unsigned>(
+        std::stoul(entry.substr(0, colon)))];
+    std::stringstream list(entry.substr(colon + 1));
+    for (std::string op; std::getline(list, op, '.');)
+      ops.push_back(op);
+  }
+  g_stats_out = out;
+}
+void set_recompose_out(const std::string &path, uint32_t flags,
+                       uint32_t capacity) {
+  g_recompose_out = path;
+  g_recompose_flags = flags;
+  g_recompose_capacity = capacity;
+}
+static unsigned g_reset_at = 0;
+void set_reset_at(unsigned frame) { g_reset_at = frame; }
 static bool g_bench = false;
 static int g_bench_observation = -1;
+static int64_t g_sub_mask = -1;
+void set_subscription_mask(int64_t mask) { g_sub_mask = mask; }
 void set_bench(bool on, int observation) {
   g_bench = on;
   g_bench_observation = observation;
+}
+
+void set_pad_script(unsigned frame, uint32_t port0, uint32_t port1) {
+  pad_script().push_back({frame, {port0, port1}});
 }
 
 void set_pad_masks(uint32_t port0, uint32_t port1) {
@@ -190,7 +301,7 @@ void set_pad_masks(uint32_t port0, uint32_t port1) {
 RunResult run_libretro(const std::string &core_path,
                        const std::string &rom_path, unsigned frames,
                        bool dump_regions,
-                       const std::vector<TraceFrame> *trace, Poke *poke) {
+                       const std::vector<TraceFrame> *trace, std::vector<Poke> *pokes) {
   RunResult result;
   std::ifstream in(rom_path, std::ios::binary);
   if (!in) {
@@ -213,6 +324,7 @@ RunResult run_libretro(const std::string &core_path,
   void(__cdecl * init)() = nullptr;
   bool(__cdecl * load)(const GameInfo *) = nullptr;
   void(__cdecl * run)() = nullptr;
+  void(__cdecl * reset_core)() = nullptr;
   void(__cdecl * unload)() = nullptr;
   void(__cdecl * deinit)() = nullptr;
   if (!(sym(core, "retro_set_environment", set_env) &&
@@ -253,7 +365,10 @@ RunResult run_libretro(const std::string &core_path,
     GetIface get_iface = nullptr;
     const AytherInterface *iface = nullptr;
     const bool want_iface =
-        dump_regions || poke != nullptr || g_bench_observation >= 0;
+        dump_regions || pokes != nullptr || g_bench_observation >= 0 ||
+        g_sub_mask >= 0 ||
+        !g_audio_events_out.empty() || !g_recompose_out.empty() ||
+        !g_multilayer_out.empty() || !g_stats_script.empty();
     if (want_iface && sym(core, "ayther_get_interface", get_iface))
       iface = get_iface(TESSERA_OBS_ABI_VERSION_1_10);
     if (want_iface && !iface)
@@ -263,16 +378,64 @@ RunResult run_libretro(const std::string &core_path,
       result.ayther_capabilities = iface->capabilities;
       if (iface->build_id != nullptr)
         result.ayther_build_id.assign(iface->build_id, iface->build_id_size);
-      iface->set_subscriptions(g_bench_observation == 0 ? 0u
-                                                        : TESSERA_OBS_SUB_ALL);
-    }
-    for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
-      if (poke && iface && i == poke->frame) {
-        uint64_t generation = 0;
-        poke->status = iface->write_control(
-            poke->region, poke->offset, poke->data.data(),
-            static_cast<uint32_t>(poke->data.size()), UINT64_MAX, &generation);
+      using GetSubs = int32_t(__cdecl *)(tessera_obs_subscription_state_v1 *,
+                                         uint32_t);
+      const auto get_subs = reinterpret_cast<GetSubs>(iface->get_subscriptions);
+      const auto ask = [&](SubscriptionState &out) {
+        if (!get_subs)
+          return;
+        tessera_obs_subscription_state_v1 s{};
+        out.status = get_subs(&s, sizeof(s));
+        out.struct_size = s.struct_size;
+        out.version = s.state_version;
+        out.supported = s.supported_mask;
+        out.active = s.active_mask;
+        out.requested = s.requested_mask;
+        out.activation_frame = s.activation_frame;
+      };
+      if (g_sub_mask >= 0) {
+        result.sub_set_status =
+            iface->set_subscriptions(static_cast<uint32_t>(g_sub_mask));
+        ask(result.sub_after_set);
+      } else {
+        iface->set_subscriptions(g_bench_observation == 0 ? 0u
+                                                          : TESSERA_OBS_SUB_ALL);
       }
+    }
+    if (g_reset_at != 0 && !sym(core, "retro_reset", reset_core))
+      result.error = "el core no exporta retro_reset";
+    g_host_hash = !g_stats_script.empty();
+    if (!g_stats_script.empty() && !reset_core)
+      sym(core, "retro_reset", reset_core);
+    std::vector<Poke> no_pokes;
+    for (unsigned i = 0; i < frames && result.error.empty(); ++i) {
+      if (g_reset_at != 0 && i == g_reset_at - 1 && reset_core)
+        reset_core();
+      for (Poke &poke : pokes ? *pokes : no_pokes) {
+        if (i != poke.frame || !iface)
+          continue;
+        uint64_t generation = 0;
+        poke.status = iface->write_control(
+            poke.region, poke.offset, poke.data.data(),
+            static_cast<uint32_t>(poke.data.size()), UINT64_MAX, &generation);
+        poke.generation = generation;
+      }
+      const auto drain_audio_events = [&] {
+        if (g_audio_events_out.empty() || !iface || !iface->poll_audio_events)
+          return;
+        using Poll = int32_t(__cdecl *)(void *, uint32_t, uint32_t *);
+        const auto poll_events = reinterpret_cast<Poll>(iface->poll_audio_events);
+        std::vector<uint8_t> buffer(80u * 1024u);
+        std::ofstream out(g_audio_events_out, std::ios::binary | std::ios::app);
+        for (;;) {
+          uint32_t count = 0;
+          if (poll_events(buffer.data(), 1024, &count) != 0 || count == 0)
+            break;
+          out.write(reinterpret_cast<const char *>(buffer.data()),
+                    static_cast<std::streamsize>(count) * 80);
+        }
+      };
+      g_audio_fnv = fnv_seed;
       if (g_bench) {
         const auto t0 = std::chrono::steady_clock::now();
         run();
@@ -282,11 +445,315 @@ RunResult run_libretro(const std::string &core_path,
       } else {
         run();
       }
+      drain_audio_events();
+      // TP-205.3: the stats script after this frame.
+      const auto ops = g_stats_script.find(i);
+      if (iface && ops != g_stats_script.end()) {
+        std::ofstream so(g_stats_out, std::ios::app);
+        std::vector<uint16_t> layers(5u * 320u * 240u);
+        static uint64_t generation_base = UINT64_MAX; // c and G (TP-302)
+        for (auto op : ops->second) {
+          uint32_t w = 0, h = 0;
+          int32_t status = -8;
+          // s/m take optional "<flags hex>@<capacity>"; g takes "<out_size>";
+          // u<hex> sets subscriptions; r resets the core.
+          const auto arg = [&](size_t from, uint32_t def, int base) {
+            return op.size() > from ? static_cast<uint32_t>(std::stoul(
+                                          op.substr(from), nullptr, base))
+                                    : def;
+          };
+          const auto at = op.find('@');
+          const uint32_t cap =
+              at == std::string::npos
+                  ? 320u * 240u
+                  : static_cast<uint32_t>(std::stoul(op.substr(at + 1)));
+          const uint32_t flags =
+              op.size() > 1 && op[1] != '@'
+                  ? static_cast<uint32_t>(std::stoul(
+                        op.substr(1, at == std::string::npos ? std::string::npos
+                                                             : at - 1),
+                        nullptr, 16))
+                  : 0u;
+          if (op[0] == 'u') {
+            status = iface->set_subscriptions(arg(1, 0, 16));
+          } else if (op == "x") {
+            // serialize and restore the same state
+            size_t(__cdecl * ssize)() = nullptr;
+            bool(__cdecl * ser)(void *, size_t) = nullptr;
+            bool(__cdecl * unser)(const void *, size_t) = nullptr;
+            if (sym(core, "retro_serialize_size", ssize) &&
+                sym(core, "retro_serialize", ser) &&
+                sym(core, "retro_unserialize", unser)) {
+              std::vector<uint8_t> state(ssize());
+              status = ser(state.data(), state.size()) &&
+                               unser(state.data(), state.size())
+                           ? 0
+                           : -1;
+            }
+          } else if (op == "S" || op == "L") {
+            // S saves the state, L restores the one saved last
+            static std::vector<uint8_t> saved;
+            size_t(__cdecl * ssize)() = nullptr;
+            bool(__cdecl * ser)(void *, size_t) = nullptr;
+            bool(__cdecl * unser)(const void *, size_t) = nullptr;
+            if (sym(core, "retro_serialize_size", ssize) &&
+                sym(core, "retro_serialize", ser) &&
+                sym(core, "retro_unserialize", unser)) {
+              if (op == "S") {
+                saved.assign(ssize(), 0);
+                status = ser(saved.data(), saved.size()) ? 0 : -1;
+              } else {
+                status =
+                    !saved.empty() && unser(saved.data(), saved.size()) ? 0 : -1;
+              }
+            }
+          } else if (op == "r" && reset_core) {
+            reset_core();
+            status = 0;
+          } else if (op[0] == 's' && iface->recompose_frame) {
+            status = iface->recompose_frame(layers.data(), cap, flags, &w, &h);
+          } else if (op[0] == 'm' &&
+                     iface->struct_size >=
+                         offsetof(AytherInterface, recompose_multilayer) +
+                             sizeof(iface->recompose_multilayer) &&
+                     iface->recompose_multilayer) {
+            uint16_t *l = layers.data();
+            const uint32_t n = 320u * 240u;
+            status = iface->recompose_multilayer(l, l + n, l + 2 * n, l + 3 * n,
+                                                 l + 4 * n, cap, flags, &w, &h);
+          } else if (op[0] == 'g' &&
+                     iface->struct_size >=
+                         offsetof(AytherInterface, get_recompose_stats) +
+                             sizeof(iface->get_recompose_stats) &&
+                     iface->get_recompose_stats) {
+            tessera_obs_recompose_stats_v1 st{};
+            status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                iface->get_recompose_stats)(&st, arg(1, sizeof(st), 10));
+            so << "frame=" << i << " stats status=" << status
+               << " size=" << st.struct_size << " single=" << st.single_calls
+               << "/" << st.single_hits << " multi=" << st.multilayer_calls
+               << "/" << st.multilayer_hits << " fingerprint=" << std::hex
+               << st.controls_fingerprint << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'R') {
+            // TP-208.3: a region read whole, R<id>[,n]: status, byte size,
+            // FNV-1a of its first n bytes (all by default) and the first 8.
+            // R<id>/<stride>:<skip> hashes records of <stride> bytes from
+            // byte <skip> on (AUDIO_WRITES without the cycle, EXC-001..004).
+            const auto slash = op.find('/');
+            size_t stride = 1, skip = 0;
+            if (slash != std::string::npos) {
+              stride = std::stoul(op.substr(slash + 1));
+              skip = std::stoul(op.substr(op.find(':', slash) + 1));
+              op = op.substr(0, slash);
+            }
+            const auto comma = op.find(',');
+            const auto id = static_cast<uint32_t>(std::stoul(op.substr(1, comma - 1)));
+            tessera_obs_region_info_v1 info{};
+            info.struct_size = sizeof(info);
+            const int32_t qs = iface->query_region(id, &info, sizeof(info));
+            std::vector<uint8_t> data(qs == 0 ? info.byte_size : 0u);
+            uint64_t generation = 0;
+            status = iface->read_region(id, 0, data.data(),
+                                        static_cast<uint32_t>(data.size()),
+                                        UINT64_MAX, &generation);
+            size_t n = comma == std::string::npos
+                           ? data.size()
+                           : std::min<size_t>(data.size(),
+                                              std::stoul(op.substr(comma + 1)));
+            uint64_t hash = fnv_seed;
+            std::vector<uint8_t> kept;
+            for (size_t k = 0; k < n; ++k)
+              if (k % stride >= skip) {
+                hash = (hash ^ data[k]) * 1099511628211ull;
+                kept.push_back(data[k]);
+              }
+            so << "frame=" << i << " region " << id << " status=" << status
+               << " size=" << data.size() << " fnv=" << std::hex << hash
+               << " head=";
+            for (size_t k = 0; k < 8 && k < kept.size(); ++k)
+              so << (kept[k] < 16 ? "0" : "") << unsigned{kept[k]};
+            so << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'h' || op[0] == 'H') {
+            // TP-206.1: the FRAME_HASH region against the host's own FNV-1a
+            // of the emitted video and audio and of the VRAM, CRAM and VSRAM
+            // regions (read raw, as the core lays them out).
+            std::vector<uint8_t> fh(56, 0x5A);
+            uint64_t generation = 0;
+            status = iface->read_region(23, 0, fh.data(), 56, UINT64_MAX,
+                                        &generation);
+            const auto u64 = [&](size_t at) {
+              uint64_t v = 0;
+              std::memcpy(&v, fh.data() + at, 8);
+              return v;
+            };
+            const auto memory = [&](uint32_t id, uint32_t size) {
+              std::vector<uint8_t> m(size);
+              uint64_t g = 0;
+              return iface->read_region(id, 0, m.data(), size, UINT64_MAX,
+                                        &g) == 0
+                         ? fnv_bytes(fnv_seed, m.data(), m.size())
+                         : 0;
+            };
+            uint32_t version = 0, size = 0;
+            std::memcpy(&version, fh.data(), 4);
+            std::memcpy(&size, fh.data() + 4, 4);
+            so << "frame=" << i << " hash status=" << status
+               << " version=" << version << " size=" << size
+               << " frame_index=" << u64(8) << std::hex
+               << " video=" << u64(16) << " audio=" << u64(24)
+               << " vram=" << u64(32) << " cram=" << u64(40)
+               << " vsram=" << u64(48);
+            if (op[0] == 'H') // diagnostics: what the host computes itself
+              so << " | host video=" << g_video_fnv
+               << " audio=" << g_audio_fnv << " vram=" << memory(1, 65536)
+               << " cram=" << memory(2, 128) << " vsram=" << memory(4, 128)
+               << " video_prev_geometry=" << g_video_prev_fnv;
+            so << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'd' || op[0] == 'D') {
+            // TP-205.4: d[out_size] polls the delta of the last frame;
+            // D<generation>[,out_size] asks for the delta since a generation
+            // ("D-<n>" counts back from the generation of the last poll).
+            static uint64_t last_generation = 0;
+            tessera_obs_frame_delta_v1 delta{};
+            std::memset(&delta, 0x5A, sizeof(delta));
+            const auto comma = op.find(',');
+            const uint32_t size =
+                comma != std::string::npos
+                    ? static_cast<uint32_t>(std::stoul(op.substr(comma + 1)))
+                : op[0] == 'd' && op.size() > 1
+                    ? static_cast<uint32_t>(std::stoul(op.substr(1)))
+                    : static_cast<uint32_t>(sizeof(delta));
+            status = -8;
+            if (op[0] == 'd' && iface->poll_frame_delta) {
+              status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                  iface->poll_frame_delta)(&delta, size);
+            } else if (op[0] == 'D' &&
+                       iface->struct_size >=
+                           offsetof(AytherInterface, frame_delta_since) +
+                               sizeof(iface->frame_delta_since) &&
+                       iface->frame_delta_since) {
+              const std::string g = op.substr(
+                  1, comma == std::string::npos ? std::string::npos : comma - 1);
+              const uint64_t from =
+                  g[0] == '-' ? last_generation - std::stoull(g.substr(1))
+                              : std::stoull(g);
+              status = iface->frame_delta_since(from, &delta, size);
+            }
+            if (op[0] == 'd' && status == 0)
+              last_generation = delta.frame_generation;
+            so << "frame=" << i << " " << op << " status=" << status
+               << " size=" << delta.struct_size
+               << " version=" << delta.delta_version
+               << " generation=" << delta.frame_generation
+               << " raster=" << delta.raster_event_count
+               << " sprites=" << delta.parsed_sprite_count
+               << " audio=" << delta.audio_write_count
+               << " dropped=" << delta.raster_events_dropped << " dirty="
+               << dirty_runs(delta.dirty_patterns,
+                             sizeof(delta.dirty_patterns))
+               << "\n";
+            continue;
+          } else if (op[0] == 'c') {
+            // TP-302 (rc.3): c[out_size] captures the frame snapshot; the
+            // fields gpgx did not write keep the 0x5A filler.
+            tessera_obs_frame_snapshot_v1 snap{};
+            std::memset(&snap, 0x5A, sizeof(snap));
+            const uint32_t size = op.size() > 1
+                                      ? static_cast<uint32_t>(std::stoul(op.substr(1)))
+                                      : static_cast<uint32_t>(sizeof(snap));
+            if (iface->capture_snapshot)
+              status = reinterpret_cast<int32_t(__cdecl *)(void *, uint32_t)>(
+                  iface->capture_snapshot)(&snap, size);
+            // The generation counts from the first one seen in the run: its
+            // value also counts the host's loading steps, not a contract.
+            if (status == 0 && generation_base == UINT64_MAX)
+              generation_base = snap.snapshot_generation;
+            so << "frame=" << i << " " << op << " status=" << status
+               << " size=" << snap.struct_size
+               << " version=" << snap.snapshot_version << " generation="
+               << (status == 0 ? "+" : "")
+               << (status == 0 ? snap.snapshot_generation - generation_base
+                               : snap.snapshot_generation)
+               << " frame_generation=" << snap.frame_generation << std::hex
+               << " flags=" << snap.flags
+               << " overflow=" << snap.overflow_flags
+               << " fallback=" << snap.fallback_reasons << std::dec
+               << " sprites=" << snap.parsed_sprite_count
+               << " audio=" << snap.audio_write_count << std::hex
+               << " reserved=" << snap.reserved0 << std::dec << "\n";
+            continue;
+          } else if (op[0] == 'G') {
+            // G<id>: a read of 0 bytes of the region, its status and, when it
+            // succeeds, the generation it answers (what the snapshot's must
+            // match), counted as c counts it.
+            uint64_t generation = 0;
+            status = iface->read_region(
+                static_cast<uint32_t>(std::stoul(op.substr(1))), 0, nullptr, 0,
+                UINT64_MAX, &generation);
+            so << "frame=" << i << " " << op << " status=" << status;
+            if (status == 0) {
+              if (generation_base == UINT64_MAX)
+                generation_base = generation;
+              so << " generation=+" << generation - generation_base;
+            }
+            so << "\n";
+            continue;
+          } else if (op.size() > 2 && op[0] == 'p') {
+            const auto eq = op.find('=');
+            const uint8_t byte =
+                static_cast<uint8_t>(std::stoul(op.substr(eq + 1), nullptr, 16));
+            uint64_t generation = 0;
+            status = iface->write_control(
+                static_cast<uint32_t>(std::stoul(op.substr(1, eq - 1))), 0,
+                &byte, 1, UINT64_MAX, &generation);
+          }
+          so << "frame=" << i << " " << op << " status=" << status << "\n";
+        }
+      }
+    }
+    if (!g_audio_events_out.empty() && iface &&
+        iface->get_audio_transport_stats) {
+      using Stats = int32_t(__cdecl *)(void *, uint32_t);
+      tessera_obs_audio_transport_stats_v1 stats{};
+      const int32_t status = reinterpret_cast<Stats>(
+          iface->get_audio_transport_stats)(&stats, sizeof(stats));
+      std::ofstream sf(g_audio_events_out + ".stats",
+                       std::ios::binary | std::ios::trunc);
+      sf.write(reinterpret_cast<const char *>(&status), sizeof(status));
+      sf.write(reinterpret_cast<const char *>(&stats), sizeof(stats));
     }
     if (g_bench) {
       size_t(__cdecl * serialize_size)() = nullptr;
       if (sym(core, "retro_serialize_size", serialize_size))
         result.serialize_size = serialize_size();
+    }
+    if (iface && g_sub_mask >= 0 && iface->get_subscriptions) {
+      tessera_obs_subscription_state_v1 s{};
+      result.sub_end.status =
+          reinterpret_cast<int32_t(__cdecl *)(tessera_obs_subscription_state_v1 *,
+                                              uint32_t)>(
+              iface->get_subscriptions)(&s, sizeof(s));
+      result.sub_end.supported = s.supported_mask;
+      result.sub_end.active = s.active_mask;
+      result.sub_end.requested = s.requested_mask;
+      result.sub_end.activation_frame = s.activation_frame;
+    }
+    if (iface && g_sub_mask >= 0) {
+      if (iface->poll_audio_events) {
+        std::vector<uint8_t> buffer(80u * 1024u);
+        result.sub_poll_status = reinterpret_cast<int32_t(__cdecl *)(
+            void *, uint32_t, uint32_t *)>(iface->poll_audio_events)(
+            buffer.data(), 1024, &result.sub_poll_count);
+      }
+      if (iface->get_audio_transport_stats) {
+        std::vector<uint8_t> stats(256);
+        result.sub_stats_status = reinterpret_cast<int32_t(__cdecl *)(
+            void *, uint32_t)>(iface->get_audio_transport_stats)(
+            stats.data(), 32);
+      }
     }
     if (iface && dump_regions) {
       for (uint32_t id = 1; id < TESSERA_OBS_REGION_COUNT; ++id) {
@@ -314,6 +781,54 @@ RunResult run_libretro(const std::string &core_path,
         }
         result.regions.push_back(d);
       }
+    }
+    if (!g_recompose_out.empty()) {
+      // TP-205.1: status, width, height (int32, uint32, uint32), then the
+      // width x height RGB565 pixels recompose_frame returned.
+      std::vector<uint16_t> pixels((std::max)(g_recompose_capacity, 1u));
+      int32_t status = -8; // AYTHER_STATUS_UNSUPPORTED: no recompose_frame
+      uint32_t width = 0, height = 0;
+      if (iface && iface->recompose_frame)
+        status = iface->recompose_frame(pixels.data(), g_recompose_capacity,
+                                        g_recompose_flags, &width, &height);
+      std::ofstream out(g_recompose_out, std::ios::binary);
+      out.write(reinterpret_cast<const char *>(&status), 4);
+      out.write(reinterpret_cast<const char *>(&width), 4);
+      out.write(reinterpret_cast<const char *>(&height), 4);
+      if (status == 0)
+        out.write(reinterpret_cast<const char *>(pixels.data()),
+                  static_cast<std::streamsize>(
+                      (std::min<size_t>)(size_t{width} * height,
+                                         pixels.size()) *
+                      2));
+    }
+    if (!g_multilayer_out.empty()) {
+      // TP-205.2: status, width, height, then plane A, plane B, window,
+      // sprites and composite, width x height RGB565 each.
+      const uint32_t capacity = g_recompose_capacity;
+      std::vector<std::vector<uint16_t>> layers(
+          5, std::vector<uint16_t>((std::max)(capacity, 1u)));
+      int32_t status = -8; // AYTHER_STATUS_UNSUPPORTED
+      uint32_t width = 0, height = 0;
+      if (iface &&
+          iface->struct_size >= offsetof(AytherInterface, recompose_multilayer) +
+                                    sizeof(void *) &&
+          iface->recompose_multilayer)
+        status = iface->recompose_multilayer(
+            layers[0].data(), layers[1].data(), layers[2].data(),
+            layers[3].data(), layers[4].data(), capacity, g_recompose_flags,
+            &width, &height);
+      std::ofstream out(g_multilayer_out, std::ios::binary);
+      out.write(reinterpret_cast<const char *>(&status), 4);
+      out.write(reinterpret_cast<const char *>(&width), 4);
+      out.write(reinterpret_cast<const char *>(&height), 4);
+      if (status == 0)
+        for (const auto &layer : layers)
+          out.write(reinterpret_cast<const char *>(layer.data()),
+                    static_cast<std::streamsize>(
+                        (std::min<size_t>)(size_t{width} * height,
+                                           layer.size()) *
+                        2));
     }
     using MemSize = size_t(__cdecl *)(unsigned);
     using MemData = void *(__cdecl *)(unsigned);

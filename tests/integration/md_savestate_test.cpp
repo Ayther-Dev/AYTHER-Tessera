@@ -149,7 +149,7 @@ TEST_CASE("savestate: a truncated, corrupted or foreign state is refused") {
   bad_magic[0] ^= 0xFF;
   CHECK_FALSE(accepts(rom, config, bad_magic));
   auto bad_version = state;
-  bad_version[4] = 2;
+  bad_version[4] = static_cast<std::uint8_t>(bad_version[4] + 1);
   CHECK_FALSE(accepts(rom, config, bad_version));
 
   // Another ROM, another region, another pad type.

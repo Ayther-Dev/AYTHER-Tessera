@@ -665,7 +665,7 @@ TEST_CASE("Extended structures reject aliases in foreign tails before writing "
 // ClownMDEmu reference backend (AGPL-3.0) exists only in the local reference
 // build (TESSERA_BUILD_CLOWN_REFERENCE) and is listed first when present.
 constexpr std::uint32_t kBackendCount =
-    2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 1 : 0);
+    2 + (TESSERA_CLOWN_REFERENCE ? 1 : 0) + (TESSERA_MEGADRIVE ? 4 : 0);
 constexpr std::uint32_t kFirstSynthetic = kBackendCount - 2;
 
 TEST_CASE("Extended backend arrays honor each declared stride and preserve "
@@ -685,8 +685,17 @@ TEST_CASE("Extended backend arrays honor each declared stride and preserve "
   REQUIRE(tessera_backends_enumerate_v1(&values[0].prefix, kBackendCount,
                                         &required, &context) == TESSERA_OK);
   CHECK(required == kBackendCount);
+  // TP-112.1: the native cores are listed first (Mega Drive, then the Phase 6
+  // systems); the reference backend after them.
+  if constexpr (TESSERA_MEGADRIVE != 0) {
+    CHECK(fixed_id(values[0].prefix.id) == "megadrive");
+    CHECK(fixed_id(values[1].prefix.id) == "mastersystem");
+    CHECK(fixed_id(values[2].prefix.id) == "gamegear");
+    CHECK(fixed_id(values[3].prefix.id) == "sg1000");
+  }
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
-    CHECK(fixed_id(values[0].prefix.id) == "clownmdemu");
+    CHECK(fixed_id(values[TESSERA_MEGADRIVE != 0 ? 4 : 0].prefix.id) ==
+          "clownmdemu");
   CHECK(fixed_id(values[kFirstSynthetic].prefix.id) == "synthetic.minimal");
   CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) ==
         "synthetic.complete");
@@ -724,14 +733,21 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
                                    &context) == TESSERA_OK);
   std::set<std::string> ids;
   for (const auto &backend : backends) {
-    const bool product = fixed_id(backend.id) == "clownmdemu" ||
-                         fixed_id(backend.id) == "megadrive";
+    const auto id = fixed_id(backend.id);
+    const bool product = id == "clownmdemu" || id == "megadrive" ||
+                         id == "mastersystem" || id == "gamegear" ||
+                         id == "sg1000";
     CHECK(backend.kind ==
           (product ? TESSERA_BACKEND_PRODUCT : TESSERA_BACKEND_TEST));
-    CHECK(backend.system ==
-          (product ? TESSERA_SYSTEM_MEGA_DRIVE : TESSERA_SYSTEM_NONE));
+    const std::uint32_t expected_sys =
+        (id == "clownmdemu" || id == "megadrive") ? TESSERA_SYSTEM_MEGA_DRIVE
+        : id == "mastersystem"                    ? TESSERA_SYSTEM_MASTER_SYSTEM
+        : id == "gamegear"                        ? TESSERA_SYSTEM_GAME_GEAR
+        : id == "sg1000"                          ? TESSERA_SYSTEM_SG1000
+                                                  : TESSERA_SYSTEM_NONE;
+    CHECK(backend.system == expected_sys);
     CHECK((backend.capabilities & ~UINT64_C(0x1FFF)) == 0);
-    ids.insert(fixed_id(backend.id));
+    ids.insert(id);
     CHECK(!fixed_id(backend.version).empty());
     CHECK(std::any_of(std::begin(backend.build_id), std::end(backend.build_id),
                       [](auto v) { return v != 0; }));
@@ -740,8 +756,12 @@ TEST_CASE("Backend enumeration is all-or-nothing and copies test identities "
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
     expected.insert("clownmdemu");
   // TP-101.1: the native core is listed only when built with the option.
-  if constexpr (TESSERA_MEGADRIVE != 0)
+  if constexpr (TESSERA_MEGADRIVE != 0) {
     expected.insert("megadrive");
+    expected.insert("mastersystem");
+    expected.insert("gamegear");
+    expected.insert("sg1000");
+  }
   CHECK(ids == expected);
   const std::string first = fixed_id(backends[0].id);
   backends[0].id[0] = '?'; // A caller copy cannot corrupt the registry.

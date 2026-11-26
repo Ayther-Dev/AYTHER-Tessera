@@ -68,6 +68,7 @@ void Session::restore(wire::View encoded, wire::View trace_bytes,
   require(candidate->tick() == state_data.logical_tick &&
               candidate->machine_record() == state_data.machine,
           TESSERA_CHECKPOINT_INVALID, TESSERA_PHASE_RESTORE);
+  candidate->keep_observation(*machine);
 
   // All parsing, allocation and backend reconstruction precede this commit.
   cancel(context, TESSERA_CANCEL_RESTORE);

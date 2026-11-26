@@ -147,15 +147,26 @@ TEST_CASE("a trace of two pads is told apart from a legacy one") {
   CHECK(wire::trace(make(kLegacyInputLayout)).layout == kLegacyInputLayout);
 }
 
-TEST_CASE("pad masks follow the bit order of the machine") {
+TEST_CASE("pad masks take the API control order to the bit order of the "
+          "machine") {
+  // API order: up, down, left, right, A, B, C, start, X, Y, Z, mode.
   InputState in{};
   in[0] = 1;       // port 0 up
-  in[4] = 1;       // B
+  in[5] = 1;       // B
   in[11] = 1;      // mode
   in[12 + 3] = 1;  // port 1 right
   in[12 + 10] = 1; // Z
   CHECK(md::pad_mask(in, 0) == (md::kPadUp | md::kPadB | md::kPadMode));
   CHECK(md::pad_mask(in, 1) == (md::kPadRight | md::kPadZ));
+  InputState abc{};
+  abc[4] = 1;
+  CHECK(md::pad_mask(abc, 0) == md::kPadA);
+  abc = {};
+  abc[6] = 1;
+  CHECK(md::pad_mask(abc, 0) == md::kPadC);
+  abc = {};
+  abc[7] = abc[8] = 1;
+  CHECK(md::pad_mask(abc, 0) == (md::kPadStart | md::kPadX));
   in[1] = 1; // up with down
   CHECK(!md::pad_mask(in, 0));
   CHECK(md::pad_mask(in, 1).has_value());
@@ -177,9 +188,9 @@ TEST_CASE("two pads reach the ports of the machine") {
     return std::vector<std::uint8_t>(ram.begin(), ram.begin() + 24);
   };
   InputState idle{}, a_only{}, both{};
-  a_only[6] = 1; // port 0: A
-  both[6] = 1;
-  both[12 + 5] = 1; // port 1: C
+  a_only[4] = 1; // port 0: A
+  both[4] = 1;
+  both[12 + 6] = 1; // port 1: C
   CHECK(run(a_only) != run(idle));
   // The same input twice gives the same bytes.
   CHECK(run(both) == run(both));

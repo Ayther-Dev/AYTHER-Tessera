@@ -17,13 +17,26 @@ class M68k final : public moira::Moira {
 public:
   explicit M68k(Bus &bus);
 
-  /// Called when the CPU is about to take an interrupt of the given level.
-  void set_interrupt_hook(std::function<void(std::uint8_t)> hook) {
+  /// Called when the CPU is about to take an interrupt of the given level, at
+  /// the 68000 clock the exception starts; returns the cycles the acknowledge
+  /// adds to Moira's exception sequence.
+  void set_interrupt_hook(std::function<int(std::uint8_t, moira::i64)> hook) {
     interrupt_hook_ = std::move(hook);
   }
 
   /// Holds the CPU for `cycles` 68000 cycles (a DMA owns the bus).
   void stall(int cycles) { sync(cycles); }
+
+  /// Sets the interrupt level as already sampled: the next instruction
+  /// boundary takes it. `setIPL` alone leaves Moira's sample of the previous
+  /// instruction in place, which takes the interrupt one instruction later.
+  /// gpgx takes the vertical interrupt at the first boundary after it rises
+  /// (measured, black box: VINT entry against loops of nop, bra, mulu, divu,
+  /// tst and movem; the delay grew with the length of the loop instruction).
+  void set_ipl_sampled(moira::u8 level) {
+    setIPL(level);
+    reg.ipl = level;
+  }
 
   /// Savestate: clock, registers, prefetch queue and interrupt lines.
   void save(StateWriter &w) const;
@@ -40,7 +53,7 @@ protected:
 
 private:
   Bus &bus_;
-  std::function<void(std::uint8_t)> interrupt_hook_;
+  std::function<int(std::uint8_t, moira::i64)> interrupt_hook_;
 };
 
 } // namespace tessera::md

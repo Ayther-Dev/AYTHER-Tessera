@@ -37,6 +37,14 @@ propia constan en [FX-01](../tests/fixtures/synthetic/README.md).
 la extensión para elegir un backend. La CLI conserva los rechazos de contenido
 desconocido/ambiguo/inválido y selección incompatible.
 
+Desde `v0.2.0` la lista incluye `megadrive`, el núcleo Mega Drive propio (spec
+008), antes de los dos sintéticos. Una sesión sin `backend_id` sobre contenido
+Mega Drive se abre con él; ClownMDEmu, que solo existe en el árbol de referencia,
+se elige únicamente por su id. `megadrive` toma dos mandos de 12 controles por
+frame (24 asignaciones, puertos 0 y 1); los sintéticos y ClownMDEmu, un mando de
+8. El orden de controles es el mismo en todos: arriba, abajo, izquierda,
+derecha, A, B, C, start y, en `megadrive`, X, Y, Z y mode.
+
 ## Traza JSON o binaria
 
 Un archivo cuyo magic sea `TSTRACE1` se entrega intacto a la API. Alternativamente,

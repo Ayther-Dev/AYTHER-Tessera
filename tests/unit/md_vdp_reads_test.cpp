@@ -66,7 +66,10 @@ TEST_CASE("CRAM and VSRAM read commands through the bus") {
 TEST_CASE("status read through the bus: word and the two bytes") {
   System s = make_system();
   const std::uint16_t word = s.read16(0xC00004);
-  CHECK(word == 0x3608); // fixed bits, FIFO empty, display off = blanking
+  // FIFO empty, display off = blanking; bits 15-10 are the open bus, the
+  // word the 68000 has prefetched (measured on gpgx, TP-110.4)
+  CHECK((word & 0x03FF) == 0x0208);
+  CHECK((word & 0xFC00) == (s.cpu().getIRC() & 0xFC00));
   CHECK(s.read8(0xC00004) == (word >> 8));
   CHECK(s.read8(0xC00005) == (word & 0xFF));
   // the mirror of the status port answers the same

@@ -1,0 +1,208 @@
+# frame_delta and frame_delta_since measured on gpgx (spec 008, TP-205.4).
+# Written by tools/diffbench/compare_recompose_stats.py --update; the native
+# side runs the same cases in tests/integration/md_subscriptions_test.cpp.
+# case <test rom> <subscriptions hex> <stats script> <frames>; then what gpgx
+# answered. delta-probe-N writes VRAM from a table (tests/support/
+# md_delta_testrom.hpp): the dirty bytes are a bit per pattern row changed.
+
+case delta-probe-0 1 0:d;1:d;2:d;3:d;4:d;5:d;6:d;7:d;8:d;9:d;10:d;11:d;12:d;13:d 14
+frame=0 d status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=0:01
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=1:80,2047:80
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=0 audio=0 dropped=0 dirty=8:ff
+frame=6 d status=0 size=2080 version=1 generation=7 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=7 d status=0 size=2080 version=1 generation=8 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=2:01
+frame=9 d status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=2:06
+frame=10 d status=0 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=11 d status=0 size=2080 version=1 generation=12 raster=0 sprites=0 audio=0 dropped=0 dirty=1024:01,1536:01
+frame=12 d status=0 size=2080 version=1 generation=13 raster=0 sprites=0 audio=0 dropped=0 dirty=0-63:ff
+frame=13 d status=0 size=2080 version=1 generation=14 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case delta-probe-0 0 0:d;1:d;2:d;3:d 4
+frame=0 d status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case delta-probe-0 8 1:d;3:d;12:d 13
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=0:01
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=1:80,2047:80
+frame=12 d status=0 size=2080 version=1 generation=13 raster=0 sprites=0 audio=0 dropped=0 dirty=0-63:ff
+end
+
+case delta-probe-0 ff 0:d;1:d;3:d;5:d 6
+frame=0 d status=0 size=2080 version=1 generation=1 raster=2 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=1 audio=0 dropped=0 dirty=0:01
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=1 audio=0 dropped=0 dirty=1:80,2047:80
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=1 audio=0 dropped=0 dirty=8:ff
+end
+
+case delta-probe-1 1 1:d;2:d;3:d;4:d;5:d;6:d;7:d;8:d 9
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=32-33:ff,34:01
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=64-65:ff
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=96-97:ff
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=6 d status=0 size=2080 version=1 generation=7 raster=0 sprites=0 audio=0 dropped=0 dirty=256:ff,257:01
+frame=7 d status=0 size=2080 version=1 generation=8 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case delta-probe-4 1 1:d;2:d;3:d;4:d;5:d;6:d;7:d;8:d;9:d 10
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=96-97:ff
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=32-33:ff,34:01
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=32-33:ff,34:01
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=0 audio=0 dropped=0 dirty=64-65:ff
+frame=6 d status=0 size=2080 version=1 generation=7 raster=0 sprites=0 audio=0 dropped=0 dirty=64-65:ff
+frame=7 d status=0 size=2080 version=1 generation=8 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=97:01
+frame=9 d status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case delta-probe-2 1 14:d.D15.D14.D13.D12.D9.D8.D7.D6.D5.D1.D0.D16.D99.D-2 16
+frame=14 d status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=14:40
+frame=14 D15 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=14:40
+frame=14 D14 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=14:40
+frame=14 D13 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=13-14:40
+frame=14 D12 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=12:20,13-14:40
+frame=14 D9 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=9-10:10,11-12:20,13-14:40
+frame=14 D8 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=8:08,9-10:10,11-12:20,13-14:40
+frame=14 D7 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=7-8:08,9-10:10,11-12:20,13-14:40
+frame=14 D6 status=-10 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=14 D5 status=-10 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=14 D1 status=-10 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=14 D0 status=-10 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=14 D16 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=14:40
+frame=14 D99 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=14:40
+frame=14 D-2 status=0 size=2080 version=1 generation=15 raster=0 sprites=0 audio=0 dropped=0 dirty=13-14:40
+end
+
+case delta-probe-2 1 0:D0.D1;1:D0.D1;2:D0.D1;7:D0;8:D0;9:D0;10:D1.D2.D-0 11
+frame=0 D0 status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=0 D1 status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 D0 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 D1 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+frame=2 D0 status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=2 D1 status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=1-2:01
+frame=7 D0 status=0 size=2080 version=1 generation=8 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=8 D0 status=-10 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=9 D0 status=-10 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=10 D1 status=-10 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=10 D2 status=-10 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=10 D-0 status=-10 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+end
+
+case delta-probe-2 ff 1:d0.d2079.d2080.d4000.D3,2079.D3,2080.D3,5000 3
+frame=1 d0 status=-3 size=1515870810 version=1515870810 generation=6510615555426900570 raster=1515870810 sprites=1515870810 audio=1515870810 dropped=1515870810 dirty=0-2047:5a
+frame=1 d2079 status=-3 size=1515870810 version=1515870810 generation=6510615555426900570 raster=1515870810 sprites=1515870810 audio=1515870810 dropped=1515870810 dirty=0-2047:5a
+frame=1 d2080 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+frame=1 d4000 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+frame=1 D3,2079 status=-3 size=1515870810 version=1515870810 generation=6510615555426900570 raster=1515870810 sprites=1515870810 audio=1515870810 dropped=1515870810 dirty=0-2047:5a
+frame=1 D3,2080 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+frame=1 D3,5000 status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1:01
+end
+
+case delta-probe-2 1 2:d.x.d.D1;3:d.D2;4:d 5
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=2:01
+frame=2 x status=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=2 D1 status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=3 D2 status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=4:02
+end
+
+case delta-probe-2 0 2:x.d;3:d;4:d 5
+frame=2 x status=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case delta-probe-2 1 2:S;8:d.L.d.D7.D3;9:d.D8;10:d 12
+frame=2 S status=0
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=8:08
+frame=8 L status=0
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=8 D7 status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=8 D3 status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=9 d status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=9 D8 status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=10 d status=0 size=2080 version=1 generation=11 raster=0 sprites=0 audio=0 dropped=0 dirty=4:02
+end
+
+case delta-probe-2 1 1:u0;2:u1;3:d;4:d;5:u8;6:d;7:u0.u1;8:d;9:d 10
+frame=1 u0 status=0
+frame=2 u1 status=0
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=4:02
+frame=5 u8 status=0
+frame=6 d status=0 size=2080 version=1 generation=7 raster=0 sprites=0 audio=0 dropped=0 dirty=6:04
+frame=7 u0 status=0
+frame=7 u1 status=0
+frame=8 d status=0 size=2080 version=1 generation=9 raster=0 sprites=0 audio=0 dropped=0 dirty=8:08
+frame=9 d status=0 size=2080 version=1 generation=10 raster=0 sprites=0 audio=0 dropped=0 dirty=9:10
+end
+
+case delta-probe-2 0 1:u1.u0;2:d;3:u1.d;4:d;5:d 6
+frame=1 u1 status=0
+frame=1 u0 status=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 u1 status=0
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=5 d status=0 size=2080 version=1 generation=6 raster=0 sprites=0 audio=0 dropped=0 dirty=5:04
+end
+
+case delta-probe-0 ff 1:d;2:d.u0.d;3:d;4:d 5
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=1 audio=0 dropped=0 dirty=0:01
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=1 audio=0 dropped=0 dirty=1:01
+frame=2 u0 status=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=1 audio=0 dropped=0 dirty=1:01
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case raster-bands-1 ff 1:d;2:d;3:d.D1.D0;4:x.d.D1;5:d 6
+frame=1 d status=0 size=2080 version=1 generation=2 raster=127 sprites=0 audio=0 dropped=0 dirty=1024-1151:ff,1584:f0,1585-1663:ff,1792-1919:ff
+frame=2 d status=0 size=2080 version=1 generation=3 raster=223 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 d status=0 size=2080 version=1 generation=4 raster=223 sprites=0 audio=0 dropped=0 dirty=none
+frame=3 D1 status=0 size=2080 version=1 generation=4 raster=223 sprites=0 audio=0 dropped=0 dirty=1024-1151:ff,1584:f0,1585-1663:ff,1792-1919:ff
+frame=3 D0 status=0 size=2080 version=1 generation=4 raster=223 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 x status=0
+frame=4 d status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=4 D1 status=0 size=2080 version=1 generation=5 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=5 d status=0 size=2080 version=1 generation=6 raster=223 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+end
+
+case raster-bands-1 1 1:d;2:d 3
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=1024-1151:ff,1584:f0,1585-1663:ff,1792-1919:ff
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case fm-psg-5 10 0:d;1:d;2:d.x.d;3:d 4
+frame=0 d status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=66 dropped=0 dirty=none
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=66 dropped=0 dirty=none
+frame=2 x status=0
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=3 d status=0 size=2080 version=1 generation=4 raster=0 sprites=0 audio=66 dropped=0 dirty=0-2047:ff
+end
+
+case fm-psg-5 ef 0:d;1:d;2:d 3
+frame=0 d status=0 size=2080 version=1 generation=1 raster=1 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end
+
+case modes-sweep-0 1 0:d;1:d;2:d 3
+frame=0 d status=0 size=2080 version=1 generation=1 raster=0 sprites=0 audio=0 dropped=0 dirty=0-2047:ff
+frame=1 d status=0 size=2080 version=1 generation=2 raster=0 sprites=0 audio=0 dropped=0 dirty=528:e0,529-575:ff,1536-1599:ff,1664-1821:ff
+frame=2 d status=0 size=2080 version=1 generation=3 raster=0 sprites=0 audio=0 dropped=0 dirty=none
+end

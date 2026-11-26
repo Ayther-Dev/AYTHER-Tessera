@@ -39,7 +39,7 @@ function(tessera_add_z80)
         message(FATAL_ERROR "DEPENDENCY_LOCK_INVALID: chips-z80 is missing from component_sources.")
     endif()
 
-    add_library(tessera_z80_chips STATIC "${PROJECT_SOURCE_DIR}/src/md/z80_chips.c")
+    add_library(tessera_z80_chips OBJECT "${PROJECT_SOURCE_DIR}/src/md/z80_chips.c")
     target_include_directories(tessera_z80_chips PUBLIC "${PROJECT_SOURCE_DIR}/src")
     target_include_directories(tessera_z80_chips SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/${include_dir}")
     if(MSVC)

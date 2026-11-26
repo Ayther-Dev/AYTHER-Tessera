@@ -29,6 +29,7 @@ typedef struct tessera_z80 {
 #define TZ80_RD (1ULL << 27)
 #define TZ80_WR (1ULL << 28)
 #define TZ80_INT (1ULL << 30)
+#define TZ80_NMI (1ULL << 31)
 #define TZ80_WAIT (1ULL << 33)
 
 /* Each returns the pins to feed to the next tick. */

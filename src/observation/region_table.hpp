@@ -1,6 +1,8 @@
 // Tabla de regiones de la ABI 1.10 (spec 008, TP-006.5). Medida por caja negra
 // con el banco diferencial sobre gpgx r4: tamaños, flags y ids heredados.
 #pragma once
+#include "tessera/tessera.h"
+
 #include <cstdint>
 
 namespace tessera::observation {
@@ -39,7 +41,57 @@ inline constexpr RegionRow kRegions[] = {
     {26, 1, 8192, 8192, 11, 1, 271u},
 };
 
+/// Suscripción (TESSERA_OBS_SUB_*) que activa una región; 0 = se sirve siempre.
+/// Medido sobre gpgx r4 (matriz en tests/fixtures/diffbench/
+/// subscription-matrix.json): los controles 5 a 10 y 15, SYSTEM y Z80_RAM no
+/// piden suscripción; PALETTE cuelga de VDP_MEMORY.
+constexpr std::uint32_t region_gate(std::uint32_t id) noexcept {
+  switch (id) {
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 24:
+    return TESSERA_OBS_SUB_VDP_MEMORY;
+  case 11:
+  case 12:
+    return TESSERA_OBS_SUB_AUDIO_WRITES;
+  case 13:
+  case 14:
+  case 25:
+    return TESSERA_OBS_SUB_SPRITE_CAPTURE;
+  case 16:
+  case 22:
+    return TESSERA_OBS_SUB_RASTER_TRACKING;
+  case 17:
+    return TESSERA_OBS_SUB_ATTRIBUTION;
+  case 19:
+    return TESSERA_OBS_SUB_LINE_STATE;
+  case 20:
+    return TESSERA_OBS_SUB_LINE_CRAM;
+  case 21:
+    return TESSERA_OBS_SUB_LINE_CELLS;
+  case 23:
+    return TESSERA_OBS_SUB_FRAME_HASH;
+  default:
+    return 0;
+  }
+}
+
 inline constexpr std::uint32_t kRegionCount =
     sizeof(kRegions) / sizeof(kRegions[0]);
+
+/// TESSERA_OBS_REGION_WORK_RAM (TP-301.3, RF-3.1): not an ABI 1.10 row. The
+/// 64 KiB work RAM word-swapped as gpgx's legacy RETRO_MEMORY_SYSTEM_RAM (2),
+/// read and control write, served without subscription.
+inline constexpr RegionRow kWorkRamRow{
+    TESSERA_OBS_REGION_WORK_RAM,
+    1,
+    65536,
+    65536,
+    TESSERA_OBS_REGION_ACCESS_READ | TESSERA_OBS_REGION_ACCESS_CONTROL_WRITE |
+        TESSERA_OBS_REGION_WORD_SWAPPED_LE,
+    1,
+    2u};
 
 } // namespace tessera::observation

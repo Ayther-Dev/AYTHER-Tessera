@@ -16,8 +16,8 @@ Cada función corresponde a un miembro de `ayther_interface_v1`; la semántica d
 | `tessera_observation_audio_events_poll_v1` | `poll_audio_events` | Lleva `event_size` para validar el layout del evento (`ayther_audio_event_v1` contiene una unión y no se genera aún). |
 | `tessera_observation_audio_transport_stats_v1` | `get_audio_transport_stats` | |
 | `tessera_observation_subscriptions_get_v1` / `_set_v1` | `get_subscriptions` / `set_subscriptions` | Máscara `TESSERA_OBS_SUB_*`. |
-| `tessera_observation_frame_delta_poll_v1` | `poll_frame_delta` | |
-| `tessera_observation_frame_delta_since_v1` | `frame_delta_since` | |
+| `tessera_observation_frame_delta_poll_v1` | `poll_frame_delta` | Delta del último frame (TP-205.4). |
+| `tessera_observation_frame_delta_since_v1` | `frame_delta_since` | `AYTHER_STATUS_DELTA_HISTORY_LOST` se devuelve como `TESSERA_STALE_EPOCH`. |
 
 ## Estado de la implementación
 Esta tarea (TP-006.4) declara y documenta; ninguna función tiene aún definición. Las implementa el backend Mega Drive en la fase 1 (TP-101 a TP-107) y la sesión sintética devolverá `TESSERA_UNSUPPORTED_CAPABILITY`.

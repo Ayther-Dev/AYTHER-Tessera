@@ -1,5 +1,7 @@
 #include "md/vdp.hpp"
 
+#include <algorithm>
+
 namespace tessera::md {
 
 std::uint32_t Vdp::active_lines() const noexcept {
@@ -7,6 +9,7 @@ std::uint32_t Vdp::active_lines() const noexcept {
 }
 
 void Vdp::write_control(std::uint16_t value) {
+  fill_flush();
   if (mode4() && !pending_second_ && (value & 0xC000U) != 0x8000U) {
     // gpgx (vdp_68k_ctrl_w): in mode 4 there is no second command word, every
     // control word is a complete command, so a trailing 0 word of a long write
@@ -34,18 +37,44 @@ void Vdp::write_control(std::uint16_t value) {
     const unsigned index = (value >> 8) & 0x1FU;
     // In mode 4 (register 1 bit 2 clear) registers above 10 do not exist.
     const bool was_mode4 = mode4();
-    if (index <= 10 || (regs_[1] & 0x04U) != 0)
+    const std::uint8_t palette_bits_before =
+        static_cast<std::uint8_t>((regs_[0] & 0x04U) | (regs_[12] & 0x08U));
+    // Geometry: H40 (12), V30 (1 bit 3) and the mode (1 bit 2): leaving
+    // Mode 4 takes the frame from 192 lines to 224 (measured, mode4_pbc).
+    const std::uint8_t geometry_before =
+        static_cast<std::uint8_t>((regs_[12] & 0x81U) | (regs_[1] & 0x0CU));
+    const std::uint8_t old_value = regs_[index];
+    if (index <= 10 || (regs_[1] & 0x04U) != 0) {
       regs_[index] = static_cast<std::uint8_t>(value);
-    if (was_mode4 && !mode4()) {
-      // Leaving Mode 4 gpgx spreads the 16 KB Mode 4 VRAM over the Mode 5 one:
-      // word w goes to word 2w and the rest is cleared (measured, mode4_pbc).
-      std::array<std::uint8_t, 0x10000> spread{};
-      for (unsigned w = 0; w < 0x2000U; ++w) {
-        spread[w * 4U] = vram_[w * 2U];
-        spread[w * 4U + 1U] = vram_[w * 2U + 1U];
+      // Not events: the line counter (10), the auto-increment (15) and the
+      // DMA registers (19 and up) (measured, raster_bands 11, 19, 20).
+      if (regs_[index] != old_value && index != 10 && index != 15 &&
+          index < 19) {
+        journal(1, static_cast<std::uint16_t>(index), regs_[index],
+                index == 1 && ((old_value ^ regs_[index]) & 0x40U) != 0);
+        if (index == 12 && ((old_value ^ regs_[index]) & 0x81U) != 0 &&
+            raster_line() >= 0 && (regs_[1] & 0x40U) != 0)
+          raster_.fallback |= 0x20U; // width change
       }
-      vram_ = spread;
+      if (index == 17 && (regs_[17] & 0x1FU) != 0) {
+        const std::uint8_t width = (regs_[12] & 0x81U) != 0 ? 20U : 16U;
+        const auto split = static_cast<std::uint8_t>(
+            std::min<unsigned>(regs_[17] & 0x1FU, width));
+        window_clip_ = (regs_[17] & 0x80U) != 0
+                           ? std::array<std::uint8_t, 2>{split, width}
+                           : std::array<std::uint8_t, 2>{0, split};
+      }
     }
+    if (((regs_[12] & 0x81U) | (regs_[1] & 0x0CU)) != geometry_before)
+      geometry_changed_ = true;
+    if (((regs_[0] & 0x04U) | (regs_[12] & 0x08U)) != palette_bits_before) {
+      // gpgx refreshes its whole palette when the limited palette or the
+      // shadow/highlight bit changes; only then do the transparent entries
+      // of palettes 1 to 3 take the CRAM value (measured, raster_bands 12-14).
+      transparent_cram_ = {cram_[16], cram_[32], cram_[48]};
+    }
+    if (was_mode4 != mode4())
+      remap_vram(mode4());
     if ((regs_[0] & 0x02U) == 0)
       hv_latched_ = false; // clearing the latch enable releases the counter
     code_ = 0;
@@ -76,33 +105,57 @@ void Vdp::put(std::uint16_t value) {
     // Mode 4 VRAM write (gpgx vdp_68k_data_w_m4): the word goes to the even
     // address, byte swapped when the address is odd, and the address steps by
     // register 15 + 1.
+    touch_vram();
     const std::uint32_t a = address_ & 0x3FFFU;
     const std::uint32_t index = a & 0x3FFEU;
     const auto word = static_cast<std::uint16_t>(
         (a & 1U) != 0 ? ((value >> 8) | (value << 8)) : value);
     // gpgx keeps the low byte at the even address (SMS layout; measured on
     // its VRAM region with mode4_scene).
-    vram_[index] = static_cast<std::uint8_t>(word);
-    vram_[index + 1U] = static_cast<std::uint8_t>(word >> 8);
+    set_vram(index, static_cast<std::uint8_t>(word));
+    set_vram(index + 1U, static_cast<std::uint8_t>(word >> 8));
     address_ = static_cast<std::uint16_t>((a + regs_[15] + 1U) & 0x3FFFU);
     return;
   }
   switch (code_ & 0x0FU) {
-  case 1:                       // VRAM write
-    if ((address_ & 1U) != 0) { // odd address: bytes swapped
-      vram_[address_] = static_cast<std::uint8_t>(value >> 8);
-      vram_[address_ ^ 1U] = static_cast<std::uint8_t>(value);
-    } else {
-      vram_[address_] = static_cast<std::uint8_t>(value >> 8);
-      vram_[address_ + 1U] = static_cast<std::uint8_t>(value);
+  case 1: { // VRAM write
+    touch_vram();
+    const std::uint32_t word_at = address_ & 0xFFFEU;
+    const auto before = static_cast<std::uint16_t>(
+        (std::uint32_t{vram_[word_at]} << 8) | vram_[word_at + 1U]);
+    // odd address: bytes swapped (address ^ 1 is then address - 1)
+    set_vram(address_, static_cast<std::uint8_t>(value >> 8));
+    set_vram(address_ ^ 1U, static_cast<std::uint8_t>(value));
+    track_vram_write(
+        word_at, before,
+        static_cast<std::uint16_t>((std::uint32_t{vram_[word_at]} << 8) |
+                                   vram_[word_at + 1U]));
+    break;
+  }
+  case 3: {
+    auto &entry = cram_[(address_ >> 1) & 0x3FU];
+    const auto colour = static_cast<std::uint16_t>(value & 0x0EEEU);
+    if (entry != colour) {
+      entry = colour;
+      const auto packed = static_cast<std::uint16_t>(((colour >> 9 & 7U) << 6) |
+                                                     ((colour >> 5 & 7U) << 3) |
+                                                     (colour >> 1 & 7U));
+      if (raster_line() >= 0)
+        raster_.cram_changed = true;
+      // The address of a CRAM event is the entry index (raster_bands 33).
+      journal(2, static_cast<std::uint16_t>((address_ >> 1) & 0x3FU), packed);
     }
     break;
-  case 3:
-    cram_[(address_ >> 1) & 0x3FU] = value & 0x0EEEU;
-    break;
+  }
   case 5:
-    if (((address_ >> 1) & 0x7FU) < vsram_.size())
-      vsram_[(address_ >> 1) & 0x7FU] = value & 0x07FFU;
+    if (((address_ >> 1) & 0x7FU) < vsram_.size()) {
+      auto &entry = vsram_[(address_ >> 1) & 0x7FU];
+      const auto word = static_cast<std::uint16_t>(value & 0x07FFU);
+      if (entry != word) {
+        entry = word;
+        journal(4, static_cast<std::uint16_t>(address_ & 0x7EU), word);
+      }
+    }
     break;
   default:
     break;
@@ -110,7 +163,108 @@ void Vdp::put(std::uint16_t value) {
   address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
 }
 
+void Vdp::replay(const RasterEvent &event) noexcept {
+  switch (event.reason) {
+  case 1:
+    regs_[event.address & 31U] = static_cast<std::uint8_t>(event.data);
+    break;
+  case 2: // BBBGGGRRR back to the CRAM word
+    cram_[event.address & 0x3FU] = static_cast<std::uint16_t>(
+        ((event.data >> 6 & 7U) << 9) | ((event.data >> 3 & 7U) << 5) |
+        ((event.data & 7U) << 1));
+    break;
+  case 4:
+    if ((event.address >> 1) < vsram_.size())
+      vsram_[event.address >> 1] = event.data;
+    break;
+  case 8:
+    vram_[event.address & 0xFFFEU] = static_cast<std::uint8_t>(event.data >> 8);
+    vram_[(event.address & 0xFFFEU) + 1U] =
+        static_cast<std::uint8_t>(event.data);
+    break;
+  default:
+    break;
+  }
+}
+
+// gpgx keeps a single VRAM and Mode 4 sees it through a permutation: Mode 4
+// word k (bytes 2k and 2k + 1 of its region) is Mode 5 word mode4_word(k)
+// with its two bytes swapped. Below $2000 the low bit of the word moves to
+// bit 8 within each block of 512 words; above, only the bytes swap
+// (measured on gpgx over the 32768 words, TP-209.1 (d): a Mode 5 -> 4 -> 5
+// round trip leaves the VRAM as it was; mode4_pbc's writes land in Mode 5
+// word 2k because they stay below word $100). Tessera stores the VRAM in the
+// layout of the current mode, so a mode change applies the permutation.
+namespace {
+constexpr std::uint32_t mode4_word(std::uint32_t k) noexcept {
+  return k < 0x2000U ? (k & ~0x1FFU) | ((k & 0xFFU) << 1) | ((k >> 8) & 1U) : k;
+}
+} // namespace
+
+void Vdp::remap_vram(bool to_mode4) {
+  touch_vram();
+  std::array<std::uint8_t, 0x10000> out{};
+  for (std::uint32_t k = 0; k < 0x8000U; ++k) {
+    const std::uint32_t w = mode4_word(k);
+    if (to_mode4) {
+      out[2U * k] = vram_[2U * w + 1U];
+      out[2U * k + 1U] = vram_[2U * w];
+    } else {
+      out[2U * w] = vram_[2U * k + 1U];
+      out[2U * w + 1U] = vram_[2U * k];
+    }
+  }
+  for (std::uint32_t i = 0; i < out.size(); ++i)
+    set_vram(i, out[i]);
+}
+
+int Vdp::raster_line() const noexcept {
+  const std::uint32_t total = lines_per_frame(standard_);
+  const std::uint32_t v = (line_ + 1U) % total;
+  return v < frame_active_ ? static_cast<int>(v) : -1;
+}
+
+void Vdp::journal(std::uint16_t reason, std::uint16_t address,
+                  std::uint16_t data, bool display_toggle) noexcept {
+  const int v = raster_line();
+  if (v < 0 || mode4())
+    return;
+  // With the display off a line is the backdrop: only what changes it is an
+  // event, register 7, its CRAM entry and the display bit itself (measured on
+  // gpgx while the test ROMs load their scene, TP-205.3).
+  if ((regs_[1] & 0x40U) == 0 && !display_toggle &&
+      !(reason == 1 && address == 7) &&
+      !(reason == 2 && address == (regs_[7] & 0x3FU)))
+    return;
+  raster_.fallback |= reason;
+  if (raster_.count < raster_.events.size()) {
+    raster_.events[raster_.count++] = {static_cast<std::uint16_t>(v), reason,
+                                       address, data};
+  } else {
+    ++raster_.dropped;
+    raster_.fallback |= 0x80U;
+  }
+}
+
+void Vdp::track_vram_write(std::uint32_t address, std::uint16_t before,
+                           std::uint16_t after) noexcept {
+  // With the display off no VRAM write is an event nor a fallback reason
+  // (measured on gpgx, see journal()).
+  if (raster_line() < 0 || mode4() || (regs_[1] & 0x40U) == 0)
+    return;
+  // The horizontal scroll table: up to 240 lines of two words (assumed
+  // extent; raster_bands 3 and 10 write its first entry).
+  const std::uint32_t table = std::uint32_t{regs_[13] & 0x3FU} << 10;
+  if (address >= table && address < table + 240U * 4U) {
+    if (before != after)
+      journal(8, static_cast<std::uint16_t>(address), after);
+  } else {
+    raster_.fallback |= 0x40U; // raster_bands 22, 23, 32
+  }
+}
+
 void Vdp::write_data(std::uint16_t value) {
+  fill_flush();
   pending_second_ = false;
   if (dma_pending_) {
     dma_pending_ = false;
@@ -188,8 +342,10 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
   const bool h40 = (regs_[12] & 0x81U) != 0;
   // In the blanking a CRAM or VSRAM word takes 3 % more than one slot
   // (measured on gpgx with dma_timing: 2175 against 2100 units for 2048).
+  // VRAM gets 204/166 slots per blanked line, as the fill DMA (fixed-delay
+  // probe over 4000 slots, TP-209.2).
   const std::uint32_t per_line =
-      (h40 ? 205U : 167U) * (colour_ram ? 1000U : 1031U) / 1031U;
+      colour_ram ? (h40 ? 205U : 167U) * 1000U / 1031U : (h40 ? 204U : 166U);
   const std::uint32_t active_per_line = h40 ? 18U : 16U;
   const std::uint32_t total_lines = lines_per_frame(standard_);
   const std::uint32_t active = active_lines();
@@ -206,20 +362,32 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
         total_lines;
     const std::uint64_t line_end = static_cast<std::uint64_t>(
         static_cast<std::int64_t>(line_start_) + (k + 1) * kCyclesPerLine);
-    if (!enabled || wrapped >= active) { // blanking: evenly spread slots
-      const std::uint64_t avail = (line_end - t) * per_line / kCyclesPerLine;
-      if (slots <= avail || avail == 0 || true) {
-        const std::uint64_t need =
-            (slots * kCyclesPerLine + per_line - 1) / per_line;
-        if (t + need <= line_end)
-          return t + need;
-      }
-      slots -= avail;
-      t = line_end;
+    if (!enabled || (wrapped >= active && wrapped + 1 != total_lines)) {
+      // blanking: evenly spread slots, the whole blanking at one rate; the
+      // end rounds down, display on or off (dm/dmb probes; with the display
+      // off, Gunstar Heroes' 68000 sub-cycle phase stays on gpgx's)
+      const std::uint64_t need = (slots * kCyclesPerLine) / per_line;
+      if (!enabled)
+        return t + need;
+      const std::uint64_t blank_end =
+          line_end + (total_lines - 2U - static_cast<std::uint64_t>(wrapped)) *
+                         kCyclesPerLine;
+      if (t + need <= blank_end)
+        return t + need;
+      slots -= (blank_end - t) * per_line / kCyclesPerLine;
+      t = blank_end;
       continue;
     }
+    // The last line of the frame takes the display rate too; the display
+    // lines that follow it are the whole next picture, not a wrapped count
+    // (a 68000 DMA started in the blanking that still has more than a
+    // picture's slots there ran on at the display rate through the next
+    // blanking: Streets of Rage 2 frame 2183, 0x1740 words from line 232,
+    // 91 lines late; scratchpad sor2/probe/ldma.py).
     const std::uint64_t lines_left =
-        active - 1U - static_cast<std::uint64_t>(wrapped);
+        static_cast<std::uint64_t>(wrapped) + 1U == total_lines
+            ? active
+            : active - 1U - static_cast<std::uint64_t>(wrapped);
     if (slots > 2ULL * active_per_line && lines_left > 1) {
       std::uint64_t m = (slots - 1U) / active_per_line;
       if (m > lines_left - 1)
@@ -236,11 +404,165 @@ std::uint64_t Vdp::slots_end(std::uint64_t start, std::uint64_t slots,
   return t;
 }
 
+// Master cycle at which a VRAM fill or copy of `slots` slots (one per fill
+// byte, two per copied byte) started at `start` is done. Unlike the 68000
+// FIFO, these slots are evenly spread over the line, 18/16 (H40/H32) while
+// the display is drawn and 204/166 while it is blanked, and the rate changes
+// 150/160 master cycles before the V counter ticks into the next line, in
+// both directions. The start latency depends on the kind of transfer and on
+// where it starts. All measured on gpgx with dense status reads after a
+// fixed CPU delay (TP-209.2, scratchpad fifo/dense.py, xfit.py, xval.py).
+std::uint64_t Vdp::fill_end(std::uint64_t start, std::uint64_t slots,
+                            bool copy) const noexcept {
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const std::uint64_t blank_rate = h40 ? 204U : 166U;
+  const std::uint64_t display_rate = h40 ? 18U : 16U;
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t active = active_lines();
+  // Work in slot x cycle units so a partial line keeps its fraction.
+  std::uint64_t rem = slots * kCyclesPerLine;
+  std::int64_t t = static_cast<std::int64_t>(start);
+  // A negative latency never ends a transfer before it starts.
+  auto done = [start](std::int64_t at, std::uint64_t cycles) {
+    const std::int64_t end = at + static_cast<std::int64_t>(cycles);
+    return end > static_cast<std::int64_t>(start)
+               ? static_cast<std::uint64_t>(end)
+               : start;
+  };
+  if ((regs_[1] & 0x40U) == 0)
+    return done(t - (copy ? 170 : 85), (rem + blank_rate - 1) / blank_rate);
+  if (blank_at(start))
+    t -= copy ? 170 : 85;
+  else
+    t += copy ? 40 : (h40 ? 345 : 390);
+  const std::int64_t origin =
+      static_cast<std::int64_t>(line_start_) - (h40 ? 150 : 160);
+  for (;;) {
+    const std::int64_t rel = t - origin;
+    const std::int64_t k =
+        rel >= 0 ? rel / kCyclesPerLine
+                 : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+    const std::int64_t line =
+        ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+    const bool blank = line >= active && line + 1 != total;
+    const std::uint64_t rate = blank ? blank_rate : display_rate;
+    const std::int64_t seg_end = origin + (k + 1) * kCyclesPerLine;
+    const std::uint64_t cap = static_cast<std::uint64_t>(seg_end - t) * rate;
+    if (rem <= cap)
+      return done(t, (rem + rate - 1) / rate);
+    rem -= cap;
+    t = seg_end;
+  }
+}
+
+// Master cycle of the first slot of a VRAM fill whose data word came at
+// `start`: the start latency of fill_end.
+std::int64_t Vdp::fill_first_slot(std::uint64_t start) const noexcept {
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const auto t = static_cast<std::int64_t>(start);
+  if ((regs_[1] & 0x40U) == 0 || blank_at(start))
+    return t - 85;
+  return t + (h40 ? 345 : 390);
+}
+
+// Slots of a fill whose first slot is at `first` that are done by `until`,
+// with the rates and segments of fill_end.
+std::uint64_t Vdp::fill_slots_by(std::int64_t first,
+                                 std::uint64_t until) const noexcept {
+  const auto end = static_cast<std::int64_t>(until);
+  if (end <= first)
+    return 0;
+  const bool h40 = (regs_[12] & 0x81U) != 0;
+  const std::uint64_t blank_rate = h40 ? 204U : 166U;
+  const std::uint64_t display_rate = h40 ? 18U : 16U;
+  if ((regs_[1] & 0x40U) == 0)
+    return static_cast<std::uint64_t>(end - first) * blank_rate /
+           kCyclesPerLine;
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t active = active_lines();
+  const std::int64_t origin =
+      static_cast<std::int64_t>(line_start_) - (h40 ? 150 : 160);
+  std::uint64_t acc = 0; // slot x cycle units
+  std::int64_t t = first;
+  while (t < end) {
+    const std::int64_t rel = t - origin;
+    const std::int64_t k =
+        rel >= 0 ? rel / kCyclesPerLine
+                 : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+    const std::int64_t line =
+        ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+    const bool blank = line >= active && line + 1 != total;
+    const std::int64_t seg_end = origin + (k + 1) * kCyclesPerLine;
+    const std::int64_t stop = std::min(seg_end, end);
+    acc += static_cast<std::uint64_t>(stop - t) *
+           (blank ? blank_rate : display_rate);
+    t = stop;
+  }
+  return acc / kCyclesPerLine;
+}
+
+// End of the block of fill slots the current line writes: 140/150 master
+// cycles (H40/H32) before the next line starts, next to where fill_end
+// changes rate (measured on gpgx, TP-209.2: VRAM at the frame end, +-1 byte).
+std::uint64_t Vdp::fill_chunk_end() const noexcept {
+  return line_start_ + kCyclesPerLine -
+         ((regs_[12] & 0x81U) != 0 ? 140U : 150U);
+}
+
+// Writes the fill bytes up to `slots` slots from its start (one byte a slot).
+void Vdp::fill_write(std::uint64_t slots) noexcept {
+  const std::uint64_t total = std::uint64_t{fill_.written} + fill_.remaining;
+  const std::uint64_t target = std::min(slots, total);
+  while (fill_.written < target) {
+    set_vram(fill_.address ^ 1U, fill_.byte, true);
+    fill_.address = static_cast<std::uint16_t>(fill_.address + fill_.step);
+    ++fill_.written;
+    --fill_.remaining;
+  }
+  if (fill_.remaining == 0)
+    fill_.active = false;
+}
+
+// Writes what is left of the fill at once: before a data or control port
+// access, whose effect on a fill in progress is not measured.
+void Vdp::fill_flush() noexcept {
+  if (fill_.active)
+    fill_write(std::uint64_t{fill_.written} + fill_.remaining);
+}
+
+// Whether the line that master cycle `t` falls in is blanked, with the
+// current registers. Unlike display_blank() it looks at the line of `t`, not
+// at the current one, which lags behind while the 68000 is held by the FIFO.
+bool Vdp::blank_at(std::uint64_t t) const noexcept {
+  if ((regs_[1] & 0x40U) == 0)
+    return true;
+  const std::int64_t rel =
+      static_cast<std::int64_t>(t) - static_cast<std::int64_t>(line_start_);
+  const std::int64_t k = rel >= 0
+                             ? rel / kCyclesPerLine
+                             : -((-rel + kCyclesPerLine - 1) / kCyclesPerLine);
+  const std::int64_t total = lines_per_frame(standard_);
+  const std::int64_t line =
+      ((static_cast<std::int64_t>(line_) + k) % total + total) % total;
+  return line >= static_cast<std::int64_t>(active_lines()) && line + 1 != total;
+}
+
 // Completion time of an entry of `slots` external slots started at `start`.
+// The rate is that of the line the entry starts in, not the line of the
+// write: a burst that holds the 68000 across the end of the display speeds
+// up when the blanking starts (measured on gpgx, TP-209.2). An entry started
+// in the last drawn line keeps its display slot even if that falls in the
+// next line.
 std::uint64_t Vdp::slot_service(std::uint64_t start,
                                 unsigned slots) const noexcept {
-  if (display_blank())
-    return start + dma_cycles(slots);
+  // The blanking rate starts 150/160 master cycles before the V counter
+  // ticks out of the last drawn line, as for the fill DMA (measured on gpgx
+  // with fixed-delay bursts that cross into the blanking, TP-209.2).
+  const std::uint64_t early = (regs_[12] & 0x81U) != 0 ? 150U : 160U;
+  if (blank_at(start) || blank_at(start + early)) {
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    return start + std::uint64_t{slots} * kCyclesPerLine / (h40 ? 205U : 167U);
+  }
   return next_slot(start, slots == 2U);
 }
 
@@ -257,10 +579,13 @@ void Vdp::fifo_write(std::uint16_t value) {
   fifo_last_done_ = slot_service(start, slots);
   fifo_done_[(fifo_head_ + fifo_count_) & 3U] = fifo_last_done_;
   ++fifo_count_;
+  if (!mode4()) // Mode 4 writes leave the data bits alone (mode4_pbc)
+    fifo_record(value);
   put(value);
 }
 
 std::uint16_t Vdp::read_data() {
+  fill_flush();
   pending_second_ = false;
   if (mode4()) {
     // Mode 4 VRAM read (gpgx vdp_68k_data_r_m4): the word of the even address,
@@ -277,12 +602,18 @@ std::uint16_t Vdp::read_data() {
     value = static_cast<std::uint16_t>((vram_[address_ & 0xFFFEU] << 8) |
                                        vram_[(address_ & 0xFFFEU) + 1U]);
     break;
-  case 8:
-    value = cram_[(address_ >> 1) & 0x3FU];
+  case 8: // 9 bits of colour, the rest from the FIFO
+    value = static_cast<std::uint16_t>((fifo_data_[fifo_wr_] & 0xF111U) |
+                                       cram_[(address_ >> 1) & 0x3FU]);
     break;
-  case 4:
+  case 4: // 11 bits of scroll, the rest from the FIFO
+    value = static_cast<std::uint16_t>(fifo_data_[fifo_wr_] & 0xF800U);
     if (((address_ >> 1) & 0x7FU) < vsram_.size())
-      value = vsram_[(address_ >> 1) & 0x7FU];
+      value |= vsram_[(address_ >> 1) & 0x7FU];
+    break;
+  case 12: // 8-bit VRAM read: the byte of address ^ 1, high byte from the FIFO
+    value = static_cast<std::uint16_t>((fifo_data_[fifo_wr_] & 0xFF00U) |
+                                       vram_[address_ ^ 1U]);
     break;
   default:
     break;
@@ -301,8 +632,11 @@ void Vdp::run_dma(std::uint16_t first_data) {
                                (std::uint32_t{regs_[21]} << 1);
   if (mode < 2) { // 68000 bus to VDP
     std::uint32_t at = source;
-    for (std::uint32_t i = 0; i < length; ++i, at += 2)
-      put(dma_reader_ ? dma_reader_(at) : std::uint16_t{0xFFFF});
+    for (std::uint32_t i = 0; i < length; ++i, at += 2) {
+      const std::uint16_t word = dma_reader_ ? dma_reader_(at) : 0xFFFFU;
+      fifo_record(word);
+      put(word);
+    }
     // A VRAM word takes two external slots, a CRAM or VSRAM word one.
     cpu_stall_ += slots_end(now_, (code_ & 0x0FU) == 1 ? 2ULL * length : length,
                             (code_ & 0x0FU) != 1) -
@@ -310,19 +644,46 @@ void Vdp::run_dma(std::uint16_t first_data) {
     finish_dma(length, true);
     return;
   }
-  // Fill: one slot per byte; copy: two slots per byte (read and write).
-  busy_until_ = now_ + dma_cycles(mode == 2 ? length : 2ULL * length);
+  // Fill: one slot per byte; copy: two slots per byte (read and write). Each
+  // line gives the slots of its own kind: a fill started while the display is
+  // drawn speeds up when the blanking starts, and one started in the blanking
+  // slows down when the display starts (measured on gpgx, TP-209.2).
+  busy_until_ = fill_end(now_, mode == 2 ? length : 2ULL * length, mode != 2);
   if (mode == 2) { // VRAM fill: the data word, then its high byte
+    fifo_record(first_data);
     put(first_data);
-    const auto byte = static_cast<std::uint8_t>(first_data >> 8);
-    for (std::uint32_t i = 0; i < length; ++i) {
-      vram_[address_ ^ 1U] = byte;
-      address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
-    }
+    touch_vram();
+    if (length != 0 && raster_line() >= 0)
+      raster_.fallback |= 0x40U;
+    // The bytes reach the VRAM a line at a time (begin_line): now, those of
+    // the slots before the end of the current segment. gpgx writes the whole
+    // fill at once when its data word comes in the last ~400 master cycles of
+    // a line drawn at the display rate (measured on gpgx: frame-end VRAM and
+    // the picture of a fill over plane A, TP-209.2, scratchpad pfill/).
+    fill_ = {true,
+             static_cast<std::uint8_t>(first_data >> 8),
+             regs_[15],
+             address_,
+             length,
+             0,
+             fill_first_slot(now_)};
+    address_ = static_cast<std::uint16_t>(address_ + length * regs_[15]);
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    const std::int64_t rel = static_cast<std::int64_t>(now_) -
+                             static_cast<std::int64_t>(line_start_);
+    const bool at_once =
+        !blank_at(now_) && rel >= (h40 ? 3025 : 2975) && rel < 3394;
+    if (at_once)
+      fill_flush();
+    else
+      fill_write(fill_slots_by(fill_.first, fill_chunk_end()));
   } else { // VRAM copy
     auto from = static_cast<std::uint16_t>(source >> 1);
+    touch_vram();
+    if (length != 0 && raster_line() >= 0)
+      raster_.fallback |= 0x40U;
     for (std::uint32_t i = 0; i < length; ++i) {
-      vram_[address_ ^ 1U] = vram_[from ^ 1U];
+      set_vram(address_ ^ 1U, vram_[from ^ 1U], true);
       ++from;
       address_ = static_cast<std::uint16_t>(address_ + regs_[15]);
     }
@@ -345,13 +706,33 @@ void Vdp::finish_dma(std::uint32_t length, bool advance_source) noexcept {
   }
 }
 
-std::uint16_t Vdp::read_status() {
+// HBlank flag window in master cycles from the line start (measured on gpgx
+// with dense status reads, 2026-11-12).
+constexpr std::uint32_t kVCounterStep = 6;
+constexpr std::uint32_t kHBlankOnH40 = 122;
+constexpr std::uint32_t kHBlankOffH40 = 766;
+constexpr std::uint32_t kHBlankOnH32 = 174;
+constexpr std::uint32_t kHBlankOffH32 = 754;
+
+std::uint16_t Vdp::read_status(std::uint32_t line_cycle) {
   pending_second_ = false;
-  std::uint16_t status = 0x3400U | 0x0200U; // fixed bits, FIFO empty
+  std::uint16_t status = 0x3400U; // fixed bits
+  fifo_retire();
+  if (fifo_count_ == 0)
+    status |= 0x0200U; // FIFO empty
+  else if (fifo_count_ == 4)
+    status |= 0x0100U; // FIFO full
   if (standard_ == Standard::pal)
     status |= 0x0001U;
   if (display_blank())
     status |= 0x0008U; // blanking: vertical blank or display disabled
+  if (line_cycle != kNoLineCycle) {
+    const bool h40 = (regs_[12] & 0x81U) != 0;
+    const std::uint32_t on = h40 ? kHBlankOnH40 : kHBlankOnH32;
+    const std::uint32_t off = h40 ? kHBlankOffH40 : kHBlankOffH32;
+    if (line_cycle >= on && line_cycle < off)
+      status |= 0x0004U; // horizontal blank
+  }
   if (now_ < busy_until_)
     status |= 0x0002U; // DMA fill or copy in progress
   if (vint_flag_)
@@ -366,8 +747,13 @@ std::uint16_t Vdp::read_status() {
   return status;
 }
 
+// The last line of the frame (V = $FF) already belongs to the display: the
+// status flag drops and the 68000 gets the active-display slots there
+// (measured on gpgx with fifo_timing, TP-104.3).
 bool Vdp::display_blank() const noexcept {
-  return line_ >= active_lines() || (regs_[1] & 0x40U) == 0;
+  return (line_ >= active_lines() &&
+          line_ + 1U != lines_per_frame(standard_)) ||
+         (regs_[1] & 0x40U) == 0;
 }
 
 // External-bus slots per line: 16/18 (H32/H40) while the display is drawn,
@@ -402,7 +788,16 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
   // $E5, PAL V28 from $102 to $CA, PAL V30 from $10A to $D2; NTSC V30 does not
   // jump. Verified against gpgx for NTSC and PAL (TP-106.1): the counter reads
   // $CA (V28) or $D2 (V30) right after $102 / $10A.
+  // A read of an instruction that ends past the line end belongs to the next
+  // line, and the V counter steps kVCounterStep master cycles after the line
+  // start (dense HV reads against gpgx, 2026-11-12: it changed about 64
+  // master cycles late on average before).
+  const std::uint32_t total = lines_per_frame(standard_);
   std::uint32_t v = line_;
+  if (line_cycle >= kCyclesPerLine + kVCounterStep)
+    v = (v + 1U) % total;
+  else if (line_cycle < kVCounterStep)
+    v = (v + total - 1U) % total;
   const bool v30 = (regs_[1] & 0x08U) != 0;
   if (standard_ == Standard::ntsc) {
     if (!v30 && v > 0xEA)
@@ -433,11 +828,17 @@ std::uint16_t Vdp::live_hv(std::uint32_t line_cycle) const noexcept {
 
 void Vdp::begin_line(std::uint32_t line, bool raise_vint) {
   line_ = line;
+  if (fill_.active) {
+    // The line's block: every slot due before the end of its segment, before
+    // the line is drawn (measured on gpgx, TP-209.2: the picture of a fill
+    // over plane A, every line H40 and H32; the VRAM at the frame end).
+    fill_write(fill_slots_by(fill_.first, fill_chunk_end()));
+  }
   if (line == 0)
     hint_counter_ = regs_[10];
   // The counter runs on the lines 0..active inclusive (gpgx); in the rest of
   // the blanking it is reloaded on every line.
-  if (line <= active_lines()) {
+  if (line <= frame_active_) {
     if (hint_counter_ == 0) {
       hint_flag_ = true;
       hint_counter_ = regs_[10];
@@ -471,6 +872,8 @@ void Vdp::save(StateWriter &w) const {
   w.array(vram_);
   w.array(cram_);
   w.array(vsram_);
+  w.array(transparent_cram_);
+  w.boolean(geometry_changed_);
   w.u8(code_);
   w.u16(address_);
   w.u16(first_word_);
@@ -489,23 +892,37 @@ void Vdp::save(StateWriter &w) const {
   w.u64(line_start_);
   w.u64(busy_until_);
   w.u64(cpu_stall_);
+  w.boolean(fill_.active);
+  w.u8(fill_.byte);
+  w.u8(fill_.step);
+  w.u16(fill_.address);
+  w.u32(fill_.remaining);
+  w.u32(fill_.written);
+  w.i64(fill_.first);
   w.array(fifo_done_);
   w.u32(fifo_head_);
   w.u32(fifo_count_);
   w.u64(fifo_last_done_);
+  w.array(fifo_data_);
+  w.u32(fifo_wr_);
 }
 
 void Vdp::load(StateReader &r) {
   r.array(regs_);
   r.array(vram_);
+  line_vram_written_ = false;
+  raster_ = {};
   r.array(cram_);
   r.array(vsram_);
+  r.array(transparent_cram_);
+  geometry_changed_ = r.boolean();
   code_ = r.u8();
   address_ = r.u16();
   first_word_ = r.u16();
   pending_second_ = r.boolean();
   dma_pending_ = r.boolean();
   line_ = r.u32();
+  frame_active_ = active_lines();
   vint_flag_ = r.boolean();
   odd_field_ = r.boolean();
   sprite_overflow_ = r.boolean();
@@ -518,10 +935,22 @@ void Vdp::load(StateReader &r) {
   line_start_ = r.u64();
   busy_until_ = r.u64();
   cpu_stall_ = r.u64();
+  fill_.active = r.boolean();
+  fill_.byte = r.u8();
+  fill_.step = r.u8();
+  fill_.address = r.u16();
+  fill_.remaining = r.u32();
+  fill_.written = r.u32();
+  fill_.first = r.i64();
+  if (fill_.active && (fill_.remaining == 0 || fill_.remaining > 0x10000U ||
+                       fill_.written > 0x10000U))
+    r.fail();
   r.array(fifo_done_);
   fifo_head_ = r.u32();
   fifo_count_ = r.u32();
   fifo_last_done_ = r.u64();
+  r.array(fifo_data_);
+  fifo_wr_ = r.u32() & 3U;
   if (fifo_head_ >= fifo_done_.size() || fifo_count_ > fifo_done_.size())
     r.fail();
 }

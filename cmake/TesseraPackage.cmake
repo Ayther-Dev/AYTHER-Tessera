@@ -26,6 +26,17 @@ if(GIT_FOUND)
         set(tessera_source_clean_json true)
     endif()
 endif()
+# TP-112.1 (DA-1): with the native core the package carries a Mega Drive
+# product backend, megadrive, and its three permissive dependencies.
+if(TESSERA_BUILD_MEGADRIVE)
+    set(tessera_scope_core megadrive)
+    set(tessera_core_dependencies "[\"PicoSHA2 1.0.1\", \"Moira ce28239\", \"floooh/chips z80.h 9e88298\", \"ymfm 81aec25\"]")
+    set(tessera_megadrive_notice "El backend de producto de Mega Drive es el núcleo propio `megadrive`, compilado con Moira (MIT), el Z80 de floooh/chips (Zlib) e ymfm (BSD-3-Clause); sus licencias acompañan al paquete bajo `licenses/`.")
+else()
+    set(tessera_scope_core synthetic)
+    set(tessera_core_dependencies "[\"PicoSHA2 1.0.1\"]")
+    set(tessera_megadrive_notice "El paquete no incluye backend de producto de Mega Drive.")
+endif()
 file(CONFIGURE OUTPUT "${tessera_package_directory}/SOURCE_AVAILABILITY.md" CONTENT [=[# Código fuente correspondiente de Tessera
 
 Este paquete se configuró desde el commit `@tessera_source_revision@` de
@@ -41,8 +52,8 @@ acompañan al paquete bajo `licenses/`.
 Esta distribución no incluye ClownMDEmu, clown68000, clownz80 ni ningún otro
 componente AGPL, GPL o LGPL: el backend de referencia ClownMDEmu solo se compila
 en un árbol local separado para pruebas diferenciales (opción
-`TESSERA_BUILD_CLOWN_REFERENCE`) y no se instala ni se publica. El paquete no
-incluye backend de producto de Mega Drive.
+`TESSERA_BUILD_CLOWN_REFERENCE`) y no se instala ni se publica.
+@tessera_megadrive_notice@
 
 Engine es una dependencia separada y aporta sus propias fuentes y avisos.
 Esta distribución no incluye ROM, pack de contenido, registro de confianza
@@ -106,6 +117,12 @@ install(FILES "${PROJECT_SOURCE_DIR}/legal/THIRD_PARTY_NOTICES.md"
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/third_party/licenses/picosha2-1.0.1"
     "${PROJECT_SOURCE_DIR}/third_party/licenses/nlohmann-json-3.12.0"
     DESTINATION "${TESSERA_INSTALL_DATADIR}/licenses")
+if(TESSERA_BUILD_MEGADRIVE)
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/third_party/licenses/moira-ce28239"
+        "${PROJECT_SOURCE_DIR}/third_party/licenses/chips-9e88298"
+        "${PROJECT_SOURCE_DIR}/third_party/licenses/ymfm-81aec25"
+        DESTINATION "${TESSERA_INSTALL_DATADIR}/licenses")
+endif()
 install(FILES "${PROJECT_SOURCE_DIR}/cmake/dependencies.lock.json"
     DESTINATION "${TESSERA_INSTALL_DATADIR}")
 file(SHA256 "${PROJECT_SOURCE_DIR}/cmake/dependencies.lock.json" tessera_dependency_lock_sha256)
@@ -116,8 +133,8 @@ file(CONFIGURE OUTPUT "${tessera_package_directory}/package-metadata.json" CONTE
   "abi": {"major": 1, "minor": 0, "pointer_bytes": 8, "platform": "windows-x64-msvc", "runtime": "/MD"},
   "build": {"id": "@build_id@", "configuration": "@CMAKE_BUILD_TYPE@", "compiler_id": "@CMAKE_CXX_COMPILER_ID@", "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@", "diagnostics": @tessera_diagnostics_json@},
   "source": {"repository": "https://github.com/Ayther-Dev/AYTHER-Tessera", "revision": "@tessera_source_revision@", "clean_at_configure": @tessera_source_clean_json@},
-  "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": ["PicoSHA2 1.0.1"], "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
-  "scope": {"core": "synthetic", "candidate_backends_included": false, "reference_backends_included": false, "license": "MPL-2.0", "fixtures_included": false, "distribution_review": "T034-local-verified"},
+  "dependencies": {"lock_sha256": "@tessera_dependency_lock_sha256@", "core": @tessera_core_dependencies@, "cli": ["PicoSHA2 1.0.1", "nlohmann/json 3.12.0"]},
+  "scope": {"core": "@tessera_scope_core@", "candidate_backends_included": false, "reference_backends_included": false, "license": "MPL-2.0", "fixtures_included": false, "distribution_review": "T034-local-verified"},
   "asan_runtime": {"included": @tessera_diagnostics_json@, "file": "@tessera_asan_dll_name@", "sha256": "@tessera_asan_sha256@", "origin": "local-compiler-toolchain", "scope": "local-development-distribution-review-T034"}
 }
 ]=] @ONLY)

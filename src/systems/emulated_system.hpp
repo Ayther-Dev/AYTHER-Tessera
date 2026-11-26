@@ -53,6 +53,100 @@ struct RegionData {
   Bytes data;
 };
 
+/// Observation surface of a system (spec 008, RF-3, TP-201.3). Statuses are
+/// tessera_status values (0 = ok). Observing never changes the emulated state;
+/// `observation_work()` counts what the observation did (bytes it produced), so
+/// a system with nothing subscribed reports 0.
+class IObservable {
+public:
+  virtual ~IObservable() = default;
+  /// False if the mask has bits the contract lacks; nothing changes then.
+  virtual bool set_subscriptions(std::uint32_t mask) = 0;
+  struct Subscriptions {
+    std::uint32_t supported, active, requested;
+    std::uint64_t activation_frame;
+  };
+  [[nodiscard]] virtual Subscriptions subscriptions() const = 0;
+  /// NOT_SUBSCRIBED while the region's subscription is idle, UNSUPPORTED while
+  /// the system does not serve it yet.
+  [[nodiscard]] virtual std::int32_t
+  read_region(std::uint32_t id, std::uint32_t offset,
+              std::span<std::uint8_t> out) = 0;
+  /// Current byte size of a region whose size varies (ATTRIBUTION, LINE_*),
+  /// as the reference answers in its query, possibly 0; UINT32_MAX for the
+  /// table size.
+  [[nodiscard]] virtual std::uint32_t
+  region_byte_size(std::uint32_t /*id*/) const {
+    return UINT32_MAX;
+  }
+  /// recompose_frame (TP-205.1): the last frame drawn again from the state
+  /// after it, as RGB565 in `out`; `width` x `height` pixels written.
+  [[nodiscard]] virtual std::int32_t recompose(std::span<std::uint16_t> /*out*/,
+                                               std::uint32_t /*flags*/,
+                                               std::uint32_t &width,
+                                               std::uint32_t &height) {
+    width = height = 0;
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// recompose_multilayer (TP-205.2): plane A, plane B, window, sprites and
+  /// the composite, each `width` x `height` RGB565 pixels.
+  [[nodiscard]] virtual std::int32_t
+  recompose_layers(std::array<std::span<std::uint16_t>, 5> /*out*/,
+                   std::uint32_t /*flags*/, std::uint32_t &width,
+                   std::uint32_t &height) {
+    width = height = 0;
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// recompose_stats (TP-205.3): accepted recompositions and how many of them
+  /// were the same frame asked again with the same flags and controls.
+  struct RecomposeStats {
+    std::uint64_t single_calls, single_hits, multilayer_calls, multilayer_hits,
+        controls_fingerprint;
+  };
+  [[nodiscard]] virtual std::int32_t
+  recompose_stats(RecomposeStats & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// frame_delta (TP-205.4): the delta of the last frame, frozen when it
+  /// ended; `generation` counts the frames run. `dirty` has one byte per VRAM
+  /// pattern, a bit per row changed.
+  /// `overflow` and `fallback` serve the frame snapshot (capture_snapshot):
+  /// the overflow bits of the frame's counters (bit 0 parsed sprites, bit 1
+  /// audio writes) and RASTER_FALLBACK_REASONS as the frame left them, 0
+  /// while their subscription is idle. The delta itself does not carry them.
+  struct FrameDelta {
+    std::uint64_t generation;
+    std::uint32_t raster_events, parsed_sprites, audio_writes, raster_dropped;
+    std::array<std::uint8_t, 2048> dirty;
+    std::uint32_t overflow, fallback;
+  };
+  [[nodiscard]] virtual std::int32_t frame_delta(FrameDelta & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// The dirty patterns of every frame after generation `from`, OR-ed, with
+  /// the counters of the last frame. A generation out of the history gives
+  /// everything dirty and a non-zero status (gpgx DELTA_HISTORY_LOST).
+  [[nodiscard]] virtual std::int32_t
+  frame_delta_since(std::uint64_t /*from*/, FrameDelta & /*out*/) const {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// write_control (TP-205.2): INVALID_ARGUMENT for a value the control
+  /// refuses, UNSUPPORTED for a region the system does not control.
+  [[nodiscard]] virtual std::int32_t
+  write_control(std::uint32_t /*id*/, std::uint32_t /*offset*/,
+                std::span<const std::uint8_t> /*data*/) {
+    return -6; // TESSERA_UNSUPPORTED_CAPABILITY
+  }
+  /// `event_size` bytes per event; `count` events written (0 if none).
+  [[nodiscard]] virtual std::int32_t
+  poll_audio_events(std::span<std::uint8_t> out, std::uint32_t capacity,
+                    std::uint32_t event_size, std::uint32_t &count) = 0;
+  /// 32 bytes of ayther_audio_transport_stats_v1; ok even when idle.
+  [[nodiscard]] virtual std::int32_t
+  audio_transport_stats(std::span<std::uint8_t> out) const = 0;
+  [[nodiscard]] virtual std::uint64_t observation_work() const noexcept = 0;
+};
+
 class IEmulatedSystem {
 public:
   virtual ~IEmulatedSystem() = default;
@@ -81,6 +175,13 @@ public:
                               const InputState &inputs) = 0;
   [[nodiscard]] virtual std::vector<RegionData>
   regions(std::uint64_t mask) const = 0;
+  /// Null when the system serves no observation (the default).
+  [[nodiscard]] virtual IObservable *observation() noexcept { return nullptr; }
+  /// A restore builds a new machine; what the consumer asked of the
+  /// observation (subscriptions, recompose counters) is not machine state and
+  /// carries over from the machine it replaces (gpgx keeps it through
+  /// retro_unserialize, TP-205.3).
+  virtual void keep_observation(IEmulatedSystem & /*previous*/) {}
 };
 
 } // namespace tessera

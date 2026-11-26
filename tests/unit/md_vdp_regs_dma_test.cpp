@@ -2,6 +2,7 @@
 // writes, VRAM/CRAM/VSRAM access with auto-increment, DMA from the 68000 bus,
 // status flags, vertical interrupt and basic H/V counters.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "md/state_io.hpp"
 #include "md/vdp.hpp"
 #include <doctest/doctest.h>
 
@@ -139,13 +140,13 @@ TEST_CASE("vblank flag and PAL bit in the status") {
 TEST_CASE("V counter follows the line, H counter the position in it") {
   Vdp v(Standard::ntsc);
   v.begin_line(100);
-  CHECK((v.read_hv(0) >> 8) == 100);
+  CHECK((v.read_hv(1000) >> 8) == 100);
   v.begin_line(234);
-  CHECK((v.read_hv(0) >> 8) == 0xEA);
+  CHECK((v.read_hv(1000) >> 8) == 0xEA);
   v.begin_line(235); // NTSC counter jumps back
-  CHECK((v.read_hv(0) >> 8) == 0xE5);
+  CHECK((v.read_hv(1000) >> 8) == 0xE5);
   v.begin_line(261);
-  CHECK((v.read_hv(0) >> 8) == 0xFF);
+  CHECK((v.read_hv(1000) >> 8) == 0xFF);
   // the line starts at H = $85 (gpgx hvc.h) and passes H = 0 on cycle 760
   CHECK((v.read_hv(0) & 0xFF) == 0x85);
   CHECK((v.read_hv(760) & 0xFF) == 0x00);
@@ -302,18 +303,127 @@ TEST_CASE("registers above 10 are ignored while the VDP is in mode 4") {
 
 TEST_CASE("a VRAM fill keeps the busy bit set for one slot per byte") {
   Vdp v(Standard::ntsc);
-  reg(v, 1, 0x14); // mode 5, DMA enabled, display off (blanking: 167 slots)
+  reg(v, 1, 0x14); // mode 5, DMA enabled, display off (blanking: 166 slots)
   reg(v, 15, 1);
   v.set_time(1000);
   dma_regs(v, 0x20, 0, 0x80);
   dma_command(v, 0x0100, 1);
   v.write_data(0xAB00);
   CHECK((v.read_status() & 0x0002) != 0);
-  const std::uint64_t duration = 0x20ULL * 3420 / 167;
+  // the end of the last slot, rounded up, less the blanking start latency
+  // of a fill (Vdp::fill_end, measured on gpgx)
+  const std::uint64_t duration = (0x20ULL * 3420 + 165) / 166 - 85;
   v.set_time(1000 + duration - 1);
   CHECK((v.read_status() & 0x0002) != 0);
   v.set_time(1000 + duration);
   CHECK((v.read_status() & 0x0002) == 0);
+}
+
+// TP-209.2 (Sonic 1 title load): a fill started while the display is drawn
+// takes the display slots only until the blanking starts; gpgx then finishes
+// it at the blanking rate. Before, the rate of the first line was used for the
+// whole fill, about 228 lines for 4095 bytes in H40.
+TEST_CASE("a VRAM fill crossing into the blanking speeds up there") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x54);  // mode 5, DMA enabled, display on
+  reg(v, 12, 0x81); // H40: 18 slots per drawn line, 204 per blanked line
+  reg(v, 15, 1);
+  v.begin_line(220);
+  v.set_line_start(0);
+  v.set_time(0);
+  dma_regs(v, 0x0FFF, 0, 0x80); // 4095 bytes
+  dma_command(v, 0x0100, 1);
+  v.write_data(0xAB00);
+  // 4 drawn lines give at most 4 * 18 bytes; the rest goes at 204 per line.
+  const std::uint64_t blanking = 4ULL * 3420;
+  const std::uint64_t rest = (0xFFFULL - 4 * 18) * 3420 / 204;
+  v.set_time(blanking + rest - 3420);
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(blanking + rest + 3420);
+  CHECK((v.read_status() & 0x0002) == 0);
+}
+
+// TP-209.2 (Sonic 1 frame 356): gpgx writes a fill a line at a time. When a
+// line starts, the bytes of every slot due before the end of its segment
+// (140 master cycles before the next line in H40) are in the VRAM; the busy
+// bit keeps its own timing (measured on gpgx: VRAM at the frame end and the
+// picture of a fill over plane A).
+namespace {
+// Fill bytes in the VRAM after a fill of `length` bytes of $AB at $0100: the
+// data word writes two, then each fill byte one, the first over the word.
+unsigned fill_bytes(const Vdp &v, unsigned length) {
+  unsigned n = 0;
+  for (unsigned i = 0; i < length + 2; ++i)
+    n += v.vram()[0x100 + i] == 0xAB ? 1U : 0U;
+  return n;
+}
+void start_fill(Vdp &v, std::uint32_t line, std::uint64_t at,
+                std::uint16_t length) {
+  reg(v, 1, 0x54);  // mode 5, DMA enabled, display on
+  reg(v, 12, 0x81); // H40: 18 slots per drawn line
+  reg(v, 15, 1);
+  v.set_line_start(0);
+  v.begin_line(line);
+  v.set_time(at);
+  dma_regs(v, length, 0, 0x80);
+  dma_command(v, 0x0100, 1);
+  v.write_data(0xABAB);
+}
+} // namespace
+
+TEST_CASE("a VRAM fill writes its bytes a line at a time") {
+  Vdp v(Standard::ntsc);
+  start_fill(v, 10, 0, 400);
+  // first slot 345 after the data word, segment end 3420 - 140
+  const auto due = [](std::uint64_t end) {
+    return static_cast<unsigned>((end - 345) * 18 / 3420);
+  };
+  CHECK(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == due(3280) + 1);
+  v.set_line_start(3420);
+  v.begin_line(11);
+  CHECK(fill_bytes(v, 400) == due(3420 + 3280) + 1);
+  // a status read leaves the fill alone (games poll the busy bit)
+  v.set_time(3500);
+  CHECK((v.read_status() & 0x0002) != 0);
+  CHECK(fill_bytes(v, 400) == due(3420 + 3280) + 1);
+  // a control or data port access writes what is left first
+  v.write_control(0x8F02);
+  CHECK_FALSE(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == 401);
+}
+
+TEST_CASE("a fill started at the end of a drawn line is written at once") {
+  Vdp v(Standard::ntsc);
+  // data word 3100 master cycles into the line: gpgx writes the whole fill
+  start_fill(v, 10, 3100, 400);
+  CHECK_FALSE(v.fill_pending());
+  CHECK(fill_bytes(v, 400) == 401);
+  CHECK((v.read_status() & 0x0002) != 0); // the busy bit is unchanged
+  // 3000 is before that window: nothing is due before the segment end
+  Vdp w(Standard::ntsc);
+  start_fill(w, 10, 3000, 400);
+  CHECK(w.fill_pending());
+  CHECK(fill_bytes(w, 400) == 2);
+}
+
+TEST_CASE("a savestate taken during a fill goes on with it") {
+  Vdp v(Standard::ntsc);
+  start_fill(v, 10, 0, 400);
+  std::vector<std::uint8_t> state;
+  StateWriter out(state);
+  v.save(out);
+  Vdp w(Standard::ntsc);
+  StateReader in(state);
+  w.load(in);
+  REQUIRE(in.finished());
+  CHECK(w.fill_pending());
+  for (Vdp *p : {&v, &w}) {
+    p->set_line_start(3 * 3420);
+    p->begin_line(13);
+  }
+  CHECK(fill_bytes(w, 400) == fill_bytes(v, 400));
+  CHECK(v.vram() == w.vram());
 }
 
 TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
@@ -323,9 +433,9 @@ TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
   set_write(v, 0x0000, 1);
   v.write_data(0x0123);
   v.write_data(0x1234);
-  v.set_time(0);
-  dma_regs(v, 4, 0, 0xC0);
-  reg(v, 21, 0); // copy source is a VRAM byte address
+  v.set_time(1000);
+  dma_regs(v, 0x40, 0, 0xC0); // long enough to outlast the start latency
+  reg(v, 21, 0);              // copy source is a VRAM byte address
   reg(v, 22, 0);
 
   v.write_control(0x0200);
@@ -333,9 +443,12 @@ TEST_CASE("a VRAM copy takes two slots per byte and uses swapped bytes") {
   // every byte lands at (dest ^ 1) from (source ^ 1)
   CHECK(v.vram()[0x201] == 0x23);
   CHECK(v.vram()[0x203] == 0x01);
-  const std::uint64_t duration = 4ULL * 2 * 3420 / 167;
+  // two slots per byte, less the blanking start latency of a copy
+  const std::uint64_t duration = (0x40ULL * 2 * 3420 + 165) / 166 - 170;
   CHECK((v.read_status() & 0x0002) != 0);
-  v.set_time(duration);
+  v.set_time(1000 + duration - 1);
+  CHECK((v.read_status() & 0x0002) != 0);
+  v.set_time(1000 + duration);
   CHECK((v.read_status() & 0x0002) == 0);
 }
 
@@ -346,9 +459,33 @@ TEST_CASE("a 68000 to VDP DMA reports the cycles it stalls the CPU") {
   v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
   dma_regs(v, 16, 0x400, 0x00);
   dma_command(v, 0x0000, 1);
-  // A VRAM word takes two external slots (measured on gpgx, TP-104.4).
-  CHECK(v.take_cpu_stall() == (2ULL * 16 * 3420 + 166) / 167);
+  // A VRAM word takes two external slots (measured on gpgx, TP-104.4), 166
+  // per blanked H32 line (TP-209.2), and the end rounds down: the 68000
+  // keeps the rest of the cycle (Gunstar Heroes sub-cycle phase, TP-209.2).
+  CHECK(v.take_cpu_stall() == 2ULL * 16 * 3420 / 166);
   CHECK(v.take_cpu_stall() == 0);
+}
+
+// Streets of Rage 2 frame 2183: 0x1740 words started at line 232 with the
+// display on still have more than a picture's slots left at the last line of
+// the frame. They take the next picture at the display rate and finish in the
+// next blanking, about line 233 (gpgx: V $E9 of the next frame). Counting the
+// last line as a wrapped display line ran them on at the display rate through
+// that blanking too, 91 lines late (TP-209.2, scratchpad sor2/probe/ldma.py).
+TEST_CASE("a 68000 DMA from the blanking takes the next blanking's rate") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x54); // display on, DMA enabled
+  reg(v, 12, 0x81);
+  reg(v, 15, 2);
+  v.set_dma_reader([](std::uint32_t) -> std::uint16_t { return 0x1111; });
+  v.begin_line(232);
+  v.set_line_start(232ULL * 3420);
+  v.set_time(232ULL * 3420 + 100);
+  dma_regs(v, 0x1740, 0xFFA900, 0x00);
+  dma_command(v, 0x4A40, 1);
+  const std::uint64_t stall = v.take_cpu_stall();
+  CHECK(stall > 262ULL * 3420);
+  CHECK(stall < 265ULL * 3420);
 }
 
 // TP-106.2 (RF-2.2): gpgx raises the horizontal interrupt on lines 0..224
@@ -377,7 +514,7 @@ TEST_CASE("the V counter jump depends on the standard and on V28/V30") {
     Vdp v(s);
     reg(v, 1, 0x04 | (v30 ? 0x08 : 0x00));
     v.begin_line(line);
-    return static_cast<unsigned>(v.read_hv(0) >> 8);
+    return static_cast<unsigned>(v.read_hv(1000) >> 8);
   };
   CHECK(v_of(Standard::ntsc, 0, 0xEA) == 0xEA);
   CHECK(v_of(Standard::ntsc, 0, 0xEB) == 0xE5);
@@ -528,4 +665,136 @@ TEST_CASE("the fifth data port write of a burst stalls the CPU") {
   CHECK(v.take_cpu_stall() == 0);
   v.write_data(0x0EEE);
   CHECK(v.take_cpu_stall() > 0);
+}
+
+TEST_CASE(
+    "FIFO status bits: empty, then full after a burst, then empty again") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x44); // mode 5, display on
+  reg(v, 15, 2);
+  reg(v, 12, 0x81);
+  v.begin_line(10);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1); // VRAM: two slots per word
+  v.set_time(1000);
+  CHECK((v.read_status() & 0x0300) == 0x0200); // empty, not full
+  v.write_data(0x1111);
+  CHECK((v.read_status() & 0x0300) == 0x0000); // neither
+  for (int i = 0; i < 4; ++i)
+    v.write_data(0x2222);
+  CHECK(v.take_cpu_stall() > 0); // the fifth write waited for a free entry
+  CHECK((v.read_status() & 0x0300) == 0x0100); // full, not empty
+  v.set_time(1000 + 2 * 3420); // two lines later every entry is written
+  CHECK((v.read_status() & 0x0300) == 0x0200);
+}
+
+TEST_CASE("the FIFO never fills in the blanking") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04); // display off: blanking slots on every line
+  reg(v, 15, 2);
+  v.begin_line(10);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1);
+  std::uint64_t t = 1000;
+  for (int i = 0; i < 8; ++i, t += 56) { // one move.w d0,(a0) apart
+    v.set_time(t);
+    v.write_data(0x3333);
+    CHECK((v.read_status() & 0x0100) == 0);
+  }
+  CHECK(v.take_cpu_stall() == 0);
+}
+
+TEST_CASE("the last line of the frame is not blanked and has display slots") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x44);
+  reg(v, 15, 2);
+  reg(v, 12, 0x81);
+  v.begin_line(260, false);
+  CHECK((v.read_status() & 0x0008) != 0); // still the vertical blank
+  v.begin_line(261, false);               // V = $FF
+  CHECK((v.read_status() & 0x0008) == 0);
+  v.set_line_start(0);
+  set_write(v, 0x0000, 1);
+  v.set_time(1000);
+  for (int i = 0; i < 4; ++i)
+    v.write_data(0x4444);
+  CHECK(v.take_cpu_stall() == 0);
+  v.write_data(0x4444);
+  CHECK(v.take_cpu_stall() > 0); // as in the active display
+}
+
+// TP-104.3: the bits a read takes from the FIFO (measured on gpgx with VDP
+// FIFO Testing). The entry is the one the next data port write goes to.
+TEST_CASE("CRAM and VSRAM reads take the undriven bits from the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x8000, 1);
+  for (std::uint16_t w : {0x1111, 0x2222, 0x3333, 0x4444, 0x5555, 0x6666})
+    v.write_data(w);
+  // six writes into four entries: the next one is the third (3333)
+  set_read(v, 0x0000, 4); // VSRAM
+  CHECK(v.read_data() == 0x3000);
+  CHECK(v.read_data() == 0x3000); // a read does not move the FIFO
+  set_read(v, 0x0000, 8);         // CRAM
+  CHECK(v.read_data() == 0x3111);
+  set_write(v, 0x0020, 3); // CRAM write: one more entry
+  v.write_data(0x0EEE);
+  set_read(v, 0x0020, 8);
+  CHECK(v.read_data() == 0x4EEE); // 4444 & F111 | colour
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0x4000);
+}
+
+TEST_CASE("a write to a read target goes through the FIFO and writes nothing") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x0000, 1);
+  for (std::uint16_t w : {0x1111, 0x2222, 0x3333, 0x4444})
+    v.write_data(w);
+  set_read(v, 0x0004, 4); // VSRAM read code
+  v.write_data(0xFFFF);
+  CHECK(v.vsram()[2] == 0);
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0x2000); // the FFFF took the 1111 entry
+}
+
+TEST_CASE(
+    "8-bit VRAM read: the byte of address ^ 1, the high byte from the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x04);
+  reg(v, 15, 2);
+  set_write(v, 0x8000, 1);
+  for (std::uint16_t w : {0x1122, 0x3344, 0x5566, 0x7788, 0x99AA})
+    v.write_data(w);
+  set_read(v, 0x8000, 0x0C);
+  CHECK(v.read_data() == 0x3322); // entry 3344
+  CHECK(v.read_data() == 0x3344);
+  reg(v, 15, 1);
+  set_read(v, 0x8001, 0x0C);
+  CHECK(v.read_data() == 0x3311);
+  CHECK(v.read_data() == 0x3344);
+}
+
+TEST_CASE("68000 DMA words and the fill word enter the FIFO") {
+  Vdp v(Standard::ntsc);
+  reg(v, 1, 0x14); // mode 5, DMA enabled, display off
+  reg(v, 15, 2);
+  std::uint16_t next = 0xAAAA;
+  v.set_dma_reader([&next](std::uint32_t) -> std::uint16_t {
+    const std::uint16_t w = next;
+    next = static_cast<std::uint16_t>(next + 0x1111);
+    return w;
+  });
+  dma_regs(v, 6, 0x1000, 0x00);
+  dma_command(v, 0x8000, 1); // AAAA BBBB CCCC DDDD EEEE FFFF
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0xC800);
+  reg(v, 15, 1);
+  dma_regs(v, 4, 0, 0x80);
+  dma_command(v, 0x9000, 1);
+  v.write_data(0x1234); // fill word
+  set_read(v, 0x0000, 4);
+  CHECK(v.read_data() == 0xD800); // the fill took the CCCC entry
 }

@@ -45,6 +45,8 @@ public:
   std::shared_ptr<Budget> budget = std::make_shared<Budget>();
   std::shared_ptr<Snapshot> latest;
   bool reset_fault{};
+  /// True while a frame runs: the observation answers BUSY (TP-201.3).
+  std::atomic<bool> running{false};
   std::deque<Event> events;
   std::uint64_t sequence{}, loss_count{}, loss_first{}, loss_last{},
       loss_epoch{};

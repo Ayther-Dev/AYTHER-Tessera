@@ -524,6 +524,18 @@
           "bytes": 59236
         },
         {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opl.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opl.cpp",
+          "sha256": "e745673678d0de9733488427397e794d42348bb000dd45f6665d6f063963d517",
+          "bytes": 65403
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_opl.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opl.h",
+          "sha256": "b01d13720c61cf040d10a2e68ee3e002e4467b9c795978514d58be6245dcbda5",
+          "bytes": 32676
+        },
+        {
           "path": "third_party/cache/ymfm-81aec25/src/ymfm_opn.cpp",
           "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.cpp",
           "sha256": "8734c6d5a6e1bf49a08eeb33d260d39c17cd1d26f5db506e5d0d3e416913b489",
@@ -534,6 +546,18 @@
           "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_opn.h",
           "sha256": "1950990c3ea0c6d492a20f66a683a372a7367ef39f7830aa65b20a20d1bcbef5",
           "bytes": 28415
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_pcm.cpp",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_pcm.cpp",
+          "sha256": "3099d770b876dcdcb8a4c15df48fcc3475f22eca5a144b66581bfa7ebbf499ab",
+          "bytes": 21684
+        },
+        {
+          "path": "third_party/cache/ymfm-81aec25/src/ymfm_pcm.h",
+          "url": "https://raw.githubusercontent.com/aaronsgiles/ymfm/81aec25ccbb98f4873a255f7551ac4dadac59b4a/src/ymfm_pcm.h",
+          "sha256": "d738b45f9406da413d29334ec062f217c42811af68ffa599ae4a2dc839cc2200",
+          "bytes": 12880
         },
         {
           "path": "third_party/cache/ymfm-81aec25/src/ymfm_ssg.cpp",

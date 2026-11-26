@@ -32,20 +32,27 @@ int main() {
   if (tessera_limits_query_v1(0, &limits, &context) != TESSERA_OK ||
       limits.content_bytes != UINT64_C(67108864) || limits.retained_count != 8)
     return 2;
+  // The synthetic test backends, after the native product cores (megadrive
+  // first, TP-112.1, then mastersystem, gamegear and sg1000) when the package
+  // carries them.
   std::uint32_t required = 0;
   if (tessera_backends_enumerate_v1(nullptr, 0, &required, &context) !=
           TESSERA_BUFFER_TOO_SMALL ||
-      required != 2)
+      (required != 2 && required != 6))
     return 3;
-  std::array<tessera_backend_info_v1, 2> backends{};
+  std::array<tessera_backend_info_v1, 8> backends{};
   for (auto &backend : backends)
     backend = initialized<tessera_backend_info_v1>();
-  if (tessera_backends_enumerate_v1(backends.data(), 2, &required, &context) !=
-          TESSERA_OK ||
-      std::strcmp(backends[0].id, "synthetic.minimal") != 0 ||
-      std::strcmp(backends[1].id, "synthetic.complete") != 0 ||
-      backends[0].kind != TESSERA_BACKEND_TEST ||
-      backends[1].kind != TESSERA_BACKEND_TEST)
+  const std::uint32_t first = required - 2;
+  if (tessera_backends_enumerate_v1(backends.data(), required, &required,
+                                    &context) != TESSERA_OK ||
+      (first != 0 && (std::strcmp(backends[0].id, "megadrive") != 0 ||
+                      backends[0].kind != TESSERA_BACKEND_PRODUCT ||
+                      backends[0].system != TESSERA_SYSTEM_MEGA_DRIVE)) ||
+      std::strcmp(backends[first].id, "synthetic.minimal") != 0 ||
+      std::strcmp(backends[first + 1].id, "synthetic.complete") != 0 ||
+      backends[first].kind != TESSERA_BACKEND_TEST ||
+      backends[first + 1].kind != TESSERA_BACKEND_TEST)
     return 4;
   if (tessera_api_query_v1(2, 0, &info, &context) != TESSERA_ABI_INCOMPATIBLE)
     return 5;

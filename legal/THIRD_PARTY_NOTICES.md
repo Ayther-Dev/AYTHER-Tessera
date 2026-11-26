@@ -8,8 +8,10 @@ basado en ClownMDEmu se conserva en este repositorio como **referencia local**:
 solo se compila con la opción `TESSERA_BUILD_CLOWN_REFERENCE` (preset
 `windows-clown-reference`), en un árbol de compilación separado que no se puede
 instalar ni empaquetar, para el banco diferencial de la spec 008. El paquete
-distribuido no incluye un backend de producto de Mega Drive; lo aportará el
-núcleo propio de la spec 008. Los paquetes publicados antes de TP-009
+distribuido incluye, desde `v0.2.0`, el backend de producto de Mega Drive propio
+de la spec 008 (`megadrive`), compilado con Moira (MIT), el Z80 de floooh/chips
+(Zlib) e ymfm (BSD-3-Clause); sus licencias se instalan en
+`share/tessera/licenses/` y su procedencia está en el inventario. Los paquetes publicados antes de TP-009
 (`v0.1.0-mvp.1` y `v0.1.0-mvp.2`) sí incluyen ese backend y conservan sus
 avisos AGPL y MIT originales. Las menciones a la integración con ClownMDEmu en
 este documento describen esos paquetes y el árbol de referencia.

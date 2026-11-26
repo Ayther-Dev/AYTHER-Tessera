@@ -30,7 +30,7 @@ if(TESSERA_BUILD_CLOWN_REFERENCE)
         backends/megadrive/clown_state_codec.cpp)
 endif()
 if(TESSERA_BUILD_MEGADRIVE)
-    list(APPEND core_sources md/md_backend.cpp md/cart.cpp md/bus.cpp md/tmss.cpp md/sram.cpp md/m68k.cpp md/z80.cpp md/ym.cpp md/psg.cpp md/vdp.cpp md/vdp_render.cpp md/system.cpp)
+    list(APPEND core_sources md/md_backend.cpp md/cart.cpp md/special_cart.cpp md/bus.cpp md/tmss.cpp md/sram.cpp md/m68k.cpp md/z80.cpp md/ym.cpp md/psg.cpp md/vdp.cpp md/vdp_render.cpp md/system.cpp sms/vdp_m4.cpp sms/ym2413.cpp sms/system.cpp sms/sms_backend.cpp)
     include("${PROJECT_SOURCE_DIR}/cmake/Moira.cmake")
     tessera_add_moira()
     include("${PROJECT_SOURCE_DIR}/cmake/Z80.cmake")
@@ -53,6 +53,8 @@ else()
     target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_CLOWN_REFERENCE=0>")
 endif()
 if(TESSERA_BUILD_MEGADRIVE)
+    # Object libraries: their objects go into tessera_core itself, so the
+    # installed static library needs no further targets (TP-112.1).
     target_link_libraries(tessera_core PUBLIC "$<BUILD_INTERFACE:Tessera::moira>" "$<BUILD_INTERFACE:Tessera::z80_chips>" "$<BUILD_INTERFACE:Tessera::ymfm>")
 endif()
 target_compile_definitions(tessera_core PUBLIC "$<BUILD_INTERFACE:TESSERA_MEGADRIVE=$<BOOL:${TESSERA_BUILD_MEGADRIVE}>>")
@@ -81,7 +83,7 @@ endforeach()
 string(SHA256 build_id "${identity_manifest}")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/build_identity.hpp"
-    CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n" @ONLY)
+    CONTENT "#pragma once\n#define TESSERA_CORE_BUILD_ID \"@build_id@\"\n#define TESSERA_PACKAGE_VERSION \"@PROJECT_VERSION@\"\n" @ONLY)
 
 if(WIN32) # the CLI uses wmain and the Windows console
 add_executable(tessera_cli cli/main.cpp cli/replay_trace.cpp)

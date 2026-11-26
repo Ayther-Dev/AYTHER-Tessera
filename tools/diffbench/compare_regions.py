@@ -1,0 +1,101 @@
+"""Memory regions of the differential bench (spec 008, TP-201.1, RF-3.1).
+
+Runs a ROM on the native machine (tessera_md_run --region-out) and on gpgx
+(tessera_diffbench --dump-regions --region-out) and compares, byte for byte,
+VRAM (1), CRAM (2), VDP_REGS (3), VSRAM (4), PARSED_SPRITES (13) and its count (14),
+SYSTEM (18), PALETTE (24), SPRITE_OUTCOME (25) and Z80_RAM (26) as the ABI hands
+them out, plus the work RAM (the legacy memory, id 0x1000 here), and the raster
+regions RASTER_FALLBACK_REASONS (16), LINE_REGS (19), LINE_CRAM (20),
+LINE_CELLS (21) and RASTER_JOURNAL (22) (TP-203, TP-204), read on gpgx with
+their subscriptions.
+
+usage: compare_regions.py <md_run> <diffbench> <gpgx_core> <rom> <frames> <out_dir>
+                          [extra tessera_md_run arguments]
+exit:  0 identical, 1 different, 2 a tool failed
+"""
+import os
+import subprocess
+import sys
+
+REGIONS = [(1, "VRAM"), (2, "CRAM"), (3, "VDP_REGS"), (4, "VSRAM"),
+           (13, "PARSED_SPRITES"), (14, "PARSED_SPRITE_COUNT"), (18, "SYSTEM"),
+           (24, "PALETTE"), (25, "SPRITE_OUTCOME"), (26, "Z80_RAM"),
+           (16, "RASTER_FALLBACK_REASONS"), (19, "LINE_REGS"), (20, "LINE_CRAM"),
+           (21, "LINE_CELLS"), (22, "RASTER_JOURNAL"), (17, "ATTRIBUTION")]
+RASTER = (16, 17, 19, 20, 21, 22)
+# VDP_MEMORY | SPRITE_CAPTURE, plus RASTER_TRACKING, ATTRIBUTION, LINE_STATE,
+# LINE_CRAM and LINE_CELLS for the raster and attribution regions.
+SUB_MASK = {rid: "78b" for rid in RASTER}
+WORK_RAM = 0x1000
+
+
+def main(argv):
+    global REGIONS
+    if "--no-sprites" in argv:
+        # Mode 4 parses sprites in its own way (TP-105.10 scenes); the Mode 5
+        # model of PARSED_SPRITES / SPRITE_OUTCOME does not cover it.
+        argv = [a for a in argv if a != "--no-sprites"]
+        # Mode 4 has no line state either.
+        REGIONS = [r for r in REGIONS if r[0] not in (13, 14, 25) + RASTER]
+    if "--no-attribution" in argv:
+        # raster_bands 7: on its H32 lines gpgx fills columns 256 to 319 with
+        # pixels that are not drawn from the scene (known limitation, TP-106.4),
+        # and its ATTRIBUTION describes them too.
+        argv = [a for a in argv if a != "--no-attribution"]
+        REGIONS = [r for r in REGIONS if r[0] != 17]
+    md_run, diffbench, core, rom, frames, out_dir = argv[1:7]
+    os.makedirs(out_dir, exist_ok=True)
+    native, oracle = {}, {}
+    for rid, _ in REGIONS + [(WORK_RAM, "WORK_RAM")]:
+        native[rid] = os.path.join(out_dir, "native.%d" % rid)
+        oracle[rid] = os.path.join(out_dir, "gpgx.%d" % rid)
+        for path in (native[rid], oracle[rid]):
+            if os.path.exists(path):
+                os.remove(path)
+    mine = [md_run, "--rom", rom, "--frames", frames, "--work-ram-out",
+            os.path.join(out_dir, "unused.wram")] + argv[7:]
+    for rid, _ in REGIONS:
+        mine += ["--region-out", "%d:%s" % (rid, native[rid])]
+    mine += ["--region-out", "%d:%s" % (WORK_RAM, native[WORK_RAM])]
+    if subprocess.run(mine, capture_output=True).returncode != 0:
+        print("tool failed:", md_run)
+        return 2
+    # The bench takes one --region-out per run. --dump-regions exits 1 when a
+    # region is smaller than announced: only a missing output file is a failure.
+    for rid, _ in REGIONS:
+        theirs = [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
+                  "--sub-mask", SUB_MASK.get(rid, "3"), "--dump-regions",
+                  "--region-out", "%d:%s" % (rid, oracle[rid])]
+        if subprocess.run(theirs, capture_output=True).returncode not in (0, 1):
+            print("tool failed:", diffbench)
+            return 2
+    theirs = [diffbench, "--libretro", core, "--rom", rom, "--frames", frames,
+              "--work-ram-out", oracle[WORK_RAM]]
+    if subprocess.run(theirs, capture_output=True).returncode != 0:
+        print("tool failed:", diffbench)
+        return 2
+    with open(oracle[WORK_RAM], "rb") as f:  # swapped words, as the bench writes
+        pass
+    status = 0
+    for rid, name in REGIONS + [(WORK_RAM, "WORK_RAM")]:
+        if not os.path.exists(native[rid]) or not os.path.exists(oracle[rid]):
+            print("tool failed: no output for", name)
+            return 2
+        with open(native[rid], "rb") as f:
+            a = f.read()
+        with open(oracle[rid], "rb") as f:
+            g = f.read()
+        if len(a) != len(g):
+            print("%s different sizes native=%d gpgx=%d" % (name, len(a), len(g)))
+            status = 1
+            continue
+        diff = [i for i in range(len(a)) if a[i] != g[i]]
+        print("%s bytes=%d differing=%d" % (name, len(a), len(diff)))
+        for i in diff[:6]:
+            print("  0x%05x native=%02x gpgx=%02x" % (i, a[i], g[i]))
+        status |= bool(diff)
+    return status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
