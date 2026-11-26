@@ -685,11 +685,16 @@ TEST_CASE("Extended backend arrays honor each declared stride and preserve "
   REQUIRE(tessera_backends_enumerate_v1(&values[0].prefix, kBackendCount,
                                         &required, &context) == TESSERA_OK);
   CHECK(required == kBackendCount);
-  // TP-112.1: the native core is listed first; the reference backend after it.
-  if constexpr (TESSERA_MEGADRIVE != 0)
+  // TP-112.1: the native cores are listed first (Mega Drive, then the Phase 6
+  // systems); the reference backend after them.
+  if constexpr (TESSERA_MEGADRIVE != 0) {
     CHECK(fixed_id(values[0].prefix.id) == "megadrive");
+    CHECK(fixed_id(values[1].prefix.id) == "mastersystem");
+    CHECK(fixed_id(values[2].prefix.id) == "gamegear");
+    CHECK(fixed_id(values[3].prefix.id) == "sg1000");
+  }
   if constexpr (TESSERA_CLOWN_REFERENCE != 0)
-    CHECK(fixed_id(values[TESSERA_MEGADRIVE != 0 ? 1 : 0].prefix.id) ==
+    CHECK(fixed_id(values[TESSERA_MEGADRIVE != 0 ? 4 : 0].prefix.id) ==
           "clownmdemu");
   CHECK(fixed_id(values[kFirstSynthetic].prefix.id) == "synthetic.minimal");
   CHECK(fixed_id(values[kFirstSynthetic + 1].prefix.id) ==
